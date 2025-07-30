@@ -360,6 +360,109 @@ fn process_voices_simd(&mut self, voices: &mut [Voice; 32]) {
 
 **Architecture Principle**: All MIDI complexity stays in TypeScript, WASM receives clean, validated MIDI events with sample-accurate timing and optimal performance characteristics.
 
+## 🎹 Virtual MIDI Keyboard Architecture  
+
+### **Complete 88-Key Interface (No Hardware Required)**
+
+**Purpose**: Full MIDI testing capability without requiring hardware MIDI devices.
+
+**Key Features:**
+- **88-key piano interface** (A0 to C8, matching standard piano range)
+- **General MIDI instrument selector** (all 128 GM instruments)
+- **MIDI CC controls**: Pitch bend wheel, modulation wheel, sustain pedal
+- **Velocity sensitivity** via mouse/touch pressure simulation
+- **Visual feedback** for active notes and control positions
+- **Unified MIDI routing** with hardware devices (same event queue)
+
+### **Virtual Keyboard Components**
+
+**1. Piano Key Interface (`virtual-midi-keyboard.ts`):**
+```typescript
+interface VirtualKey {
+    noteNumber: number;     // MIDI note (21-108 for 88 keys)
+    isPressed: boolean;     // Visual and logical state
+    velocity: number;       // 0-127 based on mouse/touch input
+    keyType: 'white' | 'black';
+}
+
+class VirtualMidiKeyboard {
+    // 88 keys: A0(21) to C8(108)
+    private keys: VirtualKey[];
+    private sustainPedal: boolean;
+    private pitchBend: number;      // -8192 to +8191
+    private modWheel: number;       // 0-127
+}
+```
+
+**2. General MIDI Instrument Selector:**
+- **128 GM instruments** organized by families
+- **Bank 0**: Melodic instruments (0-127)  
+- **Bank 128**: Percussion sets (channel 10)
+- **Real-time program change** messages to WASM
+
+**3. MIDI CC Controls:**
+```typescript
+interface MidiControllers {
+    pitchBend: number;      // -8192 to +8191 (14-bit)
+    modWheel: number;       // CC1: 0-127 (7-bit)
+    sustainPedal: boolean;  // CC64: 0/127 (on/off)
+    volume: number;         // CC7: 0-127 (channel volume)
+    expression: number;     // CC11: 0-127 (expression)
+}
+```
+
+**4. Input Handling:**
+- **Mouse events**: Click/drag for velocity and pitch bend
+- **Touch events**: Multi-touch support for chords
+- **Computer keyboard mapping**: QWERTY → piano keys
+- **Velocity simulation**: Mouse speed → MIDI velocity (0-127)
+
+### **Unified MIDI Event Routing**
+
+**Single Event Queue Architecture:**
+```
+Virtual Keyboard Events  \
+                          → Unified MIDI Router → Event Queue → WASM
+Hardware MIDI Devices    /
+```
+
+**Event Priority:**
+1. **Real hardware devices** (if available) take priority
+2. **Virtual keyboard** events when no hardware conflict
+3. **Graceful fallback** between virtual and hardware input
+
+**TypeScript MIDI Event Interface:**
+```typescript
+interface MidiEvent {
+    timestamp: number;      // Sample-accurate timing
+    channel: number;        // 0-15
+    type: 'noteOn' | 'noteOff' | 'controlChange' | 'programChange';
+    data1: number;          // Note number or CC number
+    data2: number;          // Velocity or CC value
+    source: 'virtual' | 'hardware';
+}
+```
+
+### **Development and Testing Benefits**
+
+**✅ Complete MIDI Testing:**
+- Test all 32 voices without hardware
+- Verify velocity layering across full velocity range
+- Test General MIDI compatibility (all 128 instruments)
+- Validate MIDI CC modulation (pitch, mod wheel, sustain)
+
+**✅ Development Efficiency:**
+- No dependency on hardware for basic development
+- Consistent testing environment across developers
+- Visual feedback for debugging MIDI events
+- Rapid iteration on MIDI→synthesis integration
+
+**✅ User Experience:**
+- Immediate playability without setup
+- Visual learning tool for MIDI concepts
+- Backup input method when hardware fails
+- Touch device compatibility (tablets/phones)
+
 ## 📁 Project File Structure
 
 ```
@@ -389,6 +492,7 @@ src/                          # Rust/WASM Core
 
 web/                          # TypeScript Web Interface
 ├── src/
+│   ├── virtual-midi-keyboard.ts  # 88-key virtual piano interface
 │   ├── midi-input.ts        # WebMIDI device handling (ONLY complex TS)
 │   ├── ui-controls.ts       # Simple UI management
 │   ├── file-loader.ts       # File drag & drop handling
