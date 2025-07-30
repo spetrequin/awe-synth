@@ -78,49 +78,54 @@ After completing all 12 foundation tasks, next micro-tasks will be:
 
 **📋 LOGICAL IMPLEMENTATION ORDER:**
 
-### **Phase 1: Foundation Setup (Tasks 1-4)**
-1. **[PENDING] web-package-json** - Create web/package.json with TypeScript and WebMIDI dependencies
-2. **[PENDING] web-tsconfig** - Create web/tsconfig.json for TypeScript configuration
-3. **[PENDING] wasm-midi-queue** - Add lock-free MIDI event queue interface to src/lib.rs (WASM side)
-4. **[PENDING] midi-timing-bridge** - Create TypeScript↔WASM bridge for MIDI events with sample-accurate timing
+### **Phase 1: Foundation Setup**
+**1.1** **[IN_PROGRESS]** Create web/package.json with TypeScript and WebMIDI dependencies  
+**1.2** **[PENDING]** Create web/tsconfig.json for TypeScript configuration  
+**1.3** **[PENDING]** Add lock-free MIDI event queue interface to src/lib.rs (WASM side)  
+**1.4** **[PENDING]** Create TypeScript↔WASM bridge for MIDI events with sample-accurate timing  
 
-### **Phase 2: Virtual MIDI Keyboard (Tasks 5-8)**
-5. **[PENDING] virtual-midi-keyboard** - Create web/src/virtual-midi-keyboard.ts - 88-key piano interface
-6. **[PENDING] gm-instrument-selector** - Add General MIDI instrument selector (128 instruments)
-7. **[PENDING] midi-cc-controls** - Implement CC controls: pitch bend, modulation wheel, sustain pedal
-8. **[PENDING] keyboard-input-handling** - Add keyboard mouse/touch input with velocity sensitivity
+### **Phase 2: Virtual MIDI Keyboard**
+**2.1** **[PENDING]** Create web/src/virtual-midi-keyboard.ts - 88-key piano interface  
+**2.2** **[PENDING]** Add General MIDI instrument selector (128 instruments)  
+**2.3** **[PENDING]** Implement CC controls: pitch bend, modulation wheel, sustain pedal  
+**2.4** **[PENDING]** Add keyboard mouse/touch input with velocity sensitivity  
 
-### **Phase 3: Hardware MIDI Support (Tasks 9-11)**
-9. **[PENDING] webmidi-device-discovery** - Create web/src/midi-input.ts - WebMIDI device discovery and connection
-10. **[PENDING] midi-message-parsing** - Implement MIDI message parsing and validation in midi-input.ts
-11. **[PENDING] midi-device-management** - Implement MIDI device state management (connect/disconnect)
+### **Phase 3: Hardware MIDI Support**
+**3.1** **[PENDING]** Create web/src/midi-input.ts - WebMIDI device discovery and connection  
+**3.2** **[PENDING]** Implement MIDI message parsing and validation in midi-input.ts  
+**3.3** **[PENDING]** Implement MIDI device state management (connect/disconnect)  
 
-### **Phase 4: MIDI File Support (Tasks 12-15)**
-12. **[PENDING] midi-file-parser** - Add MIDI file parser basics in src/midi/parser.rs
-13. **[PENDING] midi-track-parsing** - Implement MIDI track parsing and event extraction
-14. **[PENDING] midi-file-loader** - Create web/src/midi-file-loader.ts - drag/drop MIDI file interface
-15. **[PENDING] midi-playback-controls** - Add MIDI file playback controls: play/pause/stop/seek
+### **Phase 4: MIDI File Support**
+**4.1** **[PENDING]** Add MIDI file parser basics in src/midi/parser.rs  
+**4.2** **[PENDING]** Implement MIDI track parsing and event extraction  
+**4.3** **[PENDING]** Create web/src/midi-file-loader.ts - drag/drop MIDI file interface  
+**4.4** **[PENDING]** Add MIDI file playback controls: play/pause/stop/seek  
 
-### **Phase 5: MIDI Integration (Tasks 16-18)**
-16. **[PENDING] unified-midi-routing** - Unified MIDI routing: virtual keyboard + hardware + file playback → WASM
-17. **[PENDING] rust-midi-sequencer** - Add basic MIDI sequencer structure in src/midi/sequencer.rs
-18. **[PENDING] midi-voice-connection** - Connect VoiceManager to MIDI events (note_on/note_off)
+### **Phase 5: MIDI Integration**
+**5.1** **[PENDING]** Unified MIDI routing: virtual keyboard + hardware + file playback → WASM  
+**5.2** **[PENDING]** Add basic MIDI sequencer structure in src/midi/sequencer.rs  
+**5.3** **[PENDING]** Connect VoiceManager to MIDI events (note_on/note_off)  
 
-### **Phase 6: Integration Verification (Tasks 19-21)**
-19. **[PENDING] midi-queue-voice-integration** - 🔄 INTEGRATION CHECK: Verify MIDI queue integration with VoiceManager
-20. **[PENDING] sequencer-voice-timing-integration** - 🔄 INTEGRATION CHECK: Verify sequencer timing affects voice envelope timing
-21. **[PENDING] voice-allocation-midi-integration** - 🔄 INTEGRATION CHECK: Test voice allocation/stealing with MIDI priority
+### **Phase 6: Integration Verification**
+**6.1** **[PENDING]** 🔄 INTEGRATION CHECK: Verify MIDI queue integration with VoiceManager  
+**6.2** **[PENDING]** 🔄 INTEGRATION CHECK: Verify sequencer timing affects voice envelope timing  
+**6.3** **[PENDING]** 🔄 INTEGRATION CHECK: Test voice allocation/stealing with MIDI priority  
 
-### **Phase 7: UI and Complete Integration (Tasks 22-24)**
-22. **[PENDING] ui-controls** - Create web/src/ui-controls.ts for play/pause/stop interface
-23. **[PENDING] html-typescript-integration** - Update index.html to load TypeScript modules and MIDI interface
-24. **[PENDING] end-to-end-midi-test** - Build and test MIDI input→WASM→audio output pipeline
+### **Phase 7: UI and Complete Integration**
+**7.1** **[PENDING]** Create web/src/ui-controls.ts for play/pause/stop interface  
+**7.2** **[PENDING]** Update index.html to load TypeScript modules and MIDI interface  
+**7.3** **[PENDING]** Build and test MIDI input→WASM→audio output pipeline  
 
-### **Phase 8: Comprehensive Testing (Tasks 25-28)**
-25. **[PENDING] virtual-keyboard-test** - Test virtual keyboard: 88 keys + GM instruments + CC controls
-26. **[PENDING] midi-file-test** - Test MIDI file loading: multi-track, tempo changes, complex timing
-27. **[PENDING] midi-file-synth-integration** - 🔄 INTEGRATION CHECK: Verify MIDI file events affect synthesis parameters
-28. **[PENDING] hardware-midi-test** - Test with real MIDI hardware device and verify sample-accurate timing (MEDIUM priority)
+### **Phase 8: Comprehensive Testing**
+**8.1** **[PENDING]** Test virtual keyboard: 88 keys + GM instruments + CC controls  
+**8.2** **[PENDING]** Test MIDI file loading: multi-track, tempo changes, complex timing  
+**8.3** **[PENDING]** 🔄 INTEGRATION CHECK: Verify MIDI file events affect synthesis parameters  
+**8.4** **[PENDING]** Test with real MIDI hardware device and verify sample-accurate timing  
+
+## 🔢 **Easy Reference System**
+**Current Phase**: Phase 1 Foundation (Branch: phase-1-foundation)  
+**Commands**: Just specify the number (e.g., "1.1", "1.2", "1.3", "1.4")  
+**Next**: Phase 2 will be implemented in new branch after Phase 1 complete
 
 ### **Integration Philosophy**
 - **TypeScript handles only WebMIDI coordination** (device management, event capture)
