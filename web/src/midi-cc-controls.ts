@@ -1,5 +1,5 @@
 /**
- * MIDI CC Controls (Refactored) - Clean, modular implementation
+ * MIDI CC Controls - Clean, modular implementation
  * Part of AWE Player EMU8000 Emulator
  */
 
