@@ -29,32 +29,16 @@ export interface EnhancedTouchEvent extends TouchEvent {
     };
 }
 
-// MIDI note range type
-export type MIDINoteNumber = number & { readonly __brand: 'MIDINoteNumber' };
-export type MIDIVelocity = number & { readonly __brand: 'MIDIVelocity' };
-export type MIDIChannel = number & { readonly __brand: 'MIDIChannel' };
-
-// Helper functions to create branded types
-export const createMIDINoteNumber = (value: number): MIDINoteNumber => {
-    if (value < 0 || value > 127 || !Number.isInteger(value)) {
-        throw new Error(`Invalid MIDI note number: ${value}. Must be 0-127.`);
-    }
-    return value as MIDINoteNumber;
-};
-
-export const createMIDIVelocity = (value: number): MIDIVelocity => {
-    if (value < 0 || value > 127 || !Number.isInteger(value)) {
-        throw new Error(`Invalid MIDI velocity: ${value}. Must be 0-127.`);
-    }
-    return value as MIDIVelocity;
-};
-
-export const createMIDIChannel = (value: number): MIDIChannel => {
-    if (value < 0 || value > 15 || !Number.isInteger(value)) {
-        throw new Error(`Invalid MIDI channel: ${value}. Must be 0-15.`);
-    }
-    return value as MIDIChannel;
-};
+// Re-export unified MIDI types and constructors
+export {
+    MIDINoteNumber,
+    MIDIVelocity,
+    MIDIChannel,
+    createMIDINoteNumber,
+    createMIDIVelocity,
+    createMIDIChannel,
+    MIDIValidationError
+} from './midi-types.js';
 
 // Piano key types
 export type PianoKeyType = 'white' | 'black';
@@ -72,7 +56,7 @@ export interface TypedConfig<T> {
     readonly lastModified: Date;
 }
 
-// Error types for type-safe error handling
+// Enhanced MIDI input error with device-specific codes
 export class MIDIInputError extends Error {
     constructor(
         message: string,

@@ -3,6 +3,39 @@
  * Part of AWE Player EMU8000 Emulator
  */
 
+// ===== VELOCITY CONSTANTS =====
+
+export const VELOCITY_CONSTANTS = {
+    // Common MIDI velocity values
+    DEFAULT: 64,        // Standard default velocity
+    MAX: 127,          // Maximum MIDI velocity
+    MIN: 1,            // Minimum audible velocity (0 = note off)
+    SILENT: 0,         // Note off velocity
+    
+    // Musical dynamics (approximate MIDI values)
+    PIANISSIMO: 16,    // pp - very soft
+    PIANO: 32,         // p - soft  
+    MEZZO_PIANO: 48,   // mp - moderately soft
+    MEZZO_FORTE: 64,   // mf - moderately loud
+    FORTE: 80,         // f - loud
+    FORTISSIMO: 96,    // ff - very loud
+    FORTISSISSIMO: 112, // fff - extremely loud
+    
+    // Input-specific defaults
+    TOUCH_DEFAULT: 64,     // Default for touch input
+    MOUSE_DEFAULT: 80,     // Default for mouse input
+    KEYBOARD_DEFAULT: 90,  // Default for computer keyboard
+    DRUM_TRIGGER: 100,     // Default for drum triggers
+    TEST_NOTE: 100,        // Default for test/demo notes
+    
+    // Sensitivity ranges
+    SENSITIVITY_MIN: 0.1,
+    SENSITIVITY_MAX: 2.0,
+    SENSITIVITY_DEFAULT: 1.0
+} as const;
+
+export type VelocityConstant = typeof VELOCITY_CONSTANTS[keyof typeof VELOCITY_CONSTANTS];
+
 export interface VelocityProfile {
     name: string;
     description: string;
@@ -96,7 +129,7 @@ export class VelocityCurveProcessor {
         
         // Apply sensitivity and convert to MIDI range
         const result = curved * this.sensitivity;
-        return Math.round(Math.max(1, Math.min(127, result * 127)));
+        return Math.round(Math.max(VELOCITY_CONSTANTS.MIN, Math.min(VELOCITY_CONSTANTS.MAX, result * VELOCITY_CONSTANTS.MAX)));
     }
     
     /**

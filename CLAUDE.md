@@ -275,6 +275,18 @@ git commit -m "Complete task: [task-description]"
 
 ## 🔍 **CODE MODIFICATION GUIDELINES**
 
+### **Universal Refactoring Principle (CRITICAL)**
+
+**ALL refactoring work** (Rust and TypeScript) must follow **dependency-based analysis**:
+
+1. **Analyze dependencies FIRST** - Map component interdependencies before starting
+2. **Refactor foundations first** - Core structs/types/interfaces before dependents  
+3. **Minimize file revisits** - Touch each component only once during refactoring
+4. **Foundation → Intermediate → Isolated** - Follow dependency chain order
+5. **Document dependency analysis** - For future refactoring reference
+
+**Why**: Prevents cascading changes that break previously "finished" work and eliminates having to go back and include refactoring changes among linked files.
+
 ### **Before Changing Any Code:**
 
 1. **Understand the current behavior** - Read debug logs first

@@ -5,27 +5,18 @@
 
 import { VirtualMidiKeyboard } from './virtual-midi-keyboard.js';
 import { MIDI_CHANNELS } from './midi-constants.js';
-import { configLoader } from './config-loader.js';
+import { enhancedConfigLoader } from './utils/enhanced-config-loader.js';
+import { GMInstrument, GMDrumNote, GMDrumKit } from './utils/config-validator.js';
+import { DEBUG_LOGGERS } from './utils/debug-logger.js';
+import { VELOCITY_CONSTANTS } from './velocity-curves.js';
+import { UI_CONSTANTS, MIDI_CC } from './midi-constants.js';
+import { createModeSelector, createSelect, createSection, getContainer, injectStyles } from './utils/ui-components.js';
+import { generateComponentStyles } from './utils/ui-styles.js';
 
 // ===== INTERFACE DEFINITIONS =====
 
-export interface GMInstrument {
-    program: number;
-    name: string;
-    category: string;
-}
-
-export interface GMDrumNote {
-    note: number;
-    name: string;
-    category: string;
-}
-
-export interface GMDrumKit {
-    program: number;
-    name: string;
-    description: string;
-}
+// Re-export validated interfaces from config validator
+export type { GMInstrument, GMDrumNote, GMDrumKit } from './utils/config-validator.js';
 
 // ===== JSON CONFIG LOADERS =====
 
@@ -38,7 +29,8 @@ let gmDrumKitsCache: GMDrumKit[] | null = null;
  */
 export const getGMInstruments = async (): Promise<GMInstrument[]> => {
     if (!gmInstrumentsCache) {
-        gmInstrumentsCache = await configLoader.loadConfig<GMInstrument[]>('gm-instruments');
+        const result = await enhancedConfigLoader.loadConfig<GMInstrument[]>('gm-instruments');
+        gmInstrumentsCache = result.data;
     }
     return gmInstrumentsCache;
 };
@@ -48,7 +40,8 @@ export const getGMInstruments = async (): Promise<GMInstrument[]> => {
  */
 export const getGMDrumMap = async (): Promise<GMDrumNote[]> => {
     if (!gmDrumsCache) {
-        gmDrumsCache = await configLoader.loadConfig<GMDrumNote[]>('gm-drums');
+        const result = await enhancedConfigLoader.loadConfig<GMDrumNote[]>('gm-drums');
+        gmDrumsCache = result.data;
     }
     return gmDrumsCache;
 };
@@ -58,7 +51,8 @@ export const getGMDrumMap = async (): Promise<GMDrumNote[]> => {
  */
 export const getGMDrumKits = async (): Promise<GMDrumKit[]> => {
     if (!gmDrumKitsCache) {
-        gmDrumKitsCache = await configLoader.loadConfig<GMDrumKit[]>('gm-drum-kits');
+        const result = await enhancedConfigLoader.loadConfig<GMDrumKit[]>('gm-drum-kits');
+        gmDrumKitsCache = result.data;
     }
     return gmDrumKitsCache;
 };
@@ -112,7 +106,7 @@ export class GMSoundLibrary {
     public async createSelector(containerId: string): Promise<void> {
         const container = document.getElementById(containerId);
         if (!container) {
-            this.logToDebug(`Error: Container ${containerId} not found`);
+            DEBUG_LOGGERS.soundLibrary.error(`Container ${containerId} not found`);
             return;
         }
         
@@ -142,23 +136,14 @@ export class GMSoundLibrary {
      * Create mode selector (Instruments/Drums)
      */
     private createModeSelector(): HTMLElement {
-        const container = document.createElement('div');
-        container.className = 'mode-selector';
-        
-        const instrumentBtn = document.createElement('button');
-        instrumentBtn.className = 'mode-btn active';
-        instrumentBtn.textContent = 'Instruments';
-        instrumentBtn.addEventListener('click', () => this.setMode('instrument'));
-        
-        const drumBtn = document.createElement('button');
-        drumBtn.className = 'mode-btn';
-        drumBtn.textContent = 'Drums';
-        drumBtn.addEventListener('click', () => this.setMode('drums'));
-        
-        container.appendChild(instrumentBtn);
-        container.appendChild(drumBtn);
-        
-        return container;
+        return createModeSelector(
+            [
+                { id: 'instrument', label: 'Instruments' },
+                { id: 'drums', label: 'Drums' }
+            ],
+            'instrument',
+            (modeId) => this.setMode(modeId as 'instrument' | 'drums')
+        );
     }
     
     /**
@@ -182,7 +167,7 @@ export class GMSoundLibrary {
             this.keyboard.setChannel(MIDI_CHANNELS.DRUM_CHANNEL); // Drum channel
         }
         
-        this.logToDebug(`Mode changed to: ${mode}`);
+        DEBUG_LOGGERS.soundLibrary.log(`Mode changed to: ${mode}`);
     }
     
     private async showInstruments(): Promise<void> {
@@ -230,59 +215,53 @@ export class GMSoundLibrary {
     }
     
     private async createInstrumentCategoryFilter(): Promise<HTMLElement> {
-        const container = document.createElement('div');
-        container.className = 'category-filter';
-        
-        const label = document.createElement('label');
-        label.textContent = 'Category: ';
-        
-        const select = document.createElement('select');
-        select.className = 'category-select';
-        
         const categories = await getInstrumentCategories();
-        categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            select.appendChild(option);
-        });
+        const categoryOptions = categories.map(category => ({
+            value: category,
+            text: category,
+            selected: category === 'All'
+        }));
         
-        select.addEventListener('change', async (e) => {
-            const category = (e.target as HTMLSelectElement).value;
-            await this.displayInstruments(category);
-        });
+        const select = createSelect(
+            categoryOptions,
+            async (category) => await this.displayInstruments(category),
+            'category-select'
+        );
         
-        container.appendChild(label);
-        container.appendChild(select);
+        const container = createSection({
+            title: '',
+            className: 'category-filter',
+            content: [
+                document.createTextNode('Category: '),
+                select
+            ]
+        });
         
         return container;
     }
     
     private async createDrumCategoryFilter(): Promise<HTMLElement> {
-        const container = document.createElement('div');
-        container.className = 'category-filter';
-        
-        const label = document.createElement('label');
-        label.textContent = 'Category: ';
-        
-        const select = document.createElement('select');
-        select.className = 'category-select';
-        
         const categories = await getDrumCategories();
-        categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            select.appendChild(option);
-        });
+        const categoryOptions = categories.map(category => ({
+            value: category,
+            text: category,
+            selected: category === 'All'
+        }));
         
-        select.addEventListener('change', async (e) => {
-            const category = (e.target as HTMLSelectElement).value;
-            await this.displayDrumMap(category);
-        });
+        const select = createSelect(
+            categoryOptions,
+            async (category) => await this.displayDrumMap(category),
+            'category-select'
+        );
         
-        container.appendChild(label);
-        container.appendChild(select);
+        const container = createSection({
+            title: '',
+            className: 'category-filter',
+            content: [
+                document.createTextNode('Category: '),
+                select
+            ]
+        });
         
         return container;
     }
@@ -339,7 +318,7 @@ export class GMSoundLibrary {
                 
                 // Visual feedback
                 item.classList.add('triggered');
-                setTimeout(() => item.classList.remove('triggered'), 200);
+                setTimeout(() => item.classList.remove('triggered'), UI_CONSTANTS.VISUAL_FEEDBACK_DURATION_MS);
             });
             
             drumGrid.appendChild(item);
@@ -347,30 +326,26 @@ export class GMSoundLibrary {
     }
     
     private async createDrumKitSelector(): Promise<HTMLElement> {
-        const container = document.createElement('div');
-        container.className = 'drum-kit-selector';
-        
-        const label = document.createElement('label');
-        label.textContent = 'Drum Kit: ';
-        
-        const select = document.createElement('select');
-        select.className = 'kit-select';
-        
         const drumKits = await getGMDrumKits();
-        drumKits.forEach(kit => {
-            const option = document.createElement('option');
-            option.value = kit.program.toString();
-            option.textContent = `${kit.name} - ${kit.description}`;
-            select.appendChild(option);
-        });
+        const kitOptions = drumKits.map(kit => ({
+            value: kit.program.toString(),
+            text: `${kit.name} - ${kit.description}`
+        }));
         
-        select.addEventListener('change', (e) => {
-            const program = parseInt((e.target as HTMLSelectElement).value);
-            this.selectDrumKit(program);
-        });
+        const select = createSelect(
+            kitOptions,
+            (value) => this.selectDrumKit(parseInt(value)),
+            'kit-select'
+        );
         
-        container.appendChild(label);
-        container.appendChild(select);
+        const container = createSection({
+            title: '',
+            className: 'drum-kit-selector',
+            content: [
+                document.createTextNode('Drum Kit: '),
+                select
+            ]
+        });
         
         return container;
     }
@@ -380,7 +355,7 @@ export class GMSoundLibrary {
      */
     public selectInstrument(program: number): void {
         this.keyboard.setProgram(program);
-        this.logToDebug(`Selected instrument: ${program}`);
+        DEBUG_LOGGERS.soundLibrary.log(`Selected instrument: ${program}`);
     }
     
     /**
@@ -388,16 +363,16 @@ export class GMSoundLibrary {
      */
     public selectDrumKit(program: number): void {
         this.keyboard.setProgram(program);
-        this.logToDebug(`Selected drum kit: ${program}`);
+        DEBUG_LOGGERS.soundLibrary.log(`Selected drum kit: ${program}`);
     }
     
     /**
      * Trigger drum sound
      */
     public triggerDrum(note: number): void {
-        const velocity = 100;
+        const velocity = VELOCITY_CONSTANTS.DRUM_TRIGGER;
         this.keyboard.handleKeyPress(note, new MouseEvent('click'));
-        setTimeout(() => this.keyboard.handleKeyRelease(note), 150);
+        setTimeout(() => this.keyboard.handleKeyRelease(note), UI_CONSTANTS.DRUM_TRIGGER_DURATION_MS);
     }
     
     /**
@@ -411,49 +386,7 @@ export class GMSoundLibrary {
      * Add CSS styles for the library
      */
     private addLibraryStyles(): void {
-        if (document.getElementById('gm-sound-library-styles')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'gm-sound-library-styles';
-        style.textContent = `
-            .gm-sound-library {
-                background: #2a2a2a;
-                border-radius: 5px;
-                padding: 15px;
-                color: white;
-                font-family: system-ui, -apple-system, sans-serif;
-            }
-            
-            .mode-selector {
-                display: flex;
-                gap: 10px;
-                margin-bottom: 20px;
-                border-bottom: 2px solid #444;
-                padding-bottom: 15px;
-            }
-            
-            .mode-btn {
-                padding: 10px 20px;
-                border: 2px solid #555;
-                border-radius: 5px;
-                background: #333;
-                color: white;
-                cursor: pointer;
-                transition: all 0.2s;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            
-            .mode-btn:hover {
-                background: #444;
-                border-color: #666;
-            }
-            
-            .mode-btn.active {
-                background: #05a;
-                border-color: #07c;
-            }
-            
+        const customStyles = `
             .sound-content {
                 display: flex;
                 flex-direction: column;
@@ -466,23 +399,9 @@ export class GMSoundLibrary {
                 gap: 10px;
             }
             
-            .category-filter label {
-                font-weight: bold;
-                color: #ccc;
-            }
-            
-            .category-select, .kit-select {
-                padding: 8px 12px;
-                border: 1px solid #555;
-                border-radius: 3px;
-                background: #333;
-                color: white;
-                font-size: 14px;
-            }
-            
             .instrument-list, .drum-map-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                grid-template-columns: repeat(auto-fill, minmax(${UI_CONSTANTS.GRID_MIN_COLUMN_WIDTH_INSTRUMENTS}px, 1fr));
                 gap: 8px;
                 max-height: 400px;
                 overflow-y: auto;
@@ -539,24 +458,10 @@ export class GMSoundLibrary {
                 background: #333;
                 border-radius: 5px;
             }
-            
-            .drum-kit-selector label {
-                font-weight: bold;
-                color: #ccc;
-            }
         `;
         
-        document.head.appendChild(style);
+        const componentStyles = generateComponentStyles('GMSoundLibrary', customStyles);
+        injectStyles('gm-sound-library-styles', componentStyles);
     }
     
-    /**
-     * Log to debug textarea
-     */
-    private logToDebug(message: string): void {
-        const debugLog = document.getElementById('debug-log') as HTMLTextAreaElement;
-        if (debugLog) {
-            debugLog.value += `[GM Sound Library] ${message}\n`;
-            debugLog.scrollTop = debugLog.scrollHeight;
-        }
-    }
 }

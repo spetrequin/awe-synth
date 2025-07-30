@@ -3,7 +3,7 @@
  * Part of AWE Player EMU8000 Emulator
  */
 
-import { CCControl, CONTROL_GROUPS } from '../midi-cc-definitions.js';
+import { CCControl, getControlGroups, getCCControlDefinitions } from '../midi-cc-definitions.js';
 import { ControlFactory, ControlChangeHandler } from './control-factory.js';
 
 export class ControlGroupBuilder {
@@ -17,10 +17,11 @@ export class ControlGroupBuilder {
     /**
      * Create all control groups
      */
-    public createAllGroups(): HTMLElement[] {
+    public async createAllGroups(): Promise<HTMLElement[]> {
         const groups: HTMLElement[] = [];
+        const controlGroups = await getControlGroups();
         
-        Object.entries(CONTROL_GROUPS).forEach(([, groupDef]) => {
+        Object.entries(controlGroups).forEach(([, groupDef]) => {
             const groupElement = this.createControlGroup(groupDef.title, groupDef.controls);
             groups.push(groupElement);
         });
@@ -55,8 +56,9 @@ export class ControlGroupBuilder {
     /**
      * Reset all controls to default values
      */
-    public resetAllControls(): void {
-        Object.values(CONTROL_GROUPS).forEach(groupDef => {
+    public async resetAllControls(): Promise<void> {
+        const controlGroups = await getControlGroups();
+        Object.values(controlGroups).forEach(groupDef => {
             groupDef.controls.forEach(control => {
                 const controlElement = this.controlElements.get(control.cc);
                 if (controlElement) {
@@ -69,8 +71,9 @@ export class ControlGroupBuilder {
     /**
      * Reset controls in a specific group
      */
-    public resetGroup(groupName: keyof typeof CONTROL_GROUPS): void {
-        const groupDef = CONTROL_GROUPS[groupName];
+    public async resetGroup(groupName: string): Promise<void> {
+        const controlGroups = await getControlGroups();
+        const groupDef = controlGroups[groupName];
         if (!groupDef) return;
         
         groupDef.controls.forEach(control => {
@@ -91,17 +94,13 @@ export class ControlGroupBuilder {
     /**
      * Set control value programmatically
      */
-    public setControlValue(ccNumber: number, value: number): void {
+    public async setControlValue(ccNumber: number, value: number): Promise<void> {
         const controlElement = this.controlElements.get(ccNumber);
         if (!controlElement) return;
         
         // Find the control definition
-        let targetControl: CCControl | undefined;
-        Object.values(CONTROL_GROUPS).forEach(groupDef => {
-            const found = groupDef.controls.find(c => c.cc === ccNumber);
-            if (found) targetControl = found;
-        });
-        
+        const controls = await getCCControlDefinitions();
+        const targetControl = controls.find(c => c.cc === ccNumber);
         if (!targetControl) return;
         
         // Update the visual element

@@ -5,6 +5,8 @@
  * Handles timestamp conversion and event queuing with zero audio thread blocking.
  */
 
+import { VELOCITY_CONSTANTS } from './velocity-curves.js';
+
 export interface WasmMidiInterface {
     queue_midi_event(event: WasmMidiEvent): void;
     process_midi_events(current_sample_time: bigint): number;
@@ -85,7 +87,7 @@ export class MidiBridge {
         this.sendMidiEvent(channel, 0x90, note, velocity);
     }
 
-    sendNoteOff(channel: number, note: number, velocity: number = 64): void {
+    sendNoteOff(channel: number, note: number, velocity: number = VELOCITY_CONSTANTS.DEFAULT): void {
         this.sendMidiEvent(channel, 0x80, note, velocity);
     }
 

@@ -920,4 +920,238 @@ git commit -m "Complete task: [task-description]"
 
 ---
 
+## 🎹 **TypeScript Web Interface Architecture (Refactored December 2024)**
+
+Following comprehensive refactoring in December 2024, the TypeScript codebase now implements a **highly modular, type-safe, and maintainable architecture** with centralized utilities and shared patterns.
+
+### **📂 Directory Structure**
+```
+web/src/
+├── types/                          # Centralized Type System
+│   ├── midi-types.ts              # Branded MIDI types & validation
+│   ├── input-types.ts             # Input handler interfaces
+│   └── project-types.ts           # Global project types
+├── utils/                          # Shared Utilities (NEW)
+│   ├── debug-logger.ts            # Centralized debug logging
+│   ├── config-validator.ts        # Runtime type validation
+│   ├── enhanced-config-loader.ts  # Config loading with validation
+│   ├── ui-components.ts           # Reusable UI component factories
+│   ├── ui-styles.ts               # Centralized CSS style management
+│   └── velocity-utils.ts          # Velocity analysis utilities
+├── input-handlers/                # Input Processing
+│   ├── base-input-handler.ts      # Base handler interface
+│   ├── touch-input-handler.ts     # Touch/gesture input
+│   ├── keyboard-input-handler.ts  # Computer keyboard MIDI
+│   ├── pointer-input-handler.ts   # Stylus/pen input
+│   └── gamepad-input-handler.ts   # Controller input
+├── cc-controls/                   # MIDI CC Management
+│   ├── control-factory.ts         # UI control creation
+│   └── control-group-builder.ts   # Control group management
+├── virtual-keyboard/              # Piano Interface
+│   └── keyboard-layout.ts         # 88-key layout generation
+├── configs/                       # JSON Configuration Files
+│   ├── gm-instruments.json        # General MIDI instrument definitions
+│   ├── gm-drums.json             # GM drum map
+│   ├── gm-drum-kits.json         # Drum kit variations
+│   └── midi-cc-controls.json     # MIDI CC definitions
+├── input-manager.ts               # Unified input coordination
+├── virtual-midi-keyboard.ts       # Virtual piano implementation
+├── gm-sound-library.ts           # GM instrument/drum selector
+├── midi-cc-controls.ts           # MIDI CC control interface
+├── midi-cc-definitions.ts        # CC control definitions
+├── midi-constants.ts             # MIDI constants & utilities
+├── velocity-curves.ts            # Velocity processing
+├── midi-bridge.ts                # WASM interface bridge
+└── config-loader.ts              # Basic config loading
+```
+
+### **🔧 Architectural Patterns Implemented**
+
+#### **1. Centralized Utility Systems**
+```typescript
+// Debug logging - component-specific loggers
+export const DEBUG_LOGGERS = {
+    inputManager: new DebugLogger('InputManager'),
+    virtualKeyboard: new DebugLogger('VirtualKeyboard'),
+    midiControls: new DebugLogger('MidiControls')
+};
+
+// UI component factories - reusable patterns
+export function createButton(config: ButtonConfig): HTMLButtonElement
+export function createSelect(options: SelectOption[], onChange: Function): HTMLSelectElement
+export function createSlider(config: SliderConfig): HTMLElement
+
+// Centralized style management
+export function injectStyles(styleId: string, css: string): void
+export function generateComponentStyles(componentName: string): string
+```
+
+#### **2. Type-Safe Configuration System**
+```typescript
+// Runtime validation with branded types
+export type MIDINoteNumber = number & { readonly __brand: 'MIDINoteNumber' };
+export type MIDIVelocity = number & { readonly __brand: 'MIDIVelocity' };
+
+// Enhanced config loading with validation
+export interface ValidatedConfig<T> {
+    data: T;
+    metadata: ConfigMetadata;
+    errors: ConfigValidationError[];
+}
+
+// Async configuration loading with caching
+export const enhancedConfigLoader = new EnhancedConfigLoader();
+const config = await enhancedConfigLoader.loadConfig<GMInstrument[]>('gm-instruments');
+```
+
+#### **3. Unified Input Management**
+```typescript
+// Single coordinator for all input methods
+export class InputManager {
+    private handlers: Map<string, BaseInputHandler> = new Map();
+    private velocityProcessor: VelocityCurveProcessor;
+    
+    // Unified velocity processing across all input types
+    public setVelocityProfile(profileName: string): boolean
+    public setVelocitySensitivity(sensitivity: number): void
+}
+
+// Standardized input handler interface
+export abstract class BaseInputHandler {
+    abstract initialize(): void;
+    abstract setEnabled(enabled: boolean): void;
+    abstract cleanup(): void;
+}
+```
+
+### **🎯 Key Architecture Benefits**
+
+#### **Type Safety & Validation**
+- **Branded Types**: Prevent mixing MIDI note numbers with velocities
+- **Runtime Validation**: Catch configuration errors early with detailed messages
+- **Type Guards**: Safe type checking throughout the codebase
+
+#### **Code Reusability**
+- **UI Component Factories**: Eliminate ~300 lines of duplicate DOM creation
+- **Shared Style Management**: Consistent theming across all components
+- **Centralized Constants**: Single source of truth for MIDI values, UI dimensions
+
+#### **Maintainability**
+- **Modular Architecture**: Clear separation of concerns
+- **Debug System**: Component-specific logging with performance optimizations
+- **Configuration System**: JSON-based configs with hot reloading capability
+
+#### **Performance Optimizations**
+- **Efficient DOM Updates**: Reusable components reduce creation overhead
+- **Style Injection**: Prevents duplicate CSS with ID-based deduplication
+- **Memory Management**: Proper cleanup patterns in all components
+
+### **🔗 Component Integration Flow**
+```
+JSON Configs → Enhanced Config Loader → Runtime Validation → Component Initialization
+     ↓                    ↓                    ↓                      ↓
+Type Safety      Caching & Metadata    Error Reporting      Validated Data
+```
+
+```
+Input Events → Input Manager → Velocity Processing → MIDI Bridge → WASM
+     ↓              ↓               ↓                  ↓           ↓
+Multi-source    Unified API    Curve Processing   Type-safe    Audio Engine
+(Touch/KB/      Coordination   & Sensitivity      Interface    Processing
+ Mouse/Pad)
+```
+
+```
+UI Components → Shared Factories → Style Management → DOM Integration
+     ↓               ↓                   ↓               ↓
+Consistent     Reusable Patterns   Theme Support   Performance
+Interface      & Type Safety       & Deduplication Optimized
+```
+
+### **🎼 MIDI System Integration**
+
+#### **Type-Safe MIDI Processing**
+```typescript
+// Branded types prevent common MIDI errors
+const note: MIDINoteNumber = createMIDINoteNumber(60); // Middle C
+const velocity: MIDIVelocity = createMIDIVelocity(100);
+const channel: MIDIChannel = createMIDIChannel(0);
+
+// Validated ranges with helpful error messages
+if (!isValidMIDINote(note)) {
+    throw new MIDIValidationError(`Invalid note: ${note}`);
+}
+```
+
+#### **Unified Constants System**
+```typescript
+// Centralized MIDI constants
+export const MIDI_CC = {
+    SUSTAIN_PEDAL: 64,
+    CHANNEL_VOLUME: 7,
+    PAN: 10,
+    REVERB_SEND: 91,
+    CHORUS_SEND: 93
+};
+
+// UI timing constants
+export const UI_CONSTANTS = {
+    VISUAL_FEEDBACK_DURATION_MS: 200,
+    DRUM_TRIGGER_DURATION_MS: 150,
+    GRID_MIN_COLUMN_WIDTH_STANDARD: 200
+};
+```
+
+### **🔧 Universal Refactoring Methodology: Dependency-Based Approach**
+
+**CRITICAL PRINCIPLE**: **ALL future refactoring** (Rust, TypeScript, or any language) should follow **dependency-based analysis** rather than priority-based approaches.
+
+#### **Why Dependency-Based Refactoring**
+- **Minimize file revisits**: Each component typically touched only once
+- **Clean change propagation**: Foundation changes flow naturally to dependents
+- **Reduced risk**: No need to revisit "completed" components when dependencies change
+- **Predictable impact**: Each phase has clearly defined scope and effects
+
+#### **Universal Dependency Analysis Framework**
+
+**Applies to Rust WASM Core AND TypeScript Web Interface:**
+
+```
+Phase 1: FOUNDATIONAL (Impact ALL components across languages)
+├── Core data structures and types (Rust: structs/enums, TS: interfaces/types)
+├── Shared utilities and base abstractions (logging, validation, error handling)
+├── Constants and configuration systems (MIDI specs, audio parameters)
+└── Memory management and resource allocation patterns
+
+Phase 2: INTERMEDIATE (Impact SOME components within language boundaries)
+├── Processing pipelines and algorithms (audio synthesis, UI rendering)
+├── Coordinating systems (voice managers, input coordinators)
+├── Shared business logic (velocity processing, effects chains)
+└── Inter-language communication interfaces (WASM ↔ TypeScript)
+
+Phase 3: ISOLATED (Impact MINIMAL components, language-specific)
+├── Constants extraction and magic number elimination
+├── Method decomposition and internal optimizations
+├── Language-specific type safety improvements
+└── Performance micro-optimizations
+```
+
+**Universal Implementation Rule**: Always analyze component dependencies BEFORE starting refactoring work across **both Rust and TypeScript codebases** to determine the optimal order that minimizes having to go back and include refactoring changes among linked files.
+
+### **🚀 Future Architecture Considerations**
+
+#### **Scalability Patterns**
+- **Plugin Architecture**: Easy to add new input handlers or UI components
+- **Configuration Schema**: Runtime validation supports complex nested configs
+- **Theme System**: Centralized styling supports multiple visual themes
+
+#### **Performance Monitoring**
+- **Debug System**: Performance-aware logging that doesn't impact audio thread
+- **Memory Tracking**: Proper cleanup patterns prevent memory leaks
+- **Component Lifecycle**: Standardized initialization/cleanup across all components
+
+This refactored architecture provides a **solid foundation** for future EMU8000 emulator enhancements while maintaining **type safety**, **performance**, and **code maintainability**.
+
+---
+
 **Remember: When returning to this project, read both CLAUDE.md and this ARCHITECTURE.md file completely to understand the system design, constraints, and current implementation status.**

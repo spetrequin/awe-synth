@@ -130,7 +130,16 @@ export const UI_CONSTANTS = {
     KNOB_SIZE: 40,
     KNOB_ROTATION_RANGE: 270,  // degrees
     KNOB_MIN_ANGLE: -135,
-    KNOB_MAX_ANGLE: 135
+    KNOB_MAX_ANGLE: 135,
+    // Animation timing
+    VISUAL_FEEDBACK_DURATION_MS: 200,   // CSS transitions and hover effects
+    DRUM_TRIGGER_DURATION_MS: 150,      // How long to hold drum notes
+    KEY_VISUAL_PRESSED_DURATION_MS: 100, // Key press visual feedback
+    // Grid sizing
+    GRID_MIN_COLUMN_WIDTH_STANDARD: 200, // Standard grid column min width
+    GRID_MIN_COLUMN_WIDTH_CONTROLS: 120, // MIDI control grid min width  
+    GRID_MIN_COLUMN_WIDTH_PRESETS: 100,  // Preset button grid min width
+    GRID_MIN_COLUMN_WIDTH_INSTRUMENTS: 280 // Instrument/drum item grid min width
 } as const;
 
 // Type Guards
@@ -176,34 +185,29 @@ export const noteToFullName = (note: number): string => {
     return `${noteName}${octave}`;
 };
 
-// Type guards for MIDI validation
-export const isValidMIDIValue = (value: number): value is number =>
-    Number.isInteger(value) && value >= MIDI_VALUES.MIN && value <= MIDI_VALUES.MAX;
+// Re-export unified MIDI validation functions
+export {
+    isValidMIDICCValue as isValidMIDIValue,
+    isValidMIDINote,
+    isValidMIDIChannel,
+    isValidMIDIVelocity,
+    isValidMIDIPitchBend,
+    isValidMIDIProgram,
+    createMIDINoteNumber,
+    createMIDIVelocity,
+    createMIDIChannel,
+    createMIDICCValue,
+    createMIDIPitchBend,
+    createMIDIProgram,
+    clampToMIDINoteRange,
+    clampToMIDIVelocityRange,
+    clampToMIDIChannelRange,
+    clampToMIDICCRange,
+    MIDIValidationError,
+    MIDI_RANGES
+} from './types/midi-types.js';
 
-export const isValidMIDINote = (note: number): note is number =>
-    Number.isInteger(note) && note >= MIDI_NOTES.LOWEST && note <= MIDI_NOTES.HIGHEST;
+// Re-export unified key type functions
+export { isWhiteKey, isBlackKey } from './types/midi-types.js';
 
-export const isValidMIDIChannel = (channel: number): channel is number =>
-    Number.isInteger(channel) && channel >= 0 && channel <= 15;
-
-export const isWhiteKey = (noteInOctave: number): boolean => {
-    const whiteKeyPattern = PIANO_LAYOUT.WHITE_KEY_PATTERN as readonly number[];
-    return whiteKeyPattern.includes(noteInOctave);
-};
-
-export const isBlackKey = (noteInOctave: number): boolean => {
-    const blackKeyPattern = PIANO_LAYOUT.BLACK_KEY_PATTERN as readonly number[];
-    return blackKeyPattern.includes(noteInOctave);
-};
-
-// Velocity Curve Functions
-export const velocityCurves = {
-    linear: (n: number): number => n,
-    natural: (n: number): number => Math.sqrt(n),
-    exponential: (n: number): number => n * n,
-    logarithmic: (n: number): number => Math.log(n * 9 + 1) / Math.log(10),
-    soft: (n: number): number => Math.pow(n, 1.5),
-    hard: (n: number): number => Math.pow(n, 0.7)
-} as const;
-
-export type VelocityCurveName = keyof typeof velocityCurves;
+// Note: Velocity curve functions are now in velocity-curves.ts for better organization

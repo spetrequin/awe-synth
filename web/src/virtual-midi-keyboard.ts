@@ -6,6 +6,10 @@
 import { MidiBridge } from './midi-bridge.js';
 import { KeyboardLayoutGenerator, KeyLayout } from './virtual-keyboard/keyboard-layout.js';
 import { noteToFullName } from './midi-constants.js';
+import { DEBUG_LOGGERS } from './utils/debug-logger.js';
+import { injectStyles, generateComponentStyles } from './utils/ui-styles.js';
+import { isValidMIDIProgram, isValidMIDIChannel, MIDI_CC, UI_CONSTANTS } from './midi-constants.js';
+import { VelocityCurveProcessor, VELOCITY_CONSTANTS } from './velocity-curves.js';
 
 interface VirtualKey {
     noteNumber: number;     // MIDI note (21-108 for 88 keys)
@@ -13,6 +17,17 @@ interface VirtualKey {
     velocity: number;       // 0-127 based on mouse/touch input
     keyType: 'white' | 'black';
 }
+
+export interface VirtualKeyboardOptions {
+    velocityProfile?: string;
+    velocitySensitivity?: number;
+}
+
+// Default options for backward compatibility
+const DEFAULT_VELOCITY_OPTIONS: VirtualKeyboardOptions = {
+    velocityProfile: 'natural',
+    velocitySensitivity: 1.0
+};
 
 export class VirtualMidiKeyboard {
     private keys: Map<number, VirtualKey> = new Map();
@@ -22,6 +37,7 @@ export class VirtualMidiKeyboard {
     private sustainPedal = false;
     private currentChannel = 0;
     private layoutGenerator: KeyboardLayoutGenerator;
+    private velocityProcessor: VelocityCurveProcessor;
     
     // Key layout mapping (computer keyboard to piano keys)
     private keyMapping: Map<string, number> = new Map([
@@ -43,9 +59,16 @@ export class VirtualMidiKeyboard {
         ['j', 10], // A#
     ]);
     
-    constructor(midiBridge: MidiBridge) {
+    constructor(midiBridge: MidiBridge, options: VirtualKeyboardOptions = {}) {
         this.midiBridge = midiBridge;
         this.layoutGenerator = new KeyboardLayoutGenerator();
+        
+        // Initialize velocity processor with options
+        this.velocityProcessor = new VelocityCurveProcessor(options.velocityProfile);
+        if (options.velocitySensitivity !== undefined) {
+            this.velocityProcessor.setSensitivity(options.velocitySensitivity);
+        }
+        
         this.initializeKeys();
         this.setupKeyboardListeners();
     }
@@ -72,7 +95,7 @@ export class VirtualMidiKeyboard {
     public createVisualKeyboard(containerId: string): void {
         const container = document.getElementById(containerId);
         if (!container) {
-            this.logToDebug(`Error: Container ${containerId} not found`);
+            DEBUG_LOGGERS.virtualKeyboard.error(`Container ${containerId} not found`);
             return;
         }
         
@@ -167,7 +190,7 @@ export class VirtualMidiKeyboard {
         // Update visual state
         this.updateKeyVisual(noteNumber, true);
         
-        this.logToDebug(`Virtual keyboard: Note ON - ${noteNumber}, velocity: ${velocity}`);
+        DEBUG_LOGGERS.virtualKeyboard.log(`Note ON - ${noteNumber}, velocity: ${velocity}`);
     }
     
     /**
@@ -187,11 +210,11 @@ export class VirtualMidiKeyboard {
         // Update visual state
         this.updateKeyVisual(noteNumber, false);
         
-        this.logToDebug(`Virtual keyboard: Note OFF - ${noteNumber}`);
+        DEBUG_LOGGERS.virtualKeyboard.log(`Note OFF - ${noteNumber}`);
     }
     
     /**
-     * Calculate velocity from mouse/touch position
+     * Calculate velocity from mouse/touch position using centralized velocity processing
      */
     private calculateVelocity(event: MouseEvent | TouchEvent): number {
         let clientY: number;
@@ -201,18 +224,20 @@ export class VirtualMidiKeyboard {
         } else if (event.touches && event.touches[0]) {
             clientY = event.touches[0].clientY;
         } else {
-            return 64; // Default velocity if no touch data
+            return VELOCITY_CONSTANTS.TOUCH_DEFAULT; // Default velocity if no touch data
         }
         
         const target = event.target as HTMLElement;
-        if (!target) return 64; // Default velocity if no target
+        if (!target) return VELOCITY_CONSTANTS.TOUCH_DEFAULT; // Default velocity if no target
         const rect = target.getBoundingClientRect();
         const relativeY = clientY - rect.top;
         const normalizedY = relativeY / rect.height;
         
-        // Invert and scale to MIDI velocity (top = loud, bottom = soft)
-        const velocity = Math.round((1 - normalizedY) * 127);
-        return Math.max(1, Math.min(127, velocity));
+        // Invert position (top = loud, bottom = soft) and normalize to 0-1
+        const rawVelocity = 1 - normalizedY;
+        
+        // Use centralized velocity processing with curves and sensitivity
+        return this.velocityProcessor.processVelocity(rawVelocity);
     }
     
     /**
@@ -247,10 +272,10 @@ export class VirtualMidiKeyboard {
             // Octave controls
             if (e.key === 'ArrowLeft' && this.currentOctave > 0) {
                 this.currentOctave--;
-                this.logToDebug(`Octave changed to ${this.currentOctave}`);
+                DEBUG_LOGGERS.virtualKeyboard.log(`Octave changed to ${this.currentOctave}`);
             } else if (e.key === 'ArrowRight' && this.currentOctave < 7) {
                 this.currentOctave++;
-                this.logToDebug(`Octave changed to ${this.currentOctave}`);
+                DEBUG_LOGGERS.virtualKeyboard.log(`Octave changed to ${this.currentOctave}`);
             }
             
             // Sustain pedal (spacebar)
@@ -285,7 +310,7 @@ export class VirtualMidiKeyboard {
         
         // Send MIDI CC 64 (sustain pedal)
         const value = isPressed ? 127 : 0;
-        this.midiBridge.sendControlChange(this.currentChannel, 64, value);
+        this.midiBridge.sendControlChange(this.currentChannel, MIDI_CC.SUSTAIN_PEDAL, value);
         
         // If releasing pedal, send note off for all sustained notes
         if (!isPressed) {
@@ -296,28 +321,56 @@ export class VirtualMidiKeyboard {
             });
         }
         
-        this.logToDebug(`Sustain pedal: ${isPressed ? 'ON' : 'OFF'}`);
+        DEBUG_LOGGERS.virtualKeyboard.log(`Sustain pedal: ${isPressed ? 'ON' : 'OFF'}`);
     }
     
     /**
      * Change GM program
      */
     public setProgram(program: number): void {
-        if (program < 0 || program > 127) return;
+        if (!isValidMIDIProgram(program)) return;
         
         this.midiBridge.sendProgramChange(this.currentChannel, program);
         
-        this.logToDebug(`Program changed to ${program}`);
+        DEBUG_LOGGERS.virtualKeyboard.log(`Program changed to ${program}`);
     }
     
     /**
      * Set MIDI channel
      */
     public setChannel(channel: number): void {
-        if (channel < 0 || channel > 15) return;
+        if (!isValidMIDIChannel(channel)) return;
         
         this.currentChannel = channel;
-        this.logToDebug(`Channel changed to ${channel}`);
+        DEBUG_LOGGERS.virtualKeyboard.log(`Channel changed to ${channel}`);
+    }
+    
+    /**
+     * Set velocity profile
+     */
+    public setVelocityProfile(profileName: string): boolean {
+        const success = this.velocityProcessor.setProfile(profileName);
+        if (success) {
+            DEBUG_LOGGERS.virtualKeyboard.log(`Velocity profile changed to: ${profileName}`);
+        } else {
+            DEBUG_LOGGERS.virtualKeyboard.error(`Invalid velocity profile: ${profileName}`);
+        }
+        return success;
+    }
+    
+    /**
+     * Set velocity sensitivity
+     */
+    public setVelocitySensitivity(sensitivity: number): void {
+        this.velocityProcessor.setSensitivity(sensitivity);
+        DEBUG_LOGGERS.virtualKeyboard.log(`Velocity sensitivity set to: ${sensitivity}`);
+    }
+    
+    /**
+     * Get current velocity processor
+     */
+    public getVelocityProcessor(): VelocityCurveProcessor {
+        return this.velocityProcessor;
     }
     
     /**
@@ -338,11 +391,7 @@ export class VirtualMidiKeyboard {
      * Add CSS styles for keyboard
      */
     private addKeyboardStyles(): void {
-        if (document.getElementById('virtual-keyboard-styles')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'virtual-keyboard-styles';
-        style.textContent = `
+        const customStyles = `
             .virtual-keyboard {
                 display: flex;
                 background: #222;
@@ -365,8 +414,8 @@ export class VirtualMidiKeyboard {
             }
             
             .white-key {
-                width: 40px;
-                height: 150px;
+                width: ${UI_CONSTANTS.KEYBOARD_WHITE_KEY_WIDTH}px;
+                height: ${UI_CONSTANTS.KEYBOARD_WHITE_KEY_HEIGHT}px;
                 background: white;
                 z-index: 1;
                 display: flex;
@@ -378,8 +427,8 @@ export class VirtualMidiKeyboard {
             }
             
             .black-key {
-                width: 25px;
-                height: 100px;
+                width: ${UI_CONSTANTS.KEYBOARD_BLACK_KEY_WIDTH}px;
+                height: ${UI_CONSTANTS.KEYBOARD_BLACK_KEY_HEIGHT}px;
                 background: #333;
                 position: absolute;
                 z-index: 2;
@@ -410,17 +459,8 @@ export class VirtualMidiKeyboard {
             }
         `;
         
-        document.head.appendChild(style);
+        const componentStyles = generateComponentStyles('VirtualMidiKeyboard', customStyles);
+        injectStyles('virtual-keyboard-styles', componentStyles);
     }
     
-    /**
-     * Log to debug textarea (not console)
-     */
-    private logToDebug(message: string): void {
-        const debugLog = document.getElementById('debug-log') as HTMLTextAreaElement;
-        if (debugLog) {
-            debugLog.value += `[VirtualKeyboard] ${message}\n`;
-            debugLog.scrollTop = debugLog.scrollHeight;
-        }
-    }
 }

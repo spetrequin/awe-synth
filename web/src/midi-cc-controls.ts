@@ -4,8 +4,12 @@
  */
 
 import { MidiBridge } from './midi-bridge.js';
-import { CCControl, getControlByCC, QUICK_SELECT_CONTROLS, CONTROL_GROUPS } from './midi-cc-definitions.js';
+import { CCControl, getControlByCC, QUICK_SELECT_CONTROLS, getControlGroups, getCCControlDefinitions } from './midi-cc-definitions.js';
 import { ControlGroupBuilder } from './cc-controls/control-group-builder.js';
+import { DEBUG_LOGGERS } from './utils/debug-logger.js';
+import { isValidMIDIChannel, MIDI_CC } from './midi-constants.js';
+import { createSection, createButtonGroup, createPresetSection, injectStyles } from './utils/ui-components.js';
+import { generateComponentStyles } from './utils/ui-styles.js';
 
 export class MidiCCControls {
     private midiBridge: MidiBridge;
@@ -21,39 +25,36 @@ export class MidiCCControls {
         this.groupBuilder = new ControlGroupBuilder((control, value) => {
             this.handleControlChange(control, value);
         });
-        
-        // Initialize default values from definitions
-        this.initializeDefaultValues();
     }
     
     /**
      * Initialize default CC values
      */
-    private initializeDefaultValues(): void {
-        Object.values(CONTROL_GROUPS).forEach(groupDef => {
-            groupDef.controls.forEach(control => {
-                if (control.cc >= 0) {
-                    this.ccValues.set(control.cc, control.default);
-                }
-            });
+    private async initializeDefaultValues(): Promise<void> {
+        const controls = await getCCControlDefinitions();
+        controls.forEach(control => {
+            if (control.cc >= 0) {
+                this.ccValues.set(control.cc, control.default);
+            }
         });
     }
     
     /**
      * Create the CC controls UI
      */
-    public createControls(containerId: string): void {
+    public async createControls(containerId: string): Promise<void> {
         const container = document.getElementById(containerId);
         if (!container) {
-            this.logToDebug(`Error: Container ${containerId} not found`);
+            DEBUG_LOGGERS.midiControls.error(`Container ${containerId} not found`);
             return;
         }
         
         this.controlsElement = document.createElement('div');
         this.controlsElement.className = 'midi-cc-controls';
         
-        // Create all control groups
-        const groups = this.groupBuilder.createAllGroups();
+        // Initialize default values and create control groups
+        await this.initializeDefaultValues();
+        const groups = await this.groupBuilder.createAllGroups();
         groups.forEach(group => {
             this.controlsElement!.appendChild(group);
         });
@@ -74,41 +75,15 @@ export class MidiCCControls {
      * Create preset section for quick instrument setups
      */
     private createPresetSection(): HTMLElement {
-        const section = document.createElement('div');
-        section.className = 'control-group preset-section';
-        
-        const title = document.createElement('h3');
-        title.textContent = 'Quick Presets';
-        section.appendChild(title);
-        
-        const presetGrid = document.createElement('div');
-        presetGrid.className = 'preset-grid';
-        
-        Object.entries(QUICK_SELECT_CONTROLS).forEach(([name, values]) => {
-            const button = document.createElement('button');
-            button.className = 'preset-button';
-            button.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-            
-            button.addEventListener('click', () => {
+        return createPresetSection(
+            'Quick Presets',
+            QUICK_SELECT_CONTROLS,
+            (name, values) => {
                 this.applyPreset(values);
-                this.logToDebug(`Applied ${name} preset`);
-            });
-            
-            presetGrid.appendChild(button);
-        });
-        
-        // Reset button
-        const resetButton = document.createElement('button');
-        resetButton.className = 'preset-button reset-button';
-        resetButton.textContent = 'Reset All';
-        resetButton.addEventListener('click', () => {
-            this.resetAll();
-        });
-        
-        presetGrid.appendChild(resetButton);
-        section.appendChild(presetGrid);
-        
-        return section;
+                DEBUG_LOGGERS.midiControls.log(`Applied ${name} preset`);
+            },
+            () => this.resetAll()
+        );
     }
     
     /**
@@ -118,10 +93,10 @@ export class MidiCCControls {
         Object.entries(preset).forEach(([controlName, value]) => {
             // Map preset names to CC numbers
             const ccMap: Record<string, number> = {
-                'volume': 7,
-                'pan': 10,
-                'reverb': 91,
-                'chorus': 93
+                'volume': MIDI_CC.CHANNEL_VOLUME,
+                'pan': MIDI_CC.PAN,
+                'reverb': MIDI_CC.REVERB_SEND,
+                'chorus': MIDI_CC.CHORUS_SEND
             };
             
             const ccNumber = ccMap[controlName];
@@ -139,11 +114,11 @@ export class MidiCCControls {
     private handleControlChange(control: CCControl, value: number): void {
         if (control.cc === -1) { // Pitch bend
             this.midiBridge.sendPitchBend(this.currentChannel, value);
-            this.logToDebug(`Pitch Bend: ${value}`);
+            DEBUG_LOGGERS.midiControls.log(`Pitch Bend: ${value}`);
         } else {
             this.ccValues.set(control.cc, value);
             this.midiBridge.sendControlChange(this.currentChannel, control.cc, value);
-            this.logToDebug(`CC${control.cc} (${control.name}): ${value}`);
+            DEBUG_LOGGERS.midiControls.log(`CC${control.cc} (${control.name}): ${value}`);
         }
     }
     
@@ -160,28 +135,29 @@ export class MidiCCControls {
      * Set MIDI channel
      */
     public setChannel(channel: number): void {
-        if (channel >= 0 && channel <= 15) {
+        if (isValidMIDIChannel(channel)) {
             this.currentChannel = channel;
             this.sendInitialValues();
-            this.logToDebug(`CC Controls channel changed to ${channel}`);
+            DEBUG_LOGGERS.midiControls.log(`CC Controls channel changed to ${channel}`);
         }
     }
     
     /**
      * Reset all controllers
      */
-    public resetAll(): void {
-        this.groupBuilder.resetAllControls();
-        this.logToDebug('All CC controls reset');
+    public async resetAll(): Promise<void> {
+        await this.groupBuilder.resetAllControls();
+        DEBUG_LOGGERS.midiControls.log('All CC controls reset');
     }
     
     /**
      * Reset specific control group
      */
-    public resetGroup(groupName: string): void {
-        if (groupName in CONTROL_GROUPS) {
-            this.groupBuilder.resetGroup(groupName as keyof typeof CONTROL_GROUPS);
-            this.logToDebug(`Reset ${groupName} controls`);
+    public async resetGroup(groupName: string): Promise<void> {
+        const controlGroups = await getControlGroups();
+        if (groupName in controlGroups) {
+            this.groupBuilder.resetGroup(groupName);
+            DEBUG_LOGGERS.midiControls.log(`Reset ${groupName} controls`);
         }
     }
     
@@ -195,8 +171,8 @@ export class MidiCCControls {
     /**
      * Set control value programmatically
      */
-    public setControlValue(ccNumber: number, value: number): void {
-        const control = getControlByCC(ccNumber);
+    public async setControlValue(ccNumber: number, value: number): Promise<void> {
+        const control = await getControlByCC(ccNumber);
         if (control) {
             const clampedValue = Math.max(control.min, Math.min(control.max, value));
             this.handleControlChange(control, clampedValue);
@@ -208,16 +184,9 @@ export class MidiCCControls {
      * Add CSS styles
      */
     private addControlStyles(): void {
-        if (document.getElementById('midi-cc-styles')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'midi-cc-styles';
-        style.textContent = `
+        const customStyles = `
             .midi-cc-controls {
                 background: #333;
-                border-radius: 5px;
-                padding: 15px;
-                color: white;
             }
             
             .control-group {
@@ -235,7 +204,7 @@ export class MidiCCControls {
             
             .controls-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(${UI_CONSTANTS.GRID_MIN_COLUMN_WIDTH_CONTROLS}px, 1fr));
                 gap: 20px;
             }
             
@@ -259,33 +228,6 @@ export class MidiCCControls {
                 align-items: center;
                 gap: 5px;
                 width: 100%;
-            }
-            
-            input[type="range"] {
-                width: 100%;
-                height: 6px;
-                border-radius: 3px;
-                background: #555;
-                outline: none;
-                -webkit-appearance: none;
-            }
-            
-            input[type="range"]::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                width: 16px;
-                height: 16px;
-                border-radius: 50%;
-                background: #05a;
-                cursor: pointer;
-            }
-            
-            input[type="range"]::-moz-range-thumb {
-                width: 16px;
-                height: 16px;
-                border-radius: 50%;
-                background: #05a;
-                cursor: pointer;
-                border: none;
             }
             
             .bipolar-slider {
@@ -352,58 +294,12 @@ export class MidiCCControls {
                 min-width: 40px;
                 text-align: center;
             }
-            
-            /* Preset section */
-            .preset-section {
-                border-top: 2px solid #555;
-            }
-            
-            .preset-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-                gap: 10px;
-            }
-            
-            .preset-button {
-                padding: 8px 12px;
-                border: 1px solid #555;
-                border-radius: 3px;
-                background: #444;
-                color: white;
-                cursor: pointer;
-                transition: all 0.2s;
-                font-size: 12px;
-            }
-            
-            .preset-button:hover {
-                background: #555;
-                border-color: #666;
-            }
-            
-            .reset-button {
-                background: #c50;
-                border-color: #d60;
-            }
-            
-            .reset-button:hover {
-                background: #d60;
-                border-color: #e70;
-            }
         `;
         
-        document.head.appendChild(style);
+        const componentStyles = generateComponentStyles('MidiCCControls', customStyles);
+        injectStyles('midi-cc-styles', componentStyles);
     }
     
-    /**
-     * Log to debug textarea
-     */
-    private logToDebug(message: string): void {
-        const debugLog = document.getElementById('debug-log') as HTMLTextAreaElement;
-        if (debugLog) {
-            debugLog.value += `[CC Controls] ${message}\n`;
-            debugLog.scrollTop = debugLog.scrollHeight;
-        }
-    }
 }
 
 // Re-export for compatibility

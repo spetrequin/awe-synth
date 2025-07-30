@@ -10,6 +10,9 @@ import { TouchInputHandler } from './input-handlers/touch-input-handler.js';
 import { ComputerKeyboardInputHandler } from './input-handlers/keyboard-input-handler.js';
 import { PointerInputHandler } from './input-handlers/pointer-input-handler.js';
 import { GamepadInputHandler } from './input-handlers/gamepad-input-handler.js';
+import { DEBUG_LOGGERS } from './utils/debug-logger.js';
+import { createSection, createSelect, createSlider, createCheckbox, createLabeledField, objectToSelectOptions, createNumberRange, getContainer, injectStyles } from './utils/ui-components.js';
+import { generateComponentStyles } from './utils/ui-styles.js';
 
 export interface InputManagerOptions {
     keyboard: VirtualMidiKeyboard;
@@ -46,7 +49,7 @@ export class InputManager {
         const handlerOptions = {
             velocityProcessor: this.velocityProcessor,
             keyboard: this.keyboard,
-            debugLog: this.logToDebug.bind(this)
+            debugLog: (message: string) => DEBUG_LOGGERS.inputManager.log(message)
         };
         
         // Touch input
@@ -76,7 +79,7 @@ export class InputManager {
         // Initialize all handlers
         this.handlers.forEach(handler => handler.initialize());
         
-        this.logToDebug(`Input Manager initialized with ${this.handlers.size} handlers`);
+        DEBUG_LOGGERS.inputManager.log(`Input Manager initialized with ${this.handlers.size} handlers`);
     }
     
     /**
@@ -86,7 +89,7 @@ export class InputManager {
         const handler = this.handlers.get(handlerType);
         if (handler) {
             handler.setEnabled(enabled);
-            this.logToDebug(`${handlerType} input ${enabled ? 'enabled' : 'disabled'}`);
+            DEBUG_LOGGERS.inputManager.log(`${handlerType} input ${enabled ? 'enabled' : 'disabled'}`);
         }
     }
     
@@ -94,7 +97,8 @@ export class InputManager {
      * Get handler by type
      */
     public getHandler<T extends BaseInputHandler>(handlerType: string): T | undefined {
-        return this.handlers.get(handlerType) as T;
+        const handler = this.handlers.get(handlerType);
+        return handler ? (handler as T) : undefined;
     }
     
     /**
@@ -103,7 +107,7 @@ export class InputManager {
     public setVelocityProfile(profileName: string): boolean {
         const success = this.velocityProcessor.setProfile(profileName);
         if (success) {
-            this.logToDebug(`Velocity profile changed to: ${profileName}`);
+            DEBUG_LOGGERS.inputManager.log(`Velocity profile changed to: ${profileName}`);
         }
         return success;
     }
@@ -113,7 +117,7 @@ export class InputManager {
      */
     public setVelocitySensitivity(sensitivity: number): void {
         this.velocityProcessor.setSensitivity(sensitivity);
-        this.logToDebug(`Velocity sensitivity: ${sensitivity}`);
+        DEBUG_LOGGERS.inputManager.log(`Velocity sensitivity: ${sensitivity}`);
     }
     
     /**
@@ -154,7 +158,7 @@ export class InputManager {
     public createSettingsUI(containerId: string): void {
         const container = document.getElementById(containerId);
         if (!container) {
-            this.logToDebug(`Settings container ${containerId} not found`);
+            DEBUG_LOGGERS.inputManager.error(`Settings container ${containerId} not found`);
             return;
         }
         
@@ -180,199 +184,115 @@ export class InputManager {
     }
     
     private createVelocitySettings(): HTMLElement {
-        const section = document.createElement('div');
-        section.className = 'settings-section';
+        // Create profile selector
+        const profileOptions = this.getVelocityProfiles().map(profile => ({
+            value: profile,
+            text: profile.charAt(0).toUpperCase() + profile.slice(1)
+        }));
         
-        const title = document.createElement('h4');
-        title.textContent = 'Velocity Settings';
-        section.appendChild(title);
+        const profileSelect = createSelect(
+            profileOptions,
+            (value) => this.setVelocityProfile(value),
+            'velocity-profile-select'
+        );
         
-        // Velocity profile selector
-        const profileLabel = document.createElement('label');
-        profileLabel.textContent = 'Velocity Curve: ';
-        
-        const profileSelect = document.createElement('select');
-        profileSelect.className = 'velocity-profile-select';
-        
-        this.getVelocityProfiles().forEach(profileName => {
-            const option = document.createElement('option');
-            option.value = profileName;
-            option.textContent = profileName.charAt(0).toUpperCase() + profileName.slice(1);
-            profileSelect.appendChild(option);
+        // Create sensitivity slider
+        const sensitivitySlider = createSlider({
+            min: 0.1,
+            max: 2.0,
+            value: this.velocityProcessor.getSensitivity(),
+            step: 0.1,
+            onChange: (value) => this.setVelocitySensitivity(value)
         });
         
-        profileSelect.addEventListener('change', (e) => {
-            this.setVelocityProfile((e.target as HTMLSelectElement).value);
+        const section = createSection({
+            title: 'Velocity Settings',
+            className: 'settings-section',
+            content: [
+                createLabeledField('Velocity Curve:', profileSelect),
+                createLabeledField('Sensitivity:', sensitivitySlider)
+            ]
         });
-        
-        // Sensitivity slider
-        const sensitivityLabel = document.createElement('label');
-        sensitivityLabel.textContent = 'Sensitivity: ';
-        
-        const sensitivitySlider = document.createElement('input');
-        sensitivitySlider.type = 'range';
-        sensitivitySlider.min = '0.1';
-        sensitivitySlider.max = '2.0';
-        sensitivitySlider.step = '0.1';
-        sensitivitySlider.value = this.velocityProcessor.getSensitivity().toString();
-        
-        const sensitivityValue = document.createElement('span');
-        sensitivityValue.textContent = this.velocityProcessor.getSensitivity().toString();
-        
-        sensitivitySlider.addEventListener('input', (e) => {
-            const value = parseFloat((e.target as HTMLInputElement).value);
-            this.setVelocitySensitivity(value);
-            sensitivityValue.textContent = value.toString();
-        });
-        
-        section.appendChild(profileLabel);
-        section.appendChild(profileSelect);
-        section.appendChild(document.createElement('br'));
-        section.appendChild(sensitivityLabel);
-        section.appendChild(sensitivitySlider);
-        section.appendChild(sensitivityValue);
         
         return section;
     }
     
     private createHandlerToggles(): HTMLElement {
-        const section = document.createElement('div');
-        section.className = 'settings-section';
-        
-        const title = document.createElement('h4');
-        title.textContent = 'Input Methods';
-        section.appendChild(title);
+        const checkboxes: HTMLElement[] = [];
         
         this.handlers.forEach((handler, type) => {
-            const checkbox = this.createCheckbox(
-                handler.getType(),
-                handler.isEnabled(),
-                (checked) => this.setHandlerEnabled(type, checked)
-            );
-            section.appendChild(checkbox);
+            const checkbox = createCheckbox({
+                label: handler.getType(),
+                checked: handler.isEnabled(),
+                onChange: (checked) => this.setHandlerEnabled(type, checked)
+            });
+            checkboxes.push(checkbox);
+        });
+        
+        const section = createSection({
+            title: 'Input Methods',
+            className: 'settings-section',
+            content: checkboxes
         });
         
         return section;
     }
     
     private createAdvancedSettings(): HTMLElement {
-        const section = document.createElement('div');
-        section.className = 'settings-section';
-        
-        const title = document.createElement('h4');
-        title.textContent = 'Advanced Settings';
-        section.appendChild(title);
-        
         // Touch-specific settings
-        const aftertouchCheckbox = this.createCheckbox('Aftertouch', false, (checked) => {
-            this.setTouchOptions({ aftertouch: checked });
+        const aftertouchCheckbox = createCheckbox({
+            label: 'Aftertouch',
+            checked: false,
+            onChange: (checked) => this.setTouchOptions({ aftertouch: checked })
         });
         
-        const glissandoCheckbox = this.createCheckbox('Glissando', false, (checked) => {
-            this.setTouchOptions({ glissando: checked });
+        const glissandoCheckbox = createCheckbox({
+            label: 'Glissando', 
+            checked: false,
+            onChange: (checked) => this.setTouchOptions({ glissando: checked })
         });
         
-        // Keyboard octave
-        const octaveLabel = document.createElement('label');
-        octaveLabel.textContent = 'Keyboard Octave: ';
-        
-        const octaveSelect = document.createElement('select');
-        for (let i = 0; i <= 8; i++) {
-            const option = document.createElement('option');
-            option.value = i.toString();
-            option.textContent = `Octave ${i}`;
-            option.selected = i === 4; // Default to C4
-            octaveSelect.appendChild(option);
+        // Keyboard octave selector
+        const octaveOptions = createNumberRange(0, 8, 'Octave ');
+        const defaultOctaveOption = octaveOptions[4];
+        if (defaultOctaveOption) {
+            defaultOctaveOption.selected = true; // Default to C4
         }
         
-        octaveSelect.addEventListener('change', (e) => {
-            this.setKeyboardOctave(parseInt((e.target as HTMLSelectElement).value));
-        });
+        const octaveSelect = createSelect(
+            octaveOptions,
+            (value) => this.setKeyboardOctave(parseInt(value))
+        );
         
-        section.appendChild(aftertouchCheckbox);
-        section.appendChild(glissandoCheckbox);
-        section.appendChild(octaveLabel);
-        section.appendChild(octaveSelect);
+        const section = createSection({
+            title: 'Advanced Settings',
+            className: 'settings-section',
+            content: [
+                aftertouchCheckbox,
+                glissandoCheckbox,
+                createLabeledField('Keyboard Octave:', octaveSelect)
+            ]
+        });
         
         return section;
     }
     
-    private createCheckbox(label: string, checked: boolean, onChange: (checked: boolean) => void): HTMLElement {
-        const container = document.createElement('label');
-        container.className = 'checkbox-container';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = checked;
-        
-        checkbox.addEventListener('change', (e) => {
-            onChange((e.target as HTMLInputElement).checked);
-        });
-        
-        container.appendChild(checkbox);
-        container.appendChild(document.createTextNode(' ' + label));
-        
-        return container;
-    }
     
     private addSettingsStyles(): void {
-        if (document.getElementById('input-manager-styles')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'input-manager-styles';
-        style.textContent = `
+        const customStyles = `
             .input-manager-settings {
-                background: #333;
-                border-radius: 5px;
-                padding: 15px;
-                color: white;
                 margin-top: 10px;
-            }
-            
-            .settings-section {
-                margin-bottom: 15px;
-                padding-bottom: 10px;
-                border-bottom: 1px solid #555;
-            }
-            
-            .settings-section:last-child {
-                border-bottom: none;
-            }
-            
-            .settings-section h4 {
-                margin: 0 0 10px 0;
-                color: #ccc;
-                font-size: 14px;
             }
             
             .velocity-profile-select {
                 width: 150px;
                 padding: 3px;
                 margin: 5px;
-                background: #222;
-                color: white;
-                border: 1px solid #555;
-                border-radius: 3px;
-            }
-            
-            .checkbox-container {
-                display: block;
-                margin: 5px 0;
-                cursor: pointer;
-                font-size: 13px;
-            }
-            
-            .checkbox-container input {
-                margin-right: 5px;
-            }
-            
-            input[type="range"] {
-                width: 100px;
-                margin: 0 5px;
             }
         `;
         
-        document.head.appendChild(style);
+        const componentStyles = generateComponentStyles('InputManager', customStyles);
+        injectStyles('input-manager-styles', componentStyles);
     }
     
     /**
@@ -394,17 +314,7 @@ export class InputManager {
             this.settingsElement = null;
         }
         
-        this.logToDebug('Input Manager cleaned up');
+        DEBUG_LOGGERS.inputManager.log('Input Manager cleaned up');
     }
     
-    /**
-     * Log to debug textarea
-     */
-    private logToDebug(message: string): void {
-        const debugLog = document.getElementById('debug-log') as HTMLTextAreaElement;
-        if (debugLog) {
-            debugLog.value += `[Input Manager] ${message}\n`;
-            debugLog.scrollTop = debugLog.scrollHeight;
-        }
-    }
 }
