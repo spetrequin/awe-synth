@@ -415,6 +415,22 @@ Remember: **Debug-first development with comprehensive error handling is not opt
 
 ## 🎯 **TOKEN-EFFICIENT DEVELOPMENT STRATEGY**
 
+### **📋 TODO LIST MAINTENANCE (MANDATORY)**
+
+**⚠️ CRITICAL INSTRUCTION: After EVERY file alteration, ALWAYS update PROJECT_TODO.md to reflect current task status.**
+
+**Required Todo List Updates:**
+1. **After completing any task** → Mark as [COMPLETED] in PROJECT_TODO.md
+2. **When starting any task** → Mark as [IN_PROGRESS] in PROJECT_TODO.md  
+3. **After file changes** → Update progress summary and completion percentages
+4. **Before moving to next phase** → Verify all tasks in current phase are marked correctly
+
+**Why This Is Critical:**
+- **Session continuity** - New sessions can immediately see current status
+- **Progress tracking** - Clear visibility into what has been accomplished
+- **Documentation sync** - TodoWrite tool and PROJECT_TODO.md must stay aligned
+- **Phase management** - Accurate completion tracking for branch transitions
+
 ### **CRITICAL RULE: Prevent Token Exhaustion**
 
 **PROBLEM:** Complex tasks consume excessive tokens, causing development interruptions.
