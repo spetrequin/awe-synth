@@ -1,0 +1,47 @@
+[
+    {
+        "program": 0,
+        "name": "Standard Kit",
+        "description": "Default GM drum kit"
+    },
+    {
+        "program": 8,
+        "name": "Room Kit",
+        "description": "Drums with room ambience"
+    },
+    {
+        "program": 16,
+        "name": "Power Kit",
+        "description": "Punchy, powerful drums"
+    },
+    {
+        "program": 24,
+        "name": "Electronic Kit",
+        "description": "Electronic/synthetic drums"
+    },
+    {
+        "program": 25,
+        "name": "TR-808 Kit",
+        "description": "Classic 808 sounds"
+    },
+    {
+        "program": 32,
+        "name": "Jazz Kit",
+        "description": "Brush and jazz drums"
+    },
+    {
+        "program": 40,
+        "name": "Brush Kit",
+        "description": "Soft brush drums"
+    },
+    {
+        "program": 48,
+        "name": "Orchestra Kit",
+        "description": "Orchestral percussion"
+    },
+    {
+        "program": 56,
+        "name": "SFX Kit",
+        "description": "Sound effects kit"
+    }
+]

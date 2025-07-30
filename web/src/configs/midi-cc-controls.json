@@ -1,0 +1,112 @@
+[
+    {
+        "cc": -1,
+        "name": "Pitch Bend",
+        "type": "slider",
+        "min": -8192,
+        "max": 8191,
+        "default": 0,
+        "bipolar": true,
+        "category": "performance"
+    },
+    {
+        "cc": 1,
+        "name": "Modulation",
+        "type": "slider",
+        "min": 0,
+        "max": 127,
+        "default": 0,
+        "category": "performance"
+    },
+    {
+        "cc": 64,
+        "name": "Sustain Pedal",
+        "type": "button",
+        "min": 0,
+        "max": 127,
+        "default": 0,
+        "category": "performance"
+    },
+    {
+        "cc": 7,
+        "name": "Volume",
+        "type": "slider",
+        "min": 0,
+        "max": 127,
+        "default": 100,
+        "category": "mix"
+    },
+    {
+        "cc": 10,
+        "name": "Pan",
+        "type": "knob",
+        "min": 0,
+        "max": 127,
+        "default": 64,
+        "bipolar": true,
+        "category": "mix"
+    },
+    {
+        "cc": 11,
+        "name": "Expression",
+        "type": "slider",
+        "min": 0,
+        "max": 127,
+        "default": 127,
+        "category": "mix"
+    },
+    {
+        "cc": 91,
+        "name": "Reverb",
+        "type": "knob",
+        "min": 0,
+        "max": 127,
+        "default": 40,
+        "category": "effects"
+    },
+    {
+        "cc": 93,
+        "name": "Chorus",
+        "type": "knob",
+        "min": 0,
+        "max": 127,
+        "default": 0,
+        "category": "effects"
+    },
+    {
+        "cc": 74,
+        "name": "Brightness",
+        "type": "knob",
+        "min": 0,
+        "max": 127,
+        "default": 64,
+        "category": "effects"
+    },
+    {
+        "cc": 72,
+        "name": "Release Time",
+        "type": "knob",
+        "min": 0,
+        "max": 127,
+        "default": 64,
+        "category": "envelope"
+    },
+    {
+        "cc": 73,
+        "name": "Attack Time",
+        "type": "knob",
+        "min": 0,
+        "max": 127,
+        "default": 64,
+        "category": "envelope"
+    },
+    {
+        "cc": 65,
+        "name": "Portamento",
+        "type": "button",
+        "min": 0,
+        "max": 127,
+        "default": 0,
+        "category": "envelope"
+    }
+]

@@ -1,0 +1,237 @@
+[
+    {
+        "note": 35,
+        "name": "Acoustic Bass Drum",
+        "category": "Bass Drum"
+    },
+    {
+        "note": 36,
+        "name": "Bass Drum 1",
+        "category": "Bass Drum"
+    },
+    {
+        "note": 37,
+        "name": "Side Stick",
+        "category": "Snare"
+    },
+    {
+        "note": 38,
+        "name": "Acoustic Snare",
+        "category": "Snare"
+    },
+    {
+        "note": 39,
+        "name": "Hand Clap",
+        "category": "Snare"
+    },
+    {
+        "note": 40,
+        "name": "Electric Snare",
+        "category": "Snare"
+    },
+    {
+        "note": 41,
+        "name": "Low Floor Tom",
+        "category": "Tom"
+    },
+    {
+        "note": 42,
+        "name": "Closed Hi-Hat",
+        "category": "Hi-Hat"
+    },
+    {
+        "note": 43,
+        "name": "High Floor Tom",
+        "category": "Tom"
+    },
+    {
+        "note": 44,
+        "name": "Pedal Hi-Hat",
+        "category": "Hi-Hat"
+    },
+    {
+        "note": 45,
+        "name": "Low Tom",
+        "category": "Tom"
+    },
+    {
+        "note": 46,
+        "name": "Open Hi-Hat",
+        "category": "Hi-Hat"
+    },
+    {
+        "note": 47,
+        "name": "Low-Mid Tom",
+        "category": "Tom"
+    },
+    {
+        "note": 48,
+        "name": "Hi-Mid Tom",
+        "category": "Tom"
+    },
+    {
+        "note": 49,
+        "name": "Crash Cymbal 1",
+        "category": "Cymbal"
+    },
+    {
+        "note": 50,
+        "name": "High Tom",
+        "category": "Tom"
+    },
+    {
+        "note": 51,
+        "name": "Ride Cymbal 1",
+        "category": "Cymbal"
+    },
+    {
+        "note": 52,
+        "name": "Chinese Cymbal",
+        "category": "Cymbal"
+    },
+    {
+        "note": 53,
+        "name": "Ride Bell",
+        "category": "Cymbal"
+    },
+    {
+        "note": 54,
+        "name": "Tambourine",
+        "category": "Percussion"
+    },
+    {
+        "note": 55,
+        "name": "Splash Cymbal",
+        "category": "Cymbal"
+    },
+    {
+        "note": 56,
+        "name": "Cowbell",
+        "category": "Percussion"
+    },
+    {
+        "note": 57,
+        "name": "Crash Cymbal 2",
+        "category": "Cymbal"
+    },
+    {
+        "note": 58,
+        "name": "Vibraslap",
+        "category": "Percussion"
+    },
+    {
+        "note": 59,
+        "name": "Ride Cymbal 2",
+        "category": "Cymbal"
+    },
+    {
+        "note": 60,
+        "name": "Hi Bongo",
+        "category": "Latin"
+    },
+    {
+        "note": 61,
+        "name": "Low Bongo",
+        "category": "Latin"
+    },
+    {
+        "note": 62,
+        "name": "Mute Hi Conga",
+        "category": "Latin"
+    },
+    {
+        "note": 63,
+        "name": "Open Hi Conga",
+        "category": "Latin"
+    },
+    {
+        "note": 64,
+        "name": "Low Conga",
+        "category": "Latin"
+    },
+    {
+        "note": 65,
+        "name": "High Timbale",
+        "category": "Latin"
+    },
+    {
+        "note": 66,
+        "name": "Low Timbale",
+        "category": "Latin"
+    },
+    {
+        "note": 67,
+        "name": "High Agogo",
+        "category": "Latin"
+    },
+    {
+        "note": 68,
+        "name": "Low Agogo",
+        "category": "Latin"
+    },
+    {
+        "note": 69,
+        "name": "Cabasa",
+        "category": "Latin"
+    },
+    {
+        "note": 70,
+        "name": "Maracas",
+        "category": "Percussion"
+    },
+    {
+        "note": 71,
+        "name": "Short Whistle",
+        "category": "Effects"
+    },
+    {
+        "note": 72,
+        "name": "Long Whistle",
+        "category": "Effects"
+    },
+    {
+        "note": 73,
+        "name": "Short Guiro",
+        "category": "Percussion"
+    },
+    {
+        "note": 74,
+        "name": "Long Guiro",
+        "category": "Percussion"
+    },
+    {
+        "note": 75,
+        "name": "Claves",
+        "category": "Percussion"
+    },
+    {
+        "note": 76,
+        "name": "Hi Wood Block",
+        "category": "Percussion"
+    },
+    {
+        "note": 77,
+        "name": "Low Wood Block",
+        "category": "Percussion"
+    },
+    {
+        "note": 78,
+        "name": "Mute Cuica",
+        "category": "Effects"
+    },
+    {
+        "note": 79,
+        "name": "Open Cuica",
+        "category": "Effects"
+    },
+    {
+        "note": 80,
+        "name": "Mute Triangle",
+        "category": "Percussion"
+    },
+    {
+        "note": 81,
+        "name": "Open Triangle",
+        "category": "Percussion"
+    }
+]
