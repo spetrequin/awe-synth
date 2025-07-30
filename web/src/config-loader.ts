@@ -33,7 +33,12 @@ class ConfigurationLoader {
             
             return config as T;
         } catch (error) {
-            console.error(`Error loading config ${configName}:`, error);
+            // Log to debug textarea instead of console
+            const debugLog = document.getElementById('debug-log') as HTMLTextAreaElement;
+            if (debugLog) {
+                debugLog.value += `[Config Loader] Error loading config ${configName}: ${error}\n`;
+                debugLog.scrollTop = debugLog.scrollHeight;
+            }
             throw error;
         }
     }

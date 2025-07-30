@@ -20,7 +20,7 @@ export class ControlGroupBuilder {
     public createAllGroups(): HTMLElement[] {
         const groups: HTMLElement[] = [];
         
-        Object.entries(CONTROL_GROUPS).forEach(([key, groupDef]) => {
+        Object.entries(CONTROL_GROUPS).forEach(([, groupDef]) => {
             const groupElement = this.createControlGroup(groupDef.title, groupDef.controls);
             groups.push(groupElement);
         });
