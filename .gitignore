@@ -23,7 +23,9 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Test files
+# Test files and SoundFonts
 *.mid
-*.sf2
-!/resources/**/*.sf2
+
+# SoundFont files - ignore in resources but allow test SoundFonts elsewhere
+/resources/sf2/*.sf2
+/resources/sf2/**/*.sf2

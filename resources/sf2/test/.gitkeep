@@ -1,0 +1,4 @@
+# Test SoundFonts Directory
+
+Place small test SoundFonts here for development.
+All .sf2 files in this directory will be ignored by Git.
