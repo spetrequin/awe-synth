@@ -463,6 +463,187 @@ interface MidiEvent {
 - Backup input method when hardware fails
 - Touch device compatibility (tablets/phones)
 
+## 🎼 MIDI File Loading and Playback Architecture
+
+### **Complete Standard MIDI File Support**
+
+**Purpose**: Load and play complex MIDI compositions to test EMU8000 synthesis under realistic musical scenarios.
+
+**MIDI File Format Support:**
+- **Format 0**: Single track with all events
+- **Format 1**: Multi-track with separate channel tracks (most common)
+- **Format 2**: Multi-sequence (less common, but supported)
+- **Timing**: Both ticks-per-quarter-note and SMPTE time formats
+
+### **MIDI File Components**
+
+**1. File Loading Interface (`midi-file-loader.ts`):**
+```typescript
+interface MidiFileInfo {
+    name: string;
+    format: 0 | 1 | 2;          // SMF format type
+    trackCount: number;         // Number of tracks
+    division: number;           // Ticks per quarter note or SMPTE
+    duration: number;           // Total duration in seconds
+    eventCount: number;         // Total MIDI events
+    channels: number[];         // Active MIDI channels (0-15)
+}
+
+class MidiFileLoader {
+    // Drag & drop interface
+    loadFromFile(file: File): Promise<MidiFileInfo>;
+    
+    // Playback controls
+    play(): void;
+    pause(): void;
+    stop(): void;
+    seek(position: number): void; // Position in seconds
+    
+    // Current playback state
+    getCurrentPosition(): number;
+    getTotalDuration(): number;
+    isPlaying(): boolean;
+}
+```
+
+**2. MIDI File Parser (Rust: `src/midi/parser.rs`):**
+```rust
+pub struct MidiFile {
+    pub format: u16,              // 0, 1, or 2
+    pub track_count: u16,         // Number of tracks
+    pub division: u16,            // Ticks per quarter note
+    pub tracks: Vec<MidiTrack>,   // All tracks with events
+}
+
+pub struct MidiTrack {
+    pub events: Vec<MidiEvent>,   // Time-sorted events
+    pub name: Option<String>,     // Track name (meta event)
+    pub channel: Option<u8>,      // Primary channel (if single-channel)
+}
+
+pub struct MidiEvent {
+    pub delta_time: u32,          // Ticks since last event
+    pub absolute_time: u64,       // Absolute time in ticks
+    pub event_type: MidiEventType,
+}
+```
+
+**3. MIDI Event Types:**
+```rust
+pub enum MidiEventType {
+    // Channel Voice Messages
+    NoteOff { channel: u8, note: u8, velocity: u8 },
+    NoteOn { channel: u8, note: u8, velocity: u8 },
+    ControlChange { channel: u8, controller: u8, value: u8 },
+    ProgramChange { channel: u8, program: u8 },
+    PitchBend { channel: u8, value: i16 }, // -8192 to +8191
+    
+    // Meta Events
+    SetTempo { microseconds_per_quarter: u32 },
+    TimeSignature { numerator: u8, denominator: u8 },
+    KeySignature { key: i8, mode: u8 },
+    TrackName { name: String },
+    EndOfTrack,
+    
+    // System Exclusive
+    SysEx { data: Vec<u8> },
+}
+```
+
+### **Advanced MIDI File Features**
+
+**4. Tempo and Timing Management:**
+```typescript
+class MidiTimingEngine {
+    private currentTempo: number = 500000;    // Microseconds per quarter note (120 BPM default)
+    private ticksPerQuarter: number;
+    private sampleRate: number = 44100;
+    
+    // Convert MIDI ticks to audio samples
+    ticksToSamples(ticks: number): number {
+        const quarterNoteDuration = this.currentTempo / 1000000; // seconds
+        const tickDuration = quarterNoteDuration / this.ticksPerQuarter;
+        return Math.round(tickDuration * this.sampleRate);
+    }
+    
+    // Handle tempo changes during playback
+    updateTempo(newTempo: number): void {
+        this.currentTempo = newTempo;
+        // Recalculate timing for remaining events
+    }
+}
+```
+
+**5. Multi-Track Synchronization:**
+- **Event merging**: All tracks merged into single time-sorted event stream  
+- **Channel separation**: Events routed to appropriate MIDI channels (0-15)
+- **Tempo map**: Dynamic tempo changes applied in real-time
+- **Time signature**: Musical timing context for accurate playback
+
+### **MIDI File Testing Scenarios**
+
+**✅ EMU8000 Compatibility Testing:**
+- **General MIDI files**: Test all 128 GM instrument assignments
+- **Multi-channel compositions**: Verify 16-channel polyphony  
+- **Complex timing**: Triplets, syncopation, tempo changes
+- **Voice allocation stress**: Dense passages testing 32-voice limit
+- **Controller sweeps**: Pitch bend, modulation, volume automation
+
+**✅ SoundFont Integration Testing:**
+- **Bank select messages**: Test instrument switching
+- **Velocity layers**: Verify velocity-sensitive sample selection
+- **Sustain pedal**: Test note sustain and release behavior
+- **Effects automation**: CC modulation of filter, reverb, chorus
+
+### **Unified MIDI Event Architecture**
+
+**Triple Input Source Design:**
+```
+Virtual Keyboard Events  \
+Hardware MIDI Devices     → Unified MIDI Router → Event Queue → WASM → Audio
+MIDI File Playback       /
+```
+
+**Event Priority and Mixing:**
+1. **Real-time inputs** (keyboard/hardware) take immediate priority
+2. **File playback** continues in background
+3. **Graceful mixing** of multiple sources  
+4. **Same event queue** ensures consistent timing for all sources
+
+**TypeScript Coordination Layer:**
+```typescript
+class UnifiedMidiRouter {
+    private virtualKeyboard: VirtualMidiKeyboard;
+    private hardwareInput: WebMidiInput;
+    private filePlayer: MidiFileLoader;
+    private wasmEventQueue: WasmMidiQueue;
+    
+    // Route events from any source to WASM
+    routeEvent(event: MidiEvent, source: 'virtual' | 'hardware' | 'file'): void {
+        // Add sample-accurate timestamp
+        const sampleTime = this.audioContext.currentTime * 44100;
+        event.timestamp = sampleTime;
+        
+        // Queue to WASM with source identification
+        this.wasmEventQueue.push(event);
+    }
+}
+```
+
+### **Development and Testing Benefits**
+
+**✅ Comprehensive EMU8000 Testing:**
+- **Real musical content** tests synthesis under authentic conditions
+- **Multi-instrument compositions** verify General MIDI compatibility  
+- **Complex timing** tests sample-accurate sequencing
+- **Extended compositions** test voice management and memory efficiency
+
+**✅ Musical Accuracy Validation:**
+- **Compare with reference implementations** (FluidSynth, hardware AWE32)
+- **Timing precision verification** with metronome and tempo-critical pieces
+- **Expression and dynamics** testing with classical and jazz compositions
+- **Genre-specific testing** (orchestral, rock, electronic, etc.)
+
 ## 📁 Project File Structure
 
 ```
@@ -493,6 +674,7 @@ src/                          # Rust/WASM Core
 web/                          # TypeScript Web Interface
 ├── src/
 │   ├── virtual-midi-keyboard.ts  # 88-key virtual piano interface
+│   ├── midi-file-loader.ts  # MIDI file drag/drop and playback controls
 │   ├── midi-input.ts        # WebMIDI device handling (ONLY complex TS)
 │   ├── ui-controls.ts       # Simple UI management
 │   ├── file-loader.ts       # File drag & drop handling
