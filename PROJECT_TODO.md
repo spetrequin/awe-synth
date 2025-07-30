@@ -70,22 +70,28 @@ After completing all 12 foundation tasks, next micro-tasks will be:
 **Branch:** `typescript-midi-integration`  
 **Strategy:** Develop MIDI and synth together to prevent integration issues
 
-### **MIDI Integration Tasks (14 High Priority Micro-Tasks)**
+### **MIDI Integration Tasks (18 High Priority Micro-Tasks)**
+
+**🚨 INTEGRATION REQUIREMENT:** Every MIDI task includes corresponding synthesis verification
 
 1. **[PENDING] web-package-json** - Create web/package.json with TypeScript and WebMIDI dependencies
 2. **[PENDING] web-tsconfig** - Create web/tsconfig.json for TypeScript configuration  
 3. **[PENDING] webmidi-device-discovery** - Create web/src/midi-input.ts - WebMIDI device discovery and connection
 4. **[PENDING] midi-message-parsing** - Implement MIDI message parsing and validation in midi-input.ts
 5. **[PENDING] wasm-midi-queue** - Add lock-free MIDI event queue interface to src/lib.rs (WASM side)
-6. **[PENDING] midi-timing-bridge** - Create TypeScript↔WASM bridge for MIDI events with sample-accurate timing
-7. **[PENDING] midi-device-management** - Implement MIDI device state management (connect/disconnect)
-8. **[PENDING] rust-midi-sequencer** - Add basic MIDI sequencer structure in src/midi/sequencer.rs
-9. **[PENDING] midi-voice-connection** - Connect VoiceManager to MIDI events (note_on/note_off)
-10. **[PENDING] ui-controls** - Create web/src/ui-controls.ts for play/pause/stop interface
-11. **[PENDING] html-typescript-integration** - Update index.html to load TypeScript modules and MIDI interface
-12. **[PENDING] end-to-end-midi-test** - Build and test MIDI input→WASM→audio output pipeline
-13. **[PENDING] midi-file-parser** - Add MIDI file parser basics in src/midi/parser.rs
-14. **[PENDING] hardware-midi-test** - Test with real MIDI hardware device and verify sample-accurate timing
+6. **[PENDING] midi-queue-voice-integration** - 🔄 INTEGRATION CHECK: Verify MIDI queue integration with VoiceManager
+7. **[PENDING] midi-timing-bridge** - Create TypeScript↔WASM bridge for MIDI events with sample-accurate timing
+8. **[PENDING] midi-device-management** - Implement MIDI device state management (connect/disconnect)
+9. **[PENDING] rust-midi-sequencer** - Add basic MIDI sequencer structure in src/midi/sequencer.rs
+10. **[PENDING] sequencer-voice-timing-integration** - 🔄 INTEGRATION CHECK: Verify sequencer timing affects voice envelope timing
+11. **[PENDING] midi-voice-connection** - Connect VoiceManager to MIDI events (note_on/note_off)
+12. **[PENDING] voice-allocation-midi-integration** - 🔄 INTEGRATION CHECK: Test voice allocation/stealing with MIDI priority
+13. **[PENDING] ui-controls** - Create web/src/ui-controls.ts for play/pause/stop interface
+14. **[PENDING] html-typescript-integration** - Update index.html to load TypeScript modules and MIDI interface
+15. **[PENDING] end-to-end-midi-test** - Build and test MIDI input→WASM→audio output pipeline
+16. **[PENDING] midi-file-parser** - Add MIDI file parser basics in src/midi/parser.rs
+17. **[PENDING] midi-file-synth-integration** - 🔄 INTEGRATION CHECK: Verify MIDI file timing affects synthesis parameters
+18. **[PENDING] hardware-midi-test** - Test with real MIDI hardware device and verify sample-accurate timing
 
 ### **Integration Philosophy**
 - **TypeScript handles only WebMIDI coordination** (device management, event capture)

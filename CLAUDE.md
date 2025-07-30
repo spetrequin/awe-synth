@@ -40,6 +40,28 @@ AWE Player is a WebAssembly-based EMU8000 emulator written in Rust that provides
 
 ## 🏗️ **ARCHITECTURE PRINCIPLES**
 
+### **🚨 CRITICAL: MIDI↔Synth Integration Requirement**
+
+**⚠️ MANDATORY INTEGRATION CHECK:** Every change to MIDI components must verify impact on synthesis components, and vice versa.
+
+**Why This Is Critical:**
+- **MIDI and synthesis are tightly coupled** - MIDI events directly control voice allocation, effects, and real-time parameters
+- **Timing dependencies** - MIDI sequencer timing affects envelope timing, LFO sync, and sample-accurate note events
+- **Parameter interdependence** - MIDI CC controllers modify synthesis parameters in real-time
+- **Voice management coordination** - MIDI note events trigger voice allocation/stealing in synthesis engine
+
+**Required Integration Verification Process:**
+1. **MIDI Changes** → Check impact on: VoiceManager, Voice synthesis, effects parameters, timing accuracy
+2. **Synth Changes** → Check impact on: MIDI sequencer, event processing, voice allocation, real-time updates
+3. **Create todos for both sides** - Every implementation task must include corresponding integration tasks
+4. **Test end-to-end pipeline** - MIDI input → synthesis → audio output verification required
+
+**Example Integration Dependencies:**
+- MIDI note_on events → Voice.start_note() → envelope trigger → effects parameter update
+- MIDI CC events → real-time synthesis parameter changes → voice parameter updates  
+- MIDI timing → sample-accurate voice scheduling → envelope sync → effects modulation
+- Voice stealing algorithm → MIDI priority handling → note_off event generation
+
 ### **EMU8000 Hardware Requirements**
 
 The EMU8000 was the sound synthesis chip used in Creative Sound Blaster AWE32/64 cards:
