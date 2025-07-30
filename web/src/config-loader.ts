@@ -4,7 +4,7 @@
  */
 
 export interface ConfigCache {
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 class ConfigurationLoader {

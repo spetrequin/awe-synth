@@ -4,6 +4,7 @@
  */
 
 import { VirtualMidiKeyboard } from './virtual-midi-keyboard.js';
+import { EnhancedTouch } from './types/input-types.js';
 
 interface VelocityProfile {
     name: string;
@@ -149,10 +150,10 @@ export class KeyboardInputHandler {
                         note: note,
                         startTime: performance.now(),
                         startY: touch.clientY,
-                        pressure: (touch as any).force || 0
+                        pressure: (touch as EnhancedTouch).force || 0
                     });
                     
-                    this.keyboard.handleKeyPress(note, touch as any);
+                    this.keyboard.handleKeyPress(note, touch as unknown as MouseEvent);
                 }
             }
         }) as EventListener);
@@ -180,7 +181,7 @@ export class KeyboardInputHandler {
                                 this.keyboard.handleKeyRelease(touchInfo.note);
                                 
                                 // Play new note
-                                this.keyboard.handleKeyPress(newNote, touch as any);
+                                this.keyboard.handleKeyPress(newNote, touch as unknown as MouseEvent);
                                 
                                 // Update touch info
                                 touchInfo.note = newNote;
@@ -258,8 +259,8 @@ export class KeyboardInputHandler {
             if (!touch) continue;
             const touchInfo = this.activeTouches.get(touch.identifier);
             
-            if (touchInfo && (touch as any).force !== undefined) {
-                const pressure = Math.round((touch as any).force * 127);
+            if (touchInfo && (touch as EnhancedTouch).force !== undefined) {
+                const pressure = Math.round(((touch as EnhancedTouch).force || 0) * 127);
                 
                 if (pressure !== touchInfo.pressure) {
                     // Send channel pressure (aftertouch)

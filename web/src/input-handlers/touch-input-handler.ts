@@ -4,6 +4,7 @@
  */
 
 import { BaseInputHandler, InputHandlerOptions } from './base-input-handler.js';
+import { EnhancedTouch, EnhancedTouchEvent } from '../types/input-types.js';
 import { INPUT_TIMING } from '../midi-constants.js';
 
 interface TouchInfo {
@@ -93,10 +94,10 @@ export class TouchInputHandler extends BaseInputHandler {
                     note: note,
                     startTime: performance.now(),
                     startY: touch.clientY,
-                    pressure: (touch as any).force || 0
+                    pressure: (touch as EnhancedTouch).force || 0
                 });
                 
-                this.keyboard.handleKeyPress(note, touch as any);
+                this.keyboard.handleKeyPress(note, touch as unknown as MouseEvent);
                 this.log(`Touch start: Note ${note}, velocity ${velocity}`);
             }
         }
@@ -154,7 +155,7 @@ export class TouchInputHandler extends BaseInputHandler {
                         this.keyboard.handleKeyRelease(touchInfo.note);
                         
                         // Play new note
-                        this.keyboard.handleKeyPress(newNote, touch as any);
+                        this.keyboard.handleKeyPress(newNote, touch as unknown as MouseEvent);
                         
                         // Update touch info
                         touchInfo.note = newNote;
@@ -174,8 +175,8 @@ export class TouchInputHandler extends BaseInputHandler {
             
             const touchInfo = this.activeTouches.get(touch.identifier);
             
-            if (touchInfo && (touch as any).force !== undefined) {
-                const pressure = Math.round((touch as any).force * 127);
+            if (touchInfo && (touch as EnhancedTouch).force !== undefined) {
+                const pressure = Math.round(((touch as EnhancedTouch).force || 0) * 127);
                 
                 if (pressure !== touchInfo.pressure) {
                     // Send channel pressure (aftertouch)
@@ -199,11 +200,11 @@ export class TouchInputHandler extends BaseInputHandler {
         const normalizedY = relativeY / rect.height;
         
         // Consider touch radius if available
-        const radius = (touch as any).radiusX || 10;
+        const radius = (touch as EnhancedTouch).radiusX || 10;
         const radiusBonus = Math.min(radius / INPUT_TIMING.TOUCH_RADIUS_MAX, 0.2);
         
         // Consider pressure if available
-        const pressure = (touch as any).force || 0.5;
+        const pressure = (touch as EnhancedTouch).force || 0.5;
         
         // Combine factors
         let rawVelocity = (1 - normalizedY) * 0.7 + radiusBonus + pressure * 0.3;

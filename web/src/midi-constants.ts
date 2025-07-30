@@ -152,13 +152,21 @@ export const noteToOctave = (note: number): number =>
 
 export const noteToNoteName = (note: number): string => {
     const noteIndex = note % MIDI_NOTES.OCTAVE_SIZE;
-    const whiteKeyIndex = PIANO_LAYOUT.WHITE_KEY_PATTERN.indexOf(noteIndex as any);
-    if (whiteKeyIndex >= 0 && PIANO_LAYOUT.NOTE_NAMES[whiteKeyIndex]) {
-        return PIANO_LAYOUT.NOTE_NAMES[whiteKeyIndex];
+    
+    // Type-safe check for white keys
+    const whiteKeyPattern = PIANO_LAYOUT.WHITE_KEY_PATTERN as readonly number[];
+    const whiteKeyIndex = whiteKeyPattern.indexOf(noteIndex);
+    if (whiteKeyIndex >= 0) {
+        const noteName = PIANO_LAYOUT.NOTE_NAMES[whiteKeyIndex];
+        if (noteName) {
+            return noteName;
+        }
     }
-    // Handle black keys
-    const blackKeyNames = ['C#', 'D#', 'F#', 'G#', 'A#'];
-    const blackKeyIndex = PIANO_LAYOUT.BLACK_KEY_PATTERN.indexOf(noteIndex as any);
+    
+    // Type-safe check for black keys
+    const blackKeyPattern = PIANO_LAYOUT.BLACK_KEY_PATTERN as readonly number[];
+    const blackKeyNames = ['C#', 'D#', 'F#', 'G#', 'A#'] as const;
+    const blackKeyIndex = blackKeyPattern.indexOf(noteIndex);
     return (blackKeyIndex >= 0 && blackKeyNames[blackKeyIndex]) ? blackKeyNames[blackKeyIndex] : '?';
 };
 
@@ -166,6 +174,26 @@ export const noteToFullName = (note: number): string => {
     const noteName = noteToNoteName(note);
     const octave = noteToOctave(note);
     return `${noteName}${octave}`;
+};
+
+// Type guards for MIDI validation
+export const isValidMIDIValue = (value: number): value is number =>
+    Number.isInteger(value) && value >= MIDI_VALUES.MIN && value <= MIDI_VALUES.MAX;
+
+export const isValidMIDINote = (note: number): note is number =>
+    Number.isInteger(note) && note >= MIDI_NOTES.LOWEST && note <= MIDI_NOTES.HIGHEST;
+
+export const isValidMIDIChannel = (channel: number): channel is number =>
+    Number.isInteger(channel) && channel >= 0 && channel <= 15;
+
+export const isWhiteKey = (noteInOctave: number): boolean => {
+    const whiteKeyPattern = PIANO_LAYOUT.WHITE_KEY_PATTERN as readonly number[];
+    return whiteKeyPattern.includes(noteInOctave);
+};
+
+export const isBlackKey = (noteInOctave: number): boolean => {
+    const blackKeyPattern = PIANO_LAYOUT.BLACK_KEY_PATTERN as readonly number[];
+    return blackKeyPattern.includes(noteInOctave);
 };
 
 // Velocity Curve Functions

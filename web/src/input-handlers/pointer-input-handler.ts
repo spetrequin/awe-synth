@@ -59,7 +59,7 @@ export class PointerInputHandler extends BaseInputHandler {
         const note = parseInt(target.dataset.note || '0');
         const velocity = this.calculatePointerVelocity(e);
         
-        this.keyboard.handleKeyPress(note, e as any);
+        this.keyboard.handleKeyPress(note, e as unknown as MouseEvent);
         this.log(`Pointer down: Note ${note}, velocity ${velocity}, pressure: ${e.pressure}`);
     }) as EventListener;
     

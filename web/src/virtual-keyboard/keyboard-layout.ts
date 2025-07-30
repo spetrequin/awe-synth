@@ -3,7 +3,7 @@
  * Part of AWE Player EMU8000 Emulator
  */
 
-import { MIDI_NOTES, PIANO_LAYOUT, UI_CONSTANTS, noteToFullName } from '../midi-constants.js';
+import { MIDI_NOTES, UI_CONSTANTS, noteToFullName, isBlackKey } from '../midi-constants.js';
 
 export interface KeyLayout {
     noteNumber: number;
@@ -41,7 +41,7 @@ export class KeyboardLayoutGenerator {
         
         const octave = Math.floor((noteNumber - 12) / MIDI_NOTES.OCTAVE_SIZE);
         const noteInOctave = noteNumber % MIDI_NOTES.OCTAVE_SIZE;
-        const isBlack = PIANO_LAYOUT.BLACK_KEY_PATTERN.includes(noteInOctave as any);
+        const isBlack = isBlackKey(noteInOctave);
         const noteName = noteToFullName(noteNumber);
         
         return {
@@ -116,7 +116,7 @@ export class KeyboardLayoutGenerator {
      */
     public isWhiteKey(noteNumber: number): boolean {
         const noteInOctave = noteNumber % MIDI_NOTES.OCTAVE_SIZE;
-        return PIANO_LAYOUT.WHITE_KEY_PATTERN.includes(noteInOctave as any);
+        return !isBlackKey(noteInOctave);
     }
     
     /**
@@ -124,7 +124,7 @@ export class KeyboardLayoutGenerator {
      */
     public isBlackKey(noteNumber: number): boolean {
         const noteInOctave = noteNumber % MIDI_NOTES.OCTAVE_SIZE;
-        return PIANO_LAYOUT.BLACK_KEY_PATTERN.includes(noteInOctave as any);
+        return isBlackKey(noteInOctave);
     }
     
     /**
