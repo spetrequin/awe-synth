@@ -1,0 +1,23 @@
+{
+  "name": "awe-synth-web",
+  "version": "0.1.0",
+  "description": "TypeScript web interface for AWE Player EMU8000 emulator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "serve": "npx serve . -p 3000",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "webmidi": "^3.1.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/web": "^0.0.127"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
