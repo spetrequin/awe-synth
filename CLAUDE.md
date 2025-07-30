@@ -145,6 +145,41 @@ SoundFont Sample → Pitch Modulation → Low-Pass Filter → ADSR Envelope → 
 
 **This rule is MANDATORY and must NEVER be violated.**
 
+## 🧪 **TESTING ARCHITECTURE - ZERO PENETRATION POLICY**
+
+### **⚠️ CRITICAL RULE: No Test Code in Production**
+
+**MANDATORY SEPARATION:**
+- **NO test code in src/** - All testing stays in tests/ directory
+- **NO #[cfg(test)] blocks** - Production code stays completely clean
+- **NO mock interfaces in main code** - Testing handles mocking externally
+- **Independent builds** - Tests compile separately from production
+
+**Testing Coverage Requirements:**
+- **100% Unit Testing**: Every function and component tested in isolation
+- **Complete Integration Testing**: All TypeScript↔WASM interfaces validated
+- **Comprehensive Stress Testing**: 32-voice polyphony, MIDI flooding, memory pressure
+- **Performance Validation**: <1ms MIDI latency, <23ms buffer processing
+
+**Testing Directory Structure:**
+```
+tests/                    # Completely separate from src/
+├── unit/                # Isolated component testing
+├── integration/         # Cross-component interface testing  
+├── stress/              # Maximum load and endurance testing
+├── performance/         # Latency and throughput benchmarking
+├── reference/           # Golden files and reference data
+└── mocks/               # External mock implementations
+```
+
+**Key Testing Principles:**
+- **External Mocking**: All mocks created in tests/mocks/, not in production code
+- **Golden File Regression**: Compare audio output against known-good references
+- **EMU8000 Compatibility**: Validate against original hardware behavior
+- **Real-time Validation**: Verify sample-accurate timing under all conditions
+
+**See TESTING_ARCHITECTURE.md for complete specifications.**
+
 ### **Debug System Requirements**
 
 1. **Comprehensive logging** - Log all state changes, errors, and decisions
