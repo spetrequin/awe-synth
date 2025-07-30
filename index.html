@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>AWE Player - Foundation Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        #debug-log { width: 100%; height: 200px; background: #f0f0f0; }
+        button { margin: 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>AWE Player - Foundation Test</h1>
+    
+    <button onclick="testPlayer()">Test MidiPlayer</button>
+    <button onclick="testTone()">Test Tone</button>
+    <button onclick="updateDebugLog()">Update Debug Log</button>
+    
+    <h3>Debug Output:</h3>
+    <textarea id="debug-log" readonly></textarea>
+
+    <script type="module">
+        import init, { MidiPlayer } from './pkg/awe_synth.js';
+        
+        let player = null;
+        
+        async function initWasm() {
+            await init();
+            window.player = new MidiPlayer();
+            document.getElementById('debug-log').value = 'WASM loaded successfully\n';
+        }
+        
+        window.testPlayer = function() {
+            if (window.player) {
+                const log = window.player.get_debug_log();
+                document.getElementById('debug-log').value = log;
+            }
+        };
+        
+        window.testTone = function() {
+            if (window.player) {
+                const sample = window.player.play_test_tone();
+                document.getElementById('debug-log').value += `\nTest tone sample: ${sample}`;
+            }
+        };
+        
+        window.updateDebugLog = function() {
+            if (window.player) {
+                const log = window.player.get_debug_log();
+                document.getElementById('debug-log').value = log;
+            }
+        };
+        
+        initWasm();
+    </script>
+</body>
+</html>
