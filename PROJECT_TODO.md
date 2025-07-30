@@ -88,10 +88,10 @@ After completing all 12 foundation tasks, next micro-tasks will be:
 **1.4** **[COMPLETED]** Create TypeScript↔WASM bridge for MIDI events with sample-accurate timing  
 
 ### **Phase 2: Virtual MIDI Keyboard**
-**2.1** **[PENDING]** Create web/src/virtual-midi-keyboard.ts - 88-key piano interface  
-**2.2** **[PENDING]** Add General MIDI instrument selector (128 instruments)  
-**2.3** **[PENDING]** Implement CC controls: pitch bend, modulation wheel, sustain pedal  
-**2.4** **[PENDING]** Add keyboard mouse/touch input with velocity sensitivity  
+**2.1** **[COMPLETED]** Create web/src/virtual-midi-keyboard.ts - 88-key piano interface  
+**2.2** **[COMPLETED]** Add General MIDI instrument selector (128 instruments + drum kits)  
+**2.3** **[COMPLETED]** Implement CC controls: pitch bend, modulation wheel, sustain pedal  
+**2.4** **[COMPLETED]** Add keyboard mouse/touch input with velocity sensitivity  
 
 ### **Phase 3: Hardware MIDI Support**
 **3.1** **[PENDING]** Create web/src/midi-input.ts - WebMIDI device discovery and connection  
