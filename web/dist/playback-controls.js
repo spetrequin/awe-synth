@@ -12,12 +12,18 @@ export class PlaybackControls {
     seekSlider;
     positionDisplay;
     durationDisplay;
+    tempoSlider;
+    tempoDisplay;
+    tempoResetButton;
     state = 'stopped';
     events = {};
     isEnabled = false;
     currentPosition = 0; // Current position in seconds
     totalDuration = 0; // Total duration in seconds
-    isDragging = false; // Track if user is dragging the slider
+    isDragging = false; // Track if user is dragging the seek slider
+    originalTempo = 120; // Original MIDI file tempo (BPM)
+    currentTempo = 120; // Current adjusted tempo (BPM)
+    isTempoAdjusting = false; // Track if user is adjusting tempo
     constructor() {
         this.addControlStyles();
     }
@@ -56,6 +62,16 @@ export class PlaybackControls {
                 </div>
                 <div class="time-display duration-time">0:00</div>
             </div>
+            <div class="tempo-container">
+                <div class="tempo-label">Tempo</div>
+                <div class="tempo-controls">
+                    <div class="tempo-display">120 BPM</div>
+                    <div class="tempo-slider-container">
+                        <input type="range" class="tempo-slider" min="50" max="200" value="120" step="1" disabled>
+                    </div>
+                    <button class="tempo-reset-button" title="Reset to original tempo" disabled>Reset</button>
+                </div>
+            </div>
             <div class="playback-status">
                 <span class="status-text">No MIDI file loaded</span>
             </div>
@@ -67,6 +83,9 @@ export class PlaybackControls {
         this.seekSlider = controlsContainer.querySelector('.seek-slider');
         this.positionDisplay = controlsContainer.querySelector('.position-time');
         this.durationDisplay = controlsContainer.querySelector('.duration-time');
+        this.tempoSlider = controlsContainer.querySelector('.tempo-slider');
+        this.tempoDisplay = controlsContainer.querySelector('.tempo-display');
+        this.tempoResetButton = controlsContainer.querySelector('.tempo-reset-button');
         // Set up event listeners
         this.setupEventListeners();
         // Update initial button states
@@ -113,6 +132,29 @@ export class PlaybackControls {
                 this.handleSeek(position);
             }
         });
+        // Tempo slider event listeners
+        this.tempoSlider?.addEventListener('mousedown', () => {
+            this.isTempoAdjusting = true;
+        });
+        this.tempoSlider?.addEventListener('mouseup', () => {
+            this.isTempoAdjusting = false;
+        });
+        this.tempoSlider?.addEventListener('input', () => {
+            if (this.tempoSlider) {
+                const tempo = parseInt(this.tempoSlider.value);
+                this.handleTempoChange(tempo);
+            }
+        });
+        this.tempoSlider?.addEventListener('change', () => {
+            if (this.tempoSlider) {
+                const tempo = parseInt(this.tempoSlider.value);
+                this.handleTempoChange(tempo);
+            }
+        });
+        // Tempo reset button
+        this.tempoResetButton?.addEventListener('click', () => {
+            this.resetTempo();
+        });
     }
     /**
      * Handle play button click
@@ -155,6 +197,30 @@ export class PlaybackControls {
         log(`Seek to position: ${position}% (${seekTime.toFixed(1)}s)`);
         this.setPosition(seekTime);
         this.events.onSeek?.(seekTime);
+    }
+    /**
+     * Handle tempo slider change
+     */
+    handleTempoChange(tempo) {
+        if (!this.isEnabled)
+            return;
+        // Clamp tempo to valid range
+        const clampedTempo = Math.max(50, Math.min(200, tempo));
+        this.currentTempo = clampedTempo;
+        log(`Tempo changed to: ${clampedTempo} BPM`);
+        this.updateTempoDisplay();
+        this.events.onTempoChange?.(clampedTempo);
+    }
+    /**
+     * Reset tempo to original value
+     */
+    resetTempo() {
+        if (!this.isEnabled)
+            return;
+        log(`Tempo reset to original: ${this.originalTempo} BPM`);
+        this.currentTempo = this.originalTempo;
+        this.updateTempoControls();
+        this.events.onTempoChange?.(this.originalTempo);
     }
     /**
      * Set the current playback state
@@ -217,6 +283,44 @@ export class PlaybackControls {
         return this.currentPosition;
     }
     /**
+     * Set the original tempo from the MIDI file
+     */
+    setOriginalTempo(tempoBPM) {
+        this.originalTempo = Math.max(50, Math.min(200, tempoBPM));
+        this.currentTempo = this.originalTempo;
+        this.updateTempoControls();
+        log(`Original tempo set to ${this.originalTempo} BPM`);
+    }
+    /**
+     * Get the original tempo
+     */
+    getOriginalTempo() {
+        return this.originalTempo;
+    }
+    /**
+     * Set the current tempo (for external updates)
+     */
+    setCurrentTempo(tempoBPM) {
+        const clampedTempo = Math.max(50, Math.min(200, tempoBPM));
+        this.currentTempo = clampedTempo;
+        // Only update UI if user is not currently adjusting tempo
+        if (!this.isTempoAdjusting) {
+            this.updateTempoControls();
+        }
+    }
+    /**
+     * Get the current tempo
+     */
+    getCurrentTempo() {
+        return this.currentTempo;
+    }
+    /**
+     * Get the tempo multiplier (current/original)
+     */
+    getTempoMultiplier() {
+        return this.currentTempo / this.originalTempo;
+    }
+    /**
      * Check if controls are enabled
      */
     isControlsEnabled() {
@@ -239,11 +343,19 @@ export class PlaybackControls {
             this.stopButton.disabled = true;
             if (this.seekSlider)
                 this.seekSlider.disabled = true;
+            if (this.tempoSlider)
+                this.tempoSlider.disabled = true;
+            if (this.tempoResetButton)
+                this.tempoResetButton.disabled = true;
             return;
         }
-        // Enable seek slider when controls are enabled
+        // Enable controls when enabled
         if (this.seekSlider)
             this.seekSlider.disabled = false;
+        if (this.tempoSlider)
+            this.tempoSlider.disabled = false;
+        if (this.tempoResetButton)
+            this.tempoResetButton.disabled = false;
         // Update button states based on current state
         switch (this.state) {
             case 'stopped':
@@ -327,6 +439,30 @@ export class PlaybackControls {
         const minutes = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+    /**
+     * Update tempo display
+     */
+    updateTempoDisplay() {
+        if (this.tempoDisplay) {
+            this.tempoDisplay.textContent = `${this.currentTempo} BPM`;
+            // Add visual indication if tempo has changed
+            if (this.currentTempo !== this.originalTempo) {
+                this.tempoDisplay.classList.add('tempo-modified');
+            }
+            else {
+                this.tempoDisplay.classList.remove('tempo-modified');
+            }
+        }
+    }
+    /**
+     * Update tempo controls (slider and display)
+     */
+    updateTempoControls() {
+        if (this.tempoSlider) {
+            this.tempoSlider.value = this.currentTempo.toString();
+        }
+        this.updateTempoDisplay();
     }
     /**
      * Add CSS styles for playback controls
@@ -492,6 +628,129 @@ export class PlaybackControls {
                 box-shadow: 0 3px 6px rgba(0,0,0,0.3);
             }
 
+            .tempo-container {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 12px 0;
+            }
+
+            .tempo-label {
+                font-size: 14px;
+                font-weight: 600;
+                color: #333;
+                text-align: center;
+            }
+
+            .tempo-controls {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .tempo-display {
+                font-family: 'Courier New', monospace;
+                font-size: 16px;
+                font-weight: 700;
+                color: #333;
+                min-width: 70px;
+                text-align: center;
+                padding: 4px 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: #f9f9f9;
+                transition: all 0.2s ease;
+            }
+
+            .tempo-display.tempo-modified {
+                color: #4a90e2;
+                border-color: #4a90e2;
+                background-color: #f0f7ff;
+            }
+
+            .tempo-slider-container {
+                flex: 1;
+                position: relative;
+                height: 24px;
+                display: flex;
+                align-items: center;
+            }
+
+            .tempo-slider {
+                width: 100%;
+                height: 6px;
+                -webkit-appearance: none;
+                appearance: none;
+                background: linear-gradient(to right, #28a745 0%, #ffc107 50%, #dc3545 100%);
+                border-radius: 3px;
+                outline: none;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .tempo-slider:disabled {
+                background: #f0f0f0;
+                cursor: not-allowed;
+            }
+
+            .tempo-slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #4a90e2;
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                transition: all 0.2s ease;
+            }
+
+            .tempo-slider:not(:disabled)::-webkit-slider-thumb:hover {
+                transform: scale(1.1);
+                box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            }
+
+            .tempo-slider::-moz-range-thumb {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #4a90e2;
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                transition: all 0.2s ease;
+            }
+
+            .tempo-slider:not(:disabled)::-moz-range-thumb:hover {
+                transform: scale(1.1);
+                box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            }
+
+            .tempo-reset-button {
+                padding: 6px 12px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: #fff;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                font-size: 12px;
+                font-weight: 500;
+                color: #666;
+            }
+
+            .tempo-reset-button:not(:disabled):hover {
+                border-color: #4a90e2;
+                background-color: #f0f7ff;
+                color: #4a90e2;
+            }
+
+            .tempo-reset-button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                background-color: #f5f5f5;
+            }
+
             .playback-status {
                 text-align: center;
                 padding: 8px 0;
@@ -550,6 +809,27 @@ export class PlaybackControls {
                     font-size: 12px;
                     min-width: 35px;
                 }
+
+                .tempo-controls {
+                    flex-direction: column;
+                    gap: 8px;
+                    align-items: center;
+                }
+
+                .tempo-display {
+                    min-width: 60px;
+                    font-size: 14px;
+                }
+
+                .tempo-slider-container {
+                    width: 100%;
+                    max-width: 200px;
+                }
+
+                .tempo-reset-button {
+                    font-size: 11px;
+                    padding: 4px 8px;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -568,6 +848,9 @@ export class PlaybackControls {
         delete this.seekSlider;
         delete this.positionDisplay;
         delete this.durationDisplay;
+        delete this.tempoSlider;
+        delete this.tempoDisplay;
+        delete this.tempoResetButton;
         this.events = {};
     }
 }

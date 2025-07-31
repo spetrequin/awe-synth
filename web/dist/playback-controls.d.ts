@@ -8,6 +8,7 @@ export interface PlaybackEvents {
     onPause?: () => void;
     onStop?: () => void;
     onSeek?: (position: number) => void;
+    onTempoChange?: (tempo: number) => void;
     onStateChange?: (state: PlaybackState) => void;
 }
 export declare class PlaybackControls {
@@ -18,12 +19,18 @@ export declare class PlaybackControls {
     private seekSlider?;
     private positionDisplay?;
     private durationDisplay?;
+    private tempoSlider?;
+    private tempoDisplay?;
+    private tempoResetButton?;
     private state;
     private events;
     private isEnabled;
     private currentPosition;
     private totalDuration;
     private isDragging;
+    private originalTempo;
+    private currentTempo;
+    private isTempoAdjusting;
     constructor();
     /**
      * Set event callbacks for playback actions
@@ -54,6 +61,14 @@ export declare class PlaybackControls {
      */
     private handleSeek;
     /**
+     * Handle tempo slider change
+     */
+    private handleTempoChange;
+    /**
+     * Reset tempo to original value
+     */
+    private resetTempo;
+    /**
      * Set the current playback state
      */
     setState(state: PlaybackState): void;
@@ -82,6 +97,26 @@ export declare class PlaybackControls {
      */
     getPosition(): number;
     /**
+     * Set the original tempo from the MIDI file
+     */
+    setOriginalTempo(tempoBPM: number): void;
+    /**
+     * Get the original tempo
+     */
+    getOriginalTempo(): number;
+    /**
+     * Set the current tempo (for external updates)
+     */
+    setCurrentTempo(tempoBPM: number): void;
+    /**
+     * Get the current tempo
+     */
+    getCurrentTempo(): number;
+    /**
+     * Get the tempo multiplier (current/original)
+     */
+    getTempoMultiplier(): number;
+    /**
      * Check if controls are enabled
      */
     isControlsEnabled(): boolean;
@@ -105,6 +140,14 @@ export declare class PlaybackControls {
      * Format time in seconds to MM:SS format
      */
     private formatTime;
+    /**
+     * Update tempo display
+     */
+    private updateTempoDisplay;
+    /**
+     * Update tempo controls (slider and display)
+     */
+    private updateTempoControls;
     /**
      * Add CSS styles for playback controls
      */

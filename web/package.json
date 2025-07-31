@@ -14,8 +14,7 @@
     "webmidi": "^3.1.8"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "@types/web": "^0.0.127"
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=18.0.0"

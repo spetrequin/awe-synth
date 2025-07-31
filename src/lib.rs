@@ -8,6 +8,7 @@ mod soundfont;
 mod effects;
 
 use midi::sequencer::{MidiSequencer, PlaybackState};
+use synth::voice_manager::VoiceManager;
 
 static mut DEBUG_LOG: Option<VecDeque<String>> = None;
 static mut MIDI_EVENT_QUEUE: Option<VecDeque<MidiEvent>> = None;
@@ -47,6 +48,7 @@ impl MidiEvent {
 #[wasm_bindgen]
 pub struct MidiPlayer {
     sequencer: MidiSequencer,
+    voice_manager: VoiceManager,
     current_sample: u64,
 }
 
@@ -63,6 +65,7 @@ impl MidiPlayer {
         }
         MidiPlayer {
             sequencer: MidiSequencer::new(44100.0), // 44.1kHz sample rate
+            voice_manager: VoiceManager::new(44100.0),
             current_sample: 0,
         }
     }
@@ -90,8 +93,12 @@ impl MidiPlayer {
                 while let Some(event) = queue.front() {
                     if event.timestamp <= current_sample_time {
                         let event = queue.pop_front().unwrap();
-                        log(&format!("Processing MIDI event: ch={} type={} @{}", 
-                            event.channel, event.message_type, event.timestamp));
+                        
+                        // Process MIDI event through VoiceManager
+                        self.handle_midi_event(&event);
+                        
+                        log(&format!("Processing MIDI event: ch={} type=0x{:02X} data={},{} @{}", 
+                            event.channel, event.message_type, event.data1, event.data2, event.timestamp));
                         processed_count += 1;
                     } else {
                         break;
@@ -223,6 +230,57 @@ impl MidiPlayer {
             };
             
             self.queue_midi_event(midi_event);
+        }
+    }
+    
+    /// Handle MIDI event and route to VoiceManager
+    fn handle_midi_event(&mut self, event: &MidiEvent) {
+        let message_type = event.message_type & 0xF0;
+        
+        match message_type {
+            0x80 => {
+                // Note Off
+                self.voice_manager.note_off(event.data1);
+                log(&format!("VoiceManager: Note Off - Note {} Ch {}", event.data1, event.channel));
+            },
+            0x90 => {
+                // Note On (check velocity > 0, otherwise treat as Note Off)
+                if event.data2 > 0 {
+                    match self.voice_manager.note_on(event.data1, event.data2) {
+                        Some(voice_id) => {
+                            log(&format!("VoiceManager: Note On - Note {} Vel {} assigned to Voice {}", 
+                                event.data1, event.data2, voice_id));
+                        },
+                        None => {
+                            log(&format!("VoiceManager: Note On failed - No available voices for Note {} Vel {}", 
+                                event.data1, event.data2));
+                        }
+                    }
+                } else {
+                    // Velocity 0 = Note Off
+                    self.voice_manager.note_off(event.data1);
+                    log(&format!("VoiceManager: Note Off (vel=0) - Note {} Ch {}", event.data1, event.channel));
+                }
+            },
+            0xB0 => {
+                // Control Change
+                log(&format!("VoiceManager: CC {} = {} (Ch {})", event.data1, event.data2, event.channel));
+                // TODO: Handle CC messages (modulation, sustain pedal, etc.)
+            },
+            0xC0 => {
+                // Program Change
+                log(&format!("VoiceManager: Program Change {} (Ch {})", event.data1, event.channel));
+                // TODO: Handle program changes for instrument selection
+            },
+            0xE0 => {
+                // Pitch Bend
+                let pitch_value = ((event.data2 as u16) << 7) | (event.data1 as u16);
+                log(&format!("VoiceManager: Pitch Bend {} (Ch {})", pitch_value, event.channel));
+                // TODO: Handle pitch bend messages
+            },
+            _ => {
+                log(&format!("VoiceManager: Unhandled MIDI message type 0x{:02X}", message_type));
+            }
         }
     }
 }
