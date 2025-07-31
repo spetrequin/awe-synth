@@ -9,9 +9,15 @@ export class PlaybackControls {
     playButton;
     pauseButton;
     stopButton;
+    seekSlider;
+    positionDisplay;
+    durationDisplay;
     state = 'stopped';
     events = {};
     isEnabled = false;
+    currentPosition = 0; // Current position in seconds
+    totalDuration = 0; // Total duration in seconds
+    isDragging = false; // Track if user is dragging the slider
     constructor() {
         this.addControlStyles();
     }
@@ -42,14 +48,25 @@ export class PlaybackControls {
                     <span class="button-text">Stop</span>
                 </button>
             </div>
+            <div class="seek-container">
+                <div class="time-display position-time">0:00</div>
+                <div class="seek-bar-container">
+                    <input type="range" class="seek-slider" min="0" max="100" value="0" step="0.1" disabled>
+                    <div class="seek-progress"></div>
+                </div>
+                <div class="time-display duration-time">0:00</div>
+            </div>
             <div class="playback-status">
                 <span class="status-text">No MIDI file loaded</span>
             </div>
         `;
-        // Get button references
+        // Get element references
         this.playButton = controlsContainer.querySelector('.play-button');
         this.pauseButton = controlsContainer.querySelector('.pause-button');
         this.stopButton = controlsContainer.querySelector('.stop-button');
+        this.seekSlider = controlsContainer.querySelector('.seek-slider');
+        this.positionDisplay = controlsContainer.querySelector('.position-time');
+        this.durationDisplay = controlsContainer.querySelector('.duration-time');
         // Set up event listeners
         this.setupEventListeners();
         // Update initial button states
@@ -75,6 +92,25 @@ export class PlaybackControls {
         this.stopButton?.addEventListener('click', () => {
             if (this.state === 'playing' || this.state === 'paused') {
                 this.handleStop();
+            }
+        });
+        // Seek slider event listeners
+        this.seekSlider?.addEventListener('mousedown', () => {
+            this.isDragging = true;
+        });
+        this.seekSlider?.addEventListener('mouseup', () => {
+            this.isDragging = false;
+        });
+        this.seekSlider?.addEventListener('input', () => {
+            if (this.isDragging && this.seekSlider) {
+                const position = parseFloat(this.seekSlider.value);
+                this.handleSeek(position);
+            }
+        });
+        this.seekSlider?.addEventListener('change', () => {
+            if (this.seekSlider) {
+                const position = parseFloat(this.seekSlider.value);
+                this.handleSeek(position);
             }
         });
     }
@@ -109,6 +145,18 @@ export class PlaybackControls {
         this.events.onStop?.();
     }
     /**
+     * Handle seek slider change
+     */
+    handleSeek(position) {
+        if (!this.isEnabled)
+            return;
+        // Convert position from 0-100 range to seconds
+        const seekTime = (position / 100) * this.totalDuration;
+        log(`Seek to position: ${position}% (${seekTime.toFixed(1)}s)`);
+        this.setPosition(seekTime);
+        this.events.onSeek?.(seekTime);
+    }
+    /**
      * Set the current playback state
      */
     setState(state) {
@@ -137,6 +185,38 @@ export class PlaybackControls {
         log(`Playback controls ${enabled ? 'enabled' : 'disabled'}`);
     }
     /**
+     * Set the total duration of the MIDI file
+     */
+    setDuration(durationSeconds) {
+        this.totalDuration = Math.max(0, durationSeconds);
+        this.updateTimeDisplays();
+        this.updateSeekSlider();
+        log(`Duration set to ${this.totalDuration.toFixed(1)}s`);
+    }
+    /**
+     * Get the total duration
+     */
+    getDuration() {
+        return this.totalDuration;
+    }
+    /**
+     * Set the current playback position
+     */
+    setPosition(positionSeconds) {
+        this.currentPosition = Math.max(0, Math.min(positionSeconds, this.totalDuration));
+        // Only update UI if user is not currently dragging
+        if (!this.isDragging) {
+            this.updateTimeDisplays();
+            this.updateSeekSlider();
+        }
+    }
+    /**
+     * Get the current playback position
+     */
+    getPosition() {
+        return this.currentPosition;
+    }
+    /**
      * Check if controls are enabled
      */
     isControlsEnabled() {
@@ -157,8 +237,13 @@ export class PlaybackControls {
             this.playButton.disabled = true;
             this.pauseButton.disabled = true;
             this.stopButton.disabled = true;
+            if (this.seekSlider)
+                this.seekSlider.disabled = true;
             return;
         }
+        // Enable seek slider when controls are enabled
+        if (this.seekSlider)
+            this.seekSlider.disabled = false;
         // Update button states based on current state
         switch (this.state) {
             case 'stopped':
@@ -209,6 +294,39 @@ export class PlaybackControls {
                 statusText.className = 'status-text status-paused';
                 break;
         }
+    }
+    /**
+     * Update time displays (position and duration)
+     */
+    updateTimeDisplays() {
+        if (this.positionDisplay) {
+            this.positionDisplay.textContent = this.formatTime(this.currentPosition);
+        }
+        if (this.durationDisplay) {
+            this.durationDisplay.textContent = this.formatTime(this.totalDuration);
+        }
+    }
+    /**
+     * Update seek slider position
+     */
+    updateSeekSlider() {
+        if (!this.seekSlider)
+            return;
+        if (this.totalDuration > 0) {
+            const percentage = (this.currentPosition / this.totalDuration) * 100;
+            this.seekSlider.value = percentage.toString();
+        }
+        else {
+            this.seekSlider.value = '0';
+        }
+    }
+    /**
+     * Format time in seconds to MM:SS format
+     */
+    formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
     /**
      * Add CSS styles for playback controls
@@ -299,6 +417,81 @@ export class PlaybackControls {
                 color: #dc3545;
             }
 
+            .seek-container {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                width: 100%;
+            }
+
+            .time-display {
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                font-weight: 600;
+                color: #333;
+                min-width: 40px;
+                text-align: center;
+            }
+
+            .seek-bar-container {
+                flex: 1;
+                position: relative;
+                height: 24px;
+                display: flex;
+                align-items: center;
+            }
+
+            .seek-slider {
+                width: 100%;
+                height: 6px;
+                -webkit-appearance: none;
+                appearance: none;
+                background: linear-gradient(to right, #4a90e2 0%, #4a90e2 0%, #ddd 0%, #ddd 100%);
+                border-radius: 3px;
+                outline: none;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .seek-slider:disabled {
+                background: #f0f0f0;
+                cursor: not-allowed;
+            }
+
+            .seek-slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #4a90e2;
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                transition: all 0.2s ease;
+            }
+
+            .seek-slider:not(:disabled)::-webkit-slider-thumb:hover {
+                transform: scale(1.1);
+                box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            }
+
+            .seek-slider::-moz-range-thumb {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #4a90e2;
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                transition: all 0.2s ease;
+            }
+
+            .seek-slider:not(:disabled)::-moz-range-thumb:hover {
+                transform: scale(1.1);
+                box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            }
+
             .playback-status {
                 text-align: center;
                 padding: 8px 0;
@@ -324,6 +517,10 @@ export class PlaybackControls {
 
             /* Responsive design */
             @media (max-width: 480px) {
+                .playback-controls {
+                    padding: 16px;
+                }
+
                 .playback-buttons {
                     flex-direction: column;
                     align-items: center;
@@ -344,6 +541,15 @@ export class PlaybackControls {
                 .button-text {
                     font-size: 14px;
                 }
+
+                .seek-container {
+                    gap: 8px;
+                }
+
+                .time-display {
+                    font-size: 12px;
+                    min-width: 35px;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -359,6 +565,9 @@ export class PlaybackControls {
         delete this.playButton;
         delete this.pauseButton;
         delete this.stopButton;
+        delete this.seekSlider;
+        delete this.positionDisplay;
+        delete this.durationDisplay;
         this.events = {};
     }
 }

@@ -7,6 +7,7 @@ export interface PlaybackEvents {
     onPlay?: () => void;
     onPause?: () => void;
     onStop?: () => void;
+    onSeek?: (position: number) => void;
     onStateChange?: (state: PlaybackState) => void;
 }
 export declare class PlaybackControls {
@@ -14,9 +15,15 @@ export declare class PlaybackControls {
     private playButton?;
     private pauseButton?;
     private stopButton?;
+    private seekSlider?;
+    private positionDisplay?;
+    private durationDisplay?;
     private state;
     private events;
     private isEnabled;
+    private currentPosition;
+    private totalDuration;
+    private isDragging;
     constructor();
     /**
      * Set event callbacks for playback actions
@@ -43,6 +50,10 @@ export declare class PlaybackControls {
      */
     private handleStop;
     /**
+     * Handle seek slider change
+     */
+    private handleSeek;
+    /**
      * Set the current playback state
      */
     setState(state: PlaybackState): void;
@@ -55,6 +66,22 @@ export declare class PlaybackControls {
      */
     setEnabled(enabled: boolean): void;
     /**
+     * Set the total duration of the MIDI file
+     */
+    setDuration(durationSeconds: number): void;
+    /**
+     * Get the total duration
+     */
+    getDuration(): number;
+    /**
+     * Set the current playback position
+     */
+    setPosition(positionSeconds: number): void;
+    /**
+     * Get the current playback position
+     */
+    getPosition(): number;
+    /**
      * Check if controls are enabled
      */
     isControlsEnabled(): boolean;
@@ -66,6 +93,18 @@ export declare class PlaybackControls {
      * Update status text based on current state
      */
     private updateStatusText;
+    /**
+     * Update time displays (position and duration)
+     */
+    private updateTimeDisplays;
+    /**
+     * Update seek slider position
+     */
+    private updateSeekSlider;
+    /**
+     * Format time in seconds to MM:SS format
+     */
+    private formatTime;
     /**
      * Add CSS styles for playback controls
      */
