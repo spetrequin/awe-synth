@@ -189,6 +189,7 @@ impl<'a> MidiParser<'a> {
         let mut events = Vec::new();
         let mut absolute_time = 0u64;
         let mut running_status: Option<u8> = None;
+        let mut track_name: Option<String> = None;
         
         while self.position < track_end {
             // Read delta time
@@ -197,6 +198,11 @@ impl<'a> MidiParser<'a> {
             
             // Parse the event
             let event = self.parse_event(&mut running_status)?;
+            
+            // Extract track name if this is a TrackName meta event
+            if let MidiEventType::MetaEvent(MetaEventType::TrackName { ref name }) = event {
+                track_name = Some(name.clone());
+            }
             
             events.push(MidiEvent {
                 delta_time,
@@ -213,7 +219,7 @@ impl<'a> MidiParser<'a> {
         crate::log(&format!("Parsed {} events in track", events.len()));
         
         Ok(MidiTrack {
-            name: None, // Will be set from TrackName meta event
+            name: track_name,
             events,
         })
     }
@@ -318,6 +324,43 @@ impl<'a> MidiParser<'a> {
                 Ok(MidiEventType::MetaEvent(MetaEventType::SetTempo { 
                     microseconds_per_quarter 
                 }))
+            },
+            0x58 => {
+                // Time Signature (4 bytes: numerator, denominator, clocks_per_click, notes_per_quarter)
+                if length != 4 {
+                    crate::log(&format!("ERROR: Invalid time signature event length: {} (expected 4)", length));
+                    return Err(AweError::InvalidMidiFile);
+                }
+                
+                let numerator = self.read_u8()?;
+                let denominator_power = self.read_u8()?;
+                let clocks_per_click = self.read_u8()?;
+                let notes_per_quarter = self.read_u8()?;
+                
+                // Denominator is stored as power of 2 (e.g., 2 = 2^2 = 4 for 4/4 time)
+                let denominator = 1u8 << denominator_power;
+                
+                crate::log(&format!("Time Signature: {}/{} (clocks_per_click: {}, notes_per_quarter: {})", 
+                    numerator, denominator, clocks_per_click, notes_per_quarter));
+                
+                Ok(MidiEventType::MetaEvent(MetaEventType::TimeSignature { 
+                    numerator, 
+                    denominator, 
+                    clocks_per_click, 
+                    notes_per_quarter 
+                }))
+            },
+            0x03 => {
+                // Track Name
+                let mut name_bytes = Vec::with_capacity(length as usize);
+                for _ in 0..length {
+                    name_bytes.push(self.read_u8()?);
+                }
+                
+                let name = String::from_utf8_lossy(&name_bytes).to_string();
+                crate::log(&format!("Track Name: '{}'", name));
+                
+                Ok(MidiEventType::MetaEvent(MetaEventType::TrackName { name }))
             },
             0x2F => {
                 // End of Track
