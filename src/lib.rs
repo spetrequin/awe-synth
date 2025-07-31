@@ -131,6 +131,43 @@ impl MidiPlayer {
         (2.0 * PI * frequency * time / sample_rate).sin() * 0.1
     }
     
+    #[wasm_bindgen]
+    pub fn test_envelope_system(&mut self) -> String {
+        log("Testing EMU8000 6-stage DAHDSR envelope system...");
+        
+        // Test 1: Trigger note and process envelope for several samples
+        let note = 60; // Middle C
+        let velocity = 100;
+        
+        if let Some(voice_id) = self.voice_manager.note_on(note, velocity) {
+            log(&format!("Test: Note {} triggered on voice {}", note, voice_id));
+            
+            // Process 10 samples and collect envelope values
+            let mut envelope_values = Vec::new();
+            for i in 0..10 {
+                let active_voices = self.voice_manager.process_envelopes();
+                envelope_values.push(format!("Sample {}: {} active voices", i, active_voices));
+            }
+            
+            // Test 2: Release note and process more samples
+            self.voice_manager.note_off(note);
+            log("Test: Note released");
+            
+            for i in 10..20 {
+                let active_voices = self.voice_manager.process_envelopes();
+                envelope_values.push(format!("Sample {}: {} active voices (released)", i, active_voices));
+            }
+            
+            let result = envelope_values.join(" | ");
+            log(&format!("Envelope test completed: {}", result));
+            result
+        } else {
+            let error = "Failed to allocate voice for envelope test".to_string();
+            log(&error);
+            error
+        }
+    }
+    
     // MIDI Sequencer Controls
     
     #[wasm_bindgen]
