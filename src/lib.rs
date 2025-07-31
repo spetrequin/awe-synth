@@ -8,6 +8,7 @@ mod soundfont;
 mod effects;
 
 use midi::sequencer::{MidiSequencer, PlaybackState};
+use midi::constants::*;
 use synth::voice_manager::VoiceManager;
 
 static mut DEBUG_LOG: Option<VecDeque<String>> = None;
@@ -235,17 +236,17 @@ impl MidiPlayer {
     
     /// Handle MIDI event and route to VoiceManager
     fn handle_midi_event(&mut self, event: &MidiEvent) {
-        let message_type = event.message_type & 0xF0;
+        let message_type = (event.message_type & 0xF0) >> 4;
         
         match message_type {
-            0x80 => {
+            MIDI_EVENT_NOTE_OFF => {
                 // Note Off
                 self.voice_manager.note_off(event.data1);
                 log(&format!("VoiceManager: Note Off - Note {} Ch {}", event.data1, event.channel));
             },
-            0x90 => {
+            MIDI_EVENT_NOTE_ON => {
                 // Note On (check velocity > 0, otherwise treat as Note Off)
-                if event.data2 > 0 {
+                if event.data2 > MIDI_VELOCITY_MIN {
                     match self.voice_manager.note_on(event.data1, event.data2) {
                         Some(voice_id) => {
                             log(&format!("VoiceManager: Note On - Note {} Vel {} assigned to Voice {}", 
@@ -262,17 +263,46 @@ impl MidiPlayer {
                     log(&format!("VoiceManager: Note Off (vel=0) - Note {} Ch {}", event.data1, event.channel));
                 }
             },
-            0xB0 => {
-                // Control Change
-                log(&format!("VoiceManager: CC {} = {} (Ch {})", event.data1, event.data2, event.channel));
-                // TODO: Handle CC messages (modulation, sustain pedal, etc.)
+            MIDI_EVENT_CONTROL_CHANGE => {
+                // Control Change - handle common CC messages
+                match event.data1 {
+                    MIDI_CC_MODULATION => {
+                        log(&format!("VoiceManager: Modulation {} (Ch {})", event.data2, event.channel));
+                        // TODO: Apply modulation to active voices
+                    },
+                    MIDI_CC_VOLUME => {
+                        log(&format!("VoiceManager: Volume {} (Ch {})", event.data2, event.channel));
+                        // TODO: Apply volume to channel
+                    },
+                    MIDI_CC_PAN => {
+                        log(&format!("VoiceManager: Pan {} (Ch {})", event.data2, event.channel));
+                        // TODO: Apply pan to channel
+                    },
+                    MIDI_CC_SUSTAIN => {
+                        let sustain_on = event.data2 >= 64;
+                        log(&format!("VoiceManager: Sustain {} (Ch {})", if sustain_on { "On" } else { "Off" }, event.channel));
+                        // TODO: Apply sustain pedal to active voices
+                    },
+                    MIDI_CC_ALL_SOUND_OFF => {
+                        log(&format!("VoiceManager: All Sound Off (Ch {})", event.channel));
+                        // TODO: Stop all voices immediately
+                    },
+                    MIDI_CC_ALL_NOTES_OFF => {
+                        log(&format!("VoiceManager: All Notes Off (Ch {})", event.channel));
+                        // TODO: Release all notes (respect sustain)
+                    },
+                    _ => {
+                        log(&format!("VoiceManager: CC {} = {} (Ch {})", event.data1, event.data2, event.channel));
+                        // TODO: Handle other CC messages
+                    }
+                }
             },
-            0xC0 => {
+            MIDI_EVENT_PROGRAM_CHANGE => {
                 // Program Change
                 log(&format!("VoiceManager: Program Change {} (Ch {})", event.data1, event.channel));
                 // TODO: Handle program changes for instrument selection
             },
-            0xE0 => {
+            MIDI_EVENT_PITCH_BEND => {
                 // Pitch Bend
                 let pitch_value = ((event.data2 as u16) << 7) | (event.data1 as u16);
                 log(&format!("VoiceManager: Pitch Bend {} (Ch {})", pitch_value, event.channel));
