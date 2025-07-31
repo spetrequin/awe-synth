@@ -1,0 +1,31 @@
+[package]
+name = "awe-synth-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Reference the main AWE Synth crate
+awe-synth = { path = ".." }
+
+# Testing dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# WASM testing
+wasm-bindgen-test = "0.3"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console",
+    "Performance"
+] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "integration-test-runner"
+path = "bin/integration_test_runner.rs"
+
+[[bin]]
+name = "run-timing-tests"
+path = "bin/run_timing_tests.rs"
