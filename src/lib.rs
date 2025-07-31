@@ -1,11 +1,11 @@
 use wasm_bindgen::prelude::*;
 use std::collections::VecDeque;
 
-mod error;
-mod midi;
-mod synth;
-mod soundfont;
-mod effects;
+pub mod error;
+pub mod midi;
+pub mod synth;
+pub mod soundfont;
+pub mod effects;
 
 use midi::sequencer::{MidiSequencer, PlaybackState};
 use midi::constants::*;

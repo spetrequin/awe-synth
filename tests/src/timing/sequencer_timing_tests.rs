@@ -6,10 +6,8 @@
  */
 
 use super::{TimingTestResult, TimingTestRunner};
-
-// Note: Since we're following the zero penetration testing policy,
-// we don't have direct access to the production types.
-// These tests focus on timing calculations and logic validation.
+use awe_synth::midi::sequencer::{MidiSequencer, PlaybackState};
+use awe_synth::midi::parser::{MidiFile, MidiEvent, MidiEventType, MidiTrack, MetaEventType};
 
 /// Run all sequencer timing tests
 pub fn run_sequencer_timing_tests() -> Vec<TimingTestResult> {
@@ -22,6 +20,11 @@ pub fn run_sequencer_timing_tests() -> Vec<TimingTestResult> {
     results.push(test_playback_position_accuracy());
     results.push(test_seek_timing_accuracy());
     results.push(test_event_scheduling_precision());
+    
+    // Tests using actual MidiSequencer
+    results.push(test_sequencer_initialization());
+    results.push(test_sequencer_playback_state());
+    results.push(test_sequencer_tempo_multiplier());
     
     results
 }
@@ -211,6 +214,260 @@ fn test_event_scheduling_precision() -> TimingTestResult {
     
     let duration = start_time.elapsed().as_millis();
     TimingTestResult::success(test_name, duration, 50)
+}
+
+/// Test MidiSequencer initialization
+fn test_sequencer_initialization() -> TimingTestResult {
+    let test_name = "sequencer_initialization";
+    let start_time = std::time::Instant::now();
+    
+    // Test sequencer creation
+    let sample_rate = 44100.0;
+    let sequencer = MidiSequencer::new(sample_rate);
+    
+    // Verify initial state
+    if sequencer.get_state() != PlaybackState::Stopped {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Expected initial state Stopped, got {:?}", sequencer.get_state()),
+            duration
+        );
+    }
+    
+    // Verify initial position
+    if sequencer.get_position() != 0.0 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Expected initial position 0.0, got {}", sequencer.get_position()),
+            duration
+        );
+    }
+    
+    // Verify initial tempo (should be 120 BPM default)
+    let expected_tempo = 120.0;
+    let actual_tempo = sequencer.get_current_tempo_bpm();
+    if (actual_tempo - expected_tempo).abs() > 0.1 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Expected tempo {}, got {}", expected_tempo, actual_tempo),
+            duration
+        );
+    }
+    
+    let duration = start_time.elapsed().as_millis();
+    TimingTestResult::success(test_name, duration, 100)
+}
+
+/// Test sequencer playback state transitions
+fn test_sequencer_playback_state() -> TimingTestResult {
+    let test_name = "sequencer_playback_state";
+    let start_time = std::time::Instant::now();
+    
+    let mut sequencer = MidiSequencer::new(44100.0);
+    let current_sample = 0u64;
+    
+    // Initial state should be Stopped
+    if sequencer.get_state() != PlaybackState::Stopped {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            "Expected initial state to be Stopped",
+            duration
+        );
+    }
+    
+    // Create a simple MIDI file for testing
+    let simple_midi_data = create_test_midi_file();
+    if let Err(_) = sequencer.load_midi_file(&simple_midi_data) {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            "Failed to load test MIDI file",
+            duration
+        );
+    }
+    
+    // Test play from stopped (now should work with MIDI file loaded)
+    sequencer.play(current_sample);
+    if sequencer.get_state() != PlaybackState::Playing {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            "Expected state to be Playing after play()",
+            duration
+        );
+    }
+    
+    // Test pause
+    sequencer.pause(current_sample + 1000);
+    if sequencer.get_state() != PlaybackState::Paused {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            "Expected state to be Paused after pause()",
+            duration
+        );
+    }
+    
+    // Test resume
+    sequencer.play(current_sample + 2000);
+    if sequencer.get_state() != PlaybackState::Playing {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            "Expected state to be Playing after resume",
+            duration
+        );
+    }
+    
+    // Test stop
+    sequencer.stop();
+    if sequencer.get_state() != PlaybackState::Stopped {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            "Expected state to be Stopped after stop()",
+            duration
+        );
+    }
+    
+    // Position should reset to 0 after stop
+    if sequencer.get_position() != 0.0 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Expected position 0.0 after stop, got {}", sequencer.get_position()),
+            duration
+        );
+    }
+    
+    let duration = start_time.elapsed().as_millis();
+    TimingTestResult::success(test_name, duration, 200)
+}
+
+/// Test sequencer tempo multiplier functionality
+fn test_sequencer_tempo_multiplier() -> TimingTestResult {
+    let test_name = "sequencer_tempo_multiplier";
+    let start_time = std::time::Instant::now();
+    
+    let mut sequencer = MidiSequencer::new(44100.0);
+    
+    // Test default multiplier (should be 1.0)
+    let original_tempo = sequencer.get_original_tempo_bpm();
+    let current_tempo = sequencer.get_current_tempo_bpm();
+    if (original_tempo - current_tempo).abs() > 0.1 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Default tempo multiplier should be 1.0: original={}, current={}", 
+                original_tempo, current_tempo),
+            duration
+        );
+    }
+    
+    // Test setting tempo multiplier to 2.0 (double speed)
+    sequencer.set_tempo_multiplier(2.0);
+    let doubled_tempo = sequencer.get_current_tempo_bpm();
+    let expected_doubled = original_tempo * 2.0;
+    if (doubled_tempo - expected_doubled).abs() > 0.1 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("2x tempo should be {}, got {}", expected_doubled, doubled_tempo),
+            duration
+        );
+    }
+    
+    // Test setting tempo multiplier to 0.5 (half speed)
+    sequencer.set_tempo_multiplier(0.5);
+    let halved_tempo = sequencer.get_current_tempo_bpm();
+    let expected_halved = original_tempo * 0.5;
+    if (halved_tempo - expected_halved).abs() > 0.1 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("0.5x tempo should be {}, got {}", expected_halved, halved_tempo),
+            duration
+        );
+    }
+    
+    // Test clamping (should clamp to 0.25-4.0 range)
+    sequencer.set_tempo_multiplier(10.0);  // Should clamp to 4.0
+    let clamped_tempo = sequencer.get_current_tempo_bpm();
+    let expected_max = original_tempo * 4.0;
+    if (clamped_tempo - expected_max).abs() > 0.1 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Max tempo should be {}, got {}", expected_max, clamped_tempo),
+            duration
+        );
+    }
+    
+    sequencer.set_tempo_multiplier(0.1);  // Should clamp to 0.25
+    let clamped_min_tempo = sequencer.get_current_tempo_bpm();
+    let expected_min = original_tempo * 0.25;
+    if (clamped_min_tempo - expected_min).abs() > 0.1 {
+        let duration = start_time.elapsed().as_millis();
+        return TimingTestResult::failure(
+            test_name,
+            &format!("Min tempo should be {}, got {}", expected_min, clamped_min_tempo),
+            duration
+        );
+    }
+    
+    let duration = start_time.elapsed().as_millis();
+    TimingTestResult::success(test_name, duration, 300)
+}
+
+/// Create a simple test MIDI file for testing
+fn create_test_midi_file() -> Vec<u8> {
+    // Create a minimal valid MIDI file with one track
+    // MIDI file header (MThd chunk)
+    let mut data = Vec::new();
+    
+    // MThd header
+    data.extend_from_slice(b"MThd");      // Chunk type
+    data.extend_from_slice(&[0, 0, 0, 6]); // Chunk length (6 bytes)
+    data.extend_from_slice(&[0, 0]);       // Format 0 (single track)
+    data.extend_from_slice(&[0, 1]);       // 1 track
+    data.extend_from_slice(&[0, 96]);      // 96 ticks per quarter note
+    
+    // MTrk header  
+    data.extend_from_slice(b"MTrk");      // Track chunk type
+    
+    // Track data (we'll calculate length)
+    let mut track_data = Vec::new();
+    
+    // Note on event: delta time (0), status (0x90 = note on channel 0), note (60 = middle C), velocity (64)
+    track_data.push(0);     // Delta time
+    track_data.push(0x90);  // Note on, channel 0
+    track_data.push(60);    // Middle C
+    track_data.push(64);    // Velocity
+    
+    // Note off event: delta time (96 = 1 quarter note), status (0x80), note (60), velocity (0)
+    track_data.push(96);    // Delta time (1 quarter note)
+    track_data.push(0x80);  // Note off, channel 0
+    track_data.push(60);    // Middle C
+    track_data.push(0);     // Velocity
+    
+    // End of track meta event: delta time (0), status (0xFF), type (0x2F), length (0)
+    track_data.push(0);     // Delta time
+    track_data.push(0xFF);  // Meta event
+    track_data.push(0x2F);  // End of track
+    track_data.push(0);     // Length
+    
+    // Add track length (4 bytes, big endian)
+    let track_length = track_data.len() as u32;
+    data.extend_from_slice(&track_length.to_be_bytes());
+    
+    // Add track data
+    data.extend_from_slice(&track_data);
+    
+    data
 }
 
 #[cfg(test)]
