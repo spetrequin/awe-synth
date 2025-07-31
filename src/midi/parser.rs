@@ -1,5 +1,19 @@
 use crate::error::AweError;
 
+// MIDI event type constants (upper nibble of status byte >> 4)
+const MIDI_EVENT_NOTE_OFF: u8 = 0x8;
+const MIDI_EVENT_NOTE_ON: u8 = 0x9;
+const MIDI_EVENT_PROGRAM_CHANGE: u8 = 0xC;
+const MIDI_EVENT_CONTROL_CHANGE: u8 = 0xB;
+const MIDI_EVENT_PITCH_BEND: u8 = 0xE;
+const MIDI_EVENT_META: u8 = 0xF;
+
+// MIDI meta event type constants
+const META_EVENT_SET_TEMPO: u8 = 0x51;
+const META_EVENT_TIME_SIGNATURE: u8 = 0x58;
+const META_EVENT_TRACK_NAME: u8 = 0x03;
+const META_EVENT_END_OF_TRACK: u8 = 0x2F;
+
 /// Standard MIDI file structure
 pub struct MidiFile {
     /// Format type: 0 (single track), 1 (multi-track), 2 (multi-sequence)
@@ -249,13 +263,13 @@ impl<'a> MidiParser<'a> {
         let channel = actual_status & 0x0F;
         
         match event_type {
-            0x8 => {
+            MIDI_EVENT_NOTE_OFF => {
                 // Note Off
                 let note = self.read_u8()?;
                 let velocity = self.read_u8()?;
                 Ok(MidiEventType::NoteOff { channel, note, velocity })
             },
-            0x9 => {
+            MIDI_EVENT_NOTE_ON => {
                 // Note On (velocity 0 = Note Off)
                 let note = self.read_u8()?;
                 let velocity = self.read_u8()?;
@@ -265,13 +279,13 @@ impl<'a> MidiParser<'a> {
                     Ok(MidiEventType::NoteOn { channel, note, velocity })
                 }
             },
-            0xC => {
+            MIDI_EVENT_PROGRAM_CHANGE => {
                 // Program Change
                 let program = self.read_u8()?;
                 Ok(MidiEventType::ProgramChange { channel, program })
             },
             0xFF => {
-                // Meta Event
+                // Meta Event (special case - full status byte)
                 self.parse_meta_event()
             },
             _ => {
@@ -279,11 +293,11 @@ impl<'a> MidiParser<'a> {
                 crate::log(&format!("Skipping unknown event type: 0x{:02X}", event_type));
                 // Skip the data bytes (most events have 1-2 data bytes)
                 match event_type {
-                    0xA | 0xB | 0xE => { // 2 data bytes
+                    0xA | MIDI_EVENT_CONTROL_CHANGE | MIDI_EVENT_PITCH_BEND => { // 2 data bytes
                         self.read_u8()?;
                         self.read_u8()?;
                     },
-                    0xD => { // 1 data byte
+                    0xD => { // 1 data byte (Channel Pressure)
                         self.read_u8()?;
                     },
                     _ => {
@@ -303,7 +317,7 @@ impl<'a> MidiParser<'a> {
         let length = self.read_vlq()?;
         
         match meta_type {
-            0x51 => {
+            META_EVENT_SET_TEMPO => {
                 // Set Tempo (3 bytes: microseconds per quarter note)
                 if length != 3 {
                     crate::log(&format!("ERROR: Invalid tempo event length: {} (expected 3)", length));
@@ -325,7 +339,7 @@ impl<'a> MidiParser<'a> {
                     microseconds_per_quarter 
                 }))
             },
-            0x58 => {
+            META_EVENT_TIME_SIGNATURE => {
                 // Time Signature (4 bytes: numerator, denominator, clocks_per_click, notes_per_quarter)
                 if length != 4 {
                     crate::log(&format!("ERROR: Invalid time signature event length: {} (expected 4)", length));
@@ -350,7 +364,7 @@ impl<'a> MidiParser<'a> {
                     notes_per_quarter 
                 }))
             },
-            0x03 => {
+            META_EVENT_TRACK_NAME => {
                 // Track Name
                 let mut name_bytes = Vec::with_capacity(length as usize);
                 for _ in 0..length {
@@ -362,7 +376,7 @@ impl<'a> MidiParser<'a> {
                 
                 Ok(MidiEventType::MetaEvent(MetaEventType::TrackName { name }))
             },
-            0x2F => {
+            META_EVENT_END_OF_TRACK => {
                 // End of Track
                 if length != 0 {
                     crate::log(&format!("WARNING: End of Track has non-zero length: {}", length));
