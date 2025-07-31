@@ -185,13 +185,132 @@ impl<'a> MidiParser<'a> {
         // Save the end position of this track
         let track_end = self.position + chunk_length as usize;
         
-        // For now, just skip the track data (will parse events in later tasks)
-        self.position = track_end;
+        // Parse all events in this track
+        let mut events = Vec::new();
+        let mut absolute_time = 0u64;
+        let mut running_status: Option<u8> = None;
+        
+        while self.position < track_end {
+            // Read delta time
+            let delta_time = self.read_vlq()?;
+            absolute_time += delta_time as u64;
+            
+            // Parse the event
+            let event = self.parse_event(&mut running_status)?;
+            
+            events.push(MidiEvent {
+                delta_time,
+                absolute_time,
+                event_type: event,
+            });
+            
+            // Check for End of Track
+            if matches!(events.last(), Some(MidiEvent { event_type: MidiEventType::MetaEvent(MetaEventType::EndOfTrack), .. })) {
+                break;
+            }
+        }
+        
+        crate::log(&format!("Parsed {} events in track", events.len()));
         
         Ok(MidiTrack {
-            name: None,
-            events: Vec::new(), // Will be populated in task 3.2.3+
+            name: None, // Will be set from TrackName meta event
+            events,
         })
+    }
+
+    /// Parse a single MIDI event
+    fn parse_event(&mut self, running_status: &mut Option<u8>) -> Result<MidiEventType, AweError> {
+        let status_byte = self.read_u8()?;
+        
+        // Handle running status (reuse previous status byte if < 0x80)
+        let actual_status = if status_byte < 0x80 {
+            // This is data, not a status byte - use running status
+            if let Some(status) = *running_status {
+                // Put the byte back since it's data, not status
+                self.position -= 1;
+                status
+            } else {
+                crate::log("ERROR: No running status available");
+                return Err(AweError::InvalidMidiFile);
+            }
+        } else {
+            // This is a status byte
+            *running_status = Some(status_byte);
+            status_byte
+        };
+        
+        let event_type = (actual_status & 0xF0) >> 4;
+        let channel = actual_status & 0x0F;
+        
+        match event_type {
+            0x8 => {
+                // Note Off
+                let note = self.read_u8()?;
+                let velocity = self.read_u8()?;
+                Ok(MidiEventType::NoteOff { channel, note, velocity })
+            },
+            0x9 => {
+                // Note On (velocity 0 = Note Off)
+                let note = self.read_u8()?;
+                let velocity = self.read_u8()?;
+                if velocity == 0 {
+                    Ok(MidiEventType::NoteOff { channel, note, velocity })
+                } else {
+                    Ok(MidiEventType::NoteOn { channel, note, velocity })
+                }
+            },
+            0xC => {
+                // Program Change
+                let program = self.read_u8()?;
+                Ok(MidiEventType::ProgramChange { channel, program })
+            },
+            0xFF => {
+                // Meta Event
+                self.parse_meta_event()
+            },
+            _ => {
+                // For now, skip unknown events
+                crate::log(&format!("Skipping unknown event type: 0x{:02X}", event_type));
+                // Skip the data bytes (most events have 1-2 data bytes)
+                match event_type {
+                    0xA | 0xB | 0xE => { // 2 data bytes
+                        self.read_u8()?;
+                        self.read_u8()?;
+                    },
+                    0xD => { // 1 data byte
+                        self.read_u8()?;
+                    },
+                    _ => {
+                        // Unknown, skip 1 byte and hope for the best
+                        self.read_u8()?;
+                    }
+                }
+                // Return a placeholder - in a real implementation we'd handle all event types
+                Ok(MidiEventType::MetaEvent(MetaEventType::EndOfTrack))
+            }
+        }
+    }
+
+    /// Parse a meta event (0xFF events)
+    fn parse_meta_event(&mut self) -> Result<MidiEventType, AweError> {
+        let meta_type = self.read_u8()?;
+        let length = self.read_vlq()?;
+        
+        match meta_type {
+            0x2F => {
+                // End of Track
+                Ok(MidiEventType::MetaEvent(MetaEventType::EndOfTrack))
+            },
+            _ => {
+                // Skip unknown meta events
+                crate::log(&format!("Skipping unknown meta event: 0x{:02X}, length: {}", meta_type, length));
+                for _ in 0..length {
+                    self.read_u8()?;
+                }
+                // Return a placeholder
+                Ok(MidiEventType::MetaEvent(MetaEventType::EndOfTrack))
+            }
+        }
     }
 
     /// Read 16-bit big-endian value
