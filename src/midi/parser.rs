@@ -102,11 +102,19 @@ impl<'a> MidiParser<'a> {
         crate::log(&format!("MIDI Header: format={}, tracks={}, division={}", 
             format, track_count, division));
         
+        // Parse all tracks
+        let mut tracks = Vec::new();
+        for i in 0..track_count {
+            crate::log(&format!("Parsing track {}...", i));
+            let track = self.parse_track()?;
+            tracks.push(track);
+        }
+        
         Ok(MidiFile {
             format,
             track_count,
             division,
-            tracks: Vec::new(), // Will be populated in later tasks
+            tracks,
         })
     }
 
@@ -145,6 +153,45 @@ impl<'a> MidiParser<'a> {
         let division = self.read_u16_be()?;
         
         Ok((format, track_count, division))
+    }
+
+    /// Parse a single track (MTrk chunk)
+    fn parse_track(&mut self) -> Result<MidiTrack, AweError> {
+        // Check chunk type (4 bytes) - should be "MTrk"
+        if self.position + 8 > self.data.len() {
+            crate::log("ERROR: Unexpected end of file before MTrk chunk");
+            return Err(AweError::InvalidMidiFile);
+        }
+        
+        let chunk_type = &self.data[self.position..self.position + 4];
+        if chunk_type != b"MTrk" {
+            crate::log(&format!("ERROR: Expected MTrk chunk, got {:?}", 
+                String::from_utf8_lossy(chunk_type)));
+            return Err(AweError::InvalidMidiFile);
+        }
+        self.position += 4;
+        
+        // Read chunk length (4 bytes)
+        let chunk_length = self.read_u32_be()?;
+        crate::log(&format!("Track chunk length: {} bytes", chunk_length));
+        
+        // Verify we have enough data for the track
+        if self.position + chunk_length as usize > self.data.len() {
+            crate::log(&format!("ERROR: Track data truncated. Expected {} bytes, have {}", 
+                chunk_length, self.data.len() - self.position));
+            return Err(AweError::InvalidMidiFile);
+        }
+        
+        // Save the end position of this track
+        let track_end = self.position + chunk_length as usize;
+        
+        // For now, just skip the track data (will parse events in later tasks)
+        self.position = track_end;
+        
+        Ok(MidiTrack {
+            name: None,
+            events: Vec::new(), // Will be populated in task 3.2.3+
+        })
     }
 
     /// Read 16-bit big-endian value
