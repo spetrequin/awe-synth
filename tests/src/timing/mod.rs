@@ -6,6 +6,8 @@
  */
 
 mod sequencer_timing_tests;
+mod tempo_change_tests;
+mod sample_accuracy_tests;
 
 use std::time::{Duration, Instant};
 
@@ -194,6 +196,12 @@ pub fn run_all_timing_tests() -> Vec<TimingTestResult> {
     
     // Run sequencer timing tests
     results.extend(sequencer_timing_tests::run_sequencer_timing_tests());
+    
+    // Run tempo change tests
+    results.extend(tempo_change_tests::run_tempo_change_tests());
+    
+    // Run sample accuracy tests
+    results.extend(sample_accuracy_tests::run_sample_accuracy_tests());
     
     results
 }

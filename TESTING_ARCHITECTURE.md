@@ -1,14 +1,29 @@
 # AWE Player Testing Architecture
 
-**⚠️ CRITICAL PRINCIPLE: Zero penetration into production codebase. All testing stays external and separate.**
+**⚠️ CRITICAL PRINCIPLE: Clean separation with production code access. Tests can use production modules but stay external.**
 
 ## 🎯 Testing Philosophy
 
-### **Separation Requirements:**
-- **No test code in production files** - All testing external
+### **Updated Separation Requirements:**
+- **No test code in production files** - All testing external in tests/ directory
 - **No #[cfg(test)] blocks** - Production code stays clean  
 - **No mock interfaces in main code** - Testing handles mocking externally
-- **Independent test builds** - Tests compile separately from production
+- **Production code access allowed** - Tests can import and use production modules
+- **Public module exports** - Production modules are public for test access
+- **Dual crate types** - Main crate builds as both "cdylib" and "rlib" for WASM and testing
+
+### **Updated Testing Approach Benefits:**
+- **Real Integration Testing**: Tests use actual production code, not mocks of core logic
+- **Authentic Behavior Validation**: Tests verify real component interactions
+- **Improved Test Reliability**: Tests catch actual bugs in production code paths
+- **Simplified Test Maintenance**: No need to keep mocks in sync with production changes
+- **Better Debugging**: Test failures point to actual production code issues
+
+### **What Changed from Zero Penetration:**
+- **Before**: Tests used only mocks and theoretical calculations
+- **Now**: Tests import production modules but stay in separate tests/ directory
+- **Maintained**: Clean separation, no test code in src/, independent builds
+- **Enhanced**: More realistic testing with actual component behavior
 
 ### **Coverage Goals:**
 - **100% Unit Testing**: Every function, struct, and component tested in isolation
@@ -66,37 +81,68 @@ tests/                           # Completely separate from src/
 
 **1. MIDI Event Testing (`midi_events_test.rs`):**
 ```rust
-// Tests MidiEvent struct and queue operations in complete isolation
+// Tests actual MidiEvent and sequencer components from production code
+use awe_synth::midi::sequencer::{MidiSequencer, PlaybackState};
+use awe_synth::midi::parser::{MidiEvent, MidiEventType};
+
 #[test]
-fn test_midi_event_creation_and_validation() {
-    // Test valid MIDI event creation
-    // Test invalid data clamping (channels > 15, velocities > 127)
-    // Test timestamp ordering
+fn test_midi_sequencer_state_transitions() {
+    let mut sequencer = MidiSequencer::new(44100.0);
+    
+    // Test actual production code behavior
+    assert_eq!(sequencer.get_state(), PlaybackState::Stopped);
+    
+    // Load test MIDI file and verify state changes
+    let test_midi = create_test_midi_file();
+    sequencer.load_midi_file(&test_midi).unwrap();
+    
+    sequencer.play(0);
+    assert_eq!(sequencer.get_state(), PlaybackState::Playing);
 }
 
 #[test]
-fn test_midi_queue_operations() {
-    // Test queue capacity limits (1000 events)
-    // Test FIFO ordering
-    // Test thread safety (if applicable)
+fn test_tempo_multiplier_behavior() {
+    let mut sequencer = MidiSequencer::new(44100.0);
+    
+    // Test actual tempo calculations with production code
+    let original_tempo = sequencer.get_original_tempo_bpm();
+    sequencer.set_tempo_multiplier(2.0);
+    let doubled_tempo = sequencer.get_current_tempo_bpm();
+    
+    assert!((doubled_tempo - original_tempo * 2.0).abs() < 0.1);
 }
 ```
 
-**2. Voice Synthesis Testing (`voice_synthesis_test.rs`):**
+**2. Voice Management Testing (`voice_management_test.rs`):**
 ```rust
-// Tests individual voice processing algorithms
+// Tests actual VoiceManager from production code
+use awe_synth::synth::voice_manager::VoiceManager;
+use awe_synth::midi::constants::*;
+
 #[test]
-fn test_sample_interpolation() {
-    // Test different interpolation algorithms
-    // Compare against reference implementations
-    // Test edge cases (loop points, sample boundaries)
+fn test_voice_allocation_with_real_voice_manager() {
+    let mut voice_manager = VoiceManager::new(44100.0);
+    
+    // Test actual voice allocation behavior
+    voice_manager.note_on(0, MIDI_MIDDLE_C, 100);
+    
+    // Verify voice was allocated using production code
+    let active_voices = voice_manager.get_active_voice_count();
+    assert_eq!(active_voices, 1);
 }
 
 #[test]
-fn test_adsr_envelope_curves() {
-    // Test exponential decay curves (FluidSynth-compatible)
-    // Test envelope timing accuracy
-    // Test parameter conversion (timecents → seconds)
+fn test_32_voice_polyphony_limit() {
+    let mut voice_manager = VoiceManager::new(44100.0);
+    
+    // Allocate 32 voices using production code
+    for note in 60..92 {
+        voice_manager.note_on(0, note, 100);
+    }
+    
+    // Test voice stealing on 33rd note
+    voice_manager.note_on(0, 92, 127);
+    assert_eq!(voice_manager.get_active_voice_count(), 32);
 }
 ```
 
@@ -156,16 +202,51 @@ describe('VirtualMidiKeyboard', () => {
 
 ## 🔗 Integration Testing Strategy
 
-### **End-to-End Pipeline Testing (`integration/midi_pipeline_test.rs`):**
+### **Real Production Code Integration Testing**
+
+The updated testing approach enables **authentic integration testing** using actual production components instead of mocks for core logic.
+
+### **Timing Integration Testing (`tests/src/timing/`):**
 ```rust
-// Test complete MIDI event flow: TypeScript → WASM → Audio
+// Example from actual implementation - tests real MidiSequencer timing
+use awe_synth::midi::sequencer::{MidiSequencer, PlaybackState};
+
 #[test]
-fn test_complete_midi_pipeline() {
-    // 1. Mock TypeScript MIDI event generation
-    // 2. Send through MIDI bridge to WASM queue
-    // 3. Process in voice manager
-    // 4. Verify correct audio output generation
-    // 5. Measure end-to-end latency
+fn test_sequencer_timing_integration() {
+    let mut sequencer = MidiSequencer::new(44100.0);
+    let test_midi = create_test_midi_file();
+    
+    // Test actual sequencer behavior with real MIDI file
+    sequencer.load_midi_file(&test_midi).unwrap();
+    sequencer.play(0);
+    
+    // Verify real timing calculations
+    let current_tempo = sequencer.get_current_tempo_bpm();
+    assert!((current_tempo - 120.0).abs() < 0.1);
+    
+    // Test tempo multiplier with actual implementation
+    sequencer.set_tempo_multiplier(2.0);
+    let doubled_tempo = sequencer.get_current_tempo_bpm();
+    assert!((doubled_tempo - 240.0).abs() < 0.1);
+}
+```
+
+### **MIDI Queue Integration Testing (`integration/queue_timing_tests.rs`):**
+```rust
+// Tests actual MIDI event queue processing with production code
+use awe_synth::midi::sequencer::MidiSequencer;
+
+#[test]
+fn test_midi_queue_processing_accuracy() {
+    let mut sequencer = MidiSequencer::new(44100.0);
+    
+    // Test real event processing timing
+    let events = sequencer.process(44100, 1024); // Process 1 second of audio
+    
+    // Verify actual event timing with production implementation
+    for event in events {
+        assert!(event.sample_offset < 1024); // Within buffer bounds
+    }
 }
 ```
 
@@ -305,15 +386,57 @@ fn test_golden_audio_regression() {
 - **SoundFont Builders**: Create minimal test SoundFonts with known characteristics  
 - **Audio Analysis Tools**: Spectral analysis, timing measurement, quality metrics
 
+### **Updated Configuration Requirements:**
+```toml
+# Main Cargo.toml - Enable both WASM and library builds
+[lib]
+crate-type = ["cdylib", "rlib"]  # WASM + library for tests
+
+# Make modules public for test access
+pub mod error;
+pub mod midi;
+pub mod synth;
+pub mod soundfont;
+pub mod effects;
+```
+
+```toml
+# tests/Cargo.toml - Reference main crate as dependency
+[dependencies]
+awe-synth = { path = ".." }  # Access to production code
+
+# Testing dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+```
+
 ### **Automated Test Execution:**
 ```bash
-# Separate test commands (independent of main build)
-cargo test --manifest-path tests/Cargo.toml         # Rust unit and integration tests
+# Updated test commands with production code access
+cargo test --manifest-path tests/Cargo.toml         # Rust tests using production code
+cargo run --bin run-timing-tests                    # Specific timing test runner
 npm test --prefix tests/typescript                  # TypeScript unit tests  
 cargo bench --manifest-path tests/Cargo.toml       # Performance benchmarks
 ./tests/scripts/stress_test_suite.sh               # Extended stress testing
 ./tests/scripts/audio_quality_validation.sh        # Audio output validation
 ```
+
+### **Testing Quality Improvements:**
+
+**✅ Enhanced Test Reliability:**
+- Tests verify actual production code behavior, not mock approximations
+- Catches real bugs in component interactions and edge cases
+- Eliminates mock drift where mocks become outdated vs production code
+
+**✅ Simplified Maintenance:**
+- No need to maintain separate mock implementations
+- Tests automatically use latest production code changes
+- Reduced test code complexity and maintenance overhead
+
+**✅ Better Debug Experience:**
+- Test failures point directly to production code issues
+- Can step through actual production code paths during debugging
+- Real component behavior visible in test execution
 
 ## 📊 Testing Metrics and Success Criteria
 
