@@ -7,6 +7,8 @@ mod synth;
 mod soundfont;
 mod effects;
 
+use midi::sequencer::{MidiSequencer, PlaybackState};
+
 static mut DEBUG_LOG: Option<VecDeque<String>> = None;
 static mut MIDI_EVENT_QUEUE: Option<VecDeque<MidiEvent>> = None;
 
@@ -44,7 +46,8 @@ impl MidiEvent {
 
 #[wasm_bindgen]
 pub struct MidiPlayer {
-    // Core player state will be added here
+    sequencer: MidiSequencer,
+    current_sample: u64,
 }
 
 #[wasm_bindgen]
@@ -58,7 +61,10 @@ impl MidiPlayer {
                 log("MIDI event queue initialized (capacity: 1000)");
             }
         }
-        MidiPlayer {}
+        MidiPlayer {
+            sequencer: MidiSequencer::new(44100.0), // 44.1kHz sample rate
+            current_sample: 0,
+        }
     }
     
     #[wasm_bindgen]
@@ -115,5 +121,108 @@ impl MidiPlayer {
         let sample_rate = 44100.0;
         let time = 0.0;
         (2.0 * PI * frequency * time / sample_rate).sin() * 0.1
+    }
+    
+    // MIDI Sequencer Controls
+    
+    #[wasm_bindgen]
+    pub fn load_midi_file(&mut self, data: &[u8]) -> bool {
+        match self.sequencer.load_midi_file(data) {
+            Ok(()) => {
+                log("MIDI file loaded successfully");
+                true
+            },
+            Err(e) => {
+                log(&format!("Failed to load MIDI file: {:?}", e));
+                false
+            }
+        }
+    }
+    
+    #[wasm_bindgen]
+    pub fn play(&mut self) {
+        self.sequencer.play(self.current_sample);
+    }
+    
+    #[wasm_bindgen]
+    pub fn pause(&mut self) {
+        self.sequencer.pause(self.current_sample);
+    }
+    
+    #[wasm_bindgen]
+    pub fn stop(&mut self) {
+        self.sequencer.stop();
+    }
+    
+    #[wasm_bindgen]
+    pub fn seek(&mut self, position: f64) {
+        self.sequencer.seek(position, self.current_sample);
+    }
+    
+    #[wasm_bindgen]
+    pub fn set_tempo_multiplier(&mut self, multiplier: f64) {
+        self.sequencer.set_tempo_multiplier(multiplier);
+    }
+    
+    #[wasm_bindgen]
+    pub fn get_playback_state(&self) -> u8 {
+        match self.sequencer.get_state() {
+            PlaybackState::Stopped => 0,
+            PlaybackState::Playing => 1,
+            PlaybackState::Paused => 2,
+        }
+    }
+    
+    #[wasm_bindgen]
+    pub fn get_position(&self) -> f64 {
+        self.sequencer.get_position()
+    }
+    
+    #[wasm_bindgen]
+    pub fn get_position_seconds(&self) -> f64 {
+        self.sequencer.get_position_seconds()
+    }
+    
+    #[wasm_bindgen]
+    pub fn get_duration_seconds(&self) -> f64 {
+        self.sequencer.get_duration_seconds()
+    }
+    
+    #[wasm_bindgen]
+    pub fn get_current_tempo_bpm(&self) -> f64 {
+        self.sequencer.get_current_tempo_bpm()
+    }
+    
+    #[wasm_bindgen]
+    pub fn get_original_tempo_bpm(&self) -> f64 {
+        self.sequencer.get_original_tempo_bpm()
+    }
+    
+    #[wasm_bindgen]
+    pub fn advance_time(&mut self, samples: u32) {
+        self.current_sample += samples as u64;
+        
+        // Process sequencer events
+        let events = self.sequencer.process(self.current_sample, samples as usize);
+        
+        // Convert sequencer events to our MIDI event queue
+        for event in events {
+            let midi_event = match event.event_type {
+                midi::sequencer::ProcessedEventType::NoteOn { channel, note, velocity } => {
+                    MidiEvent::new(self.current_sample, channel, 0x90, note, velocity)
+                },
+                midi::sequencer::ProcessedEventType::NoteOff { channel, note, velocity } => {
+                    MidiEvent::new(self.current_sample, channel, 0x80, note, velocity)
+                },
+                midi::sequencer::ProcessedEventType::ProgramChange { channel, program } => {
+                    MidiEvent::new(self.current_sample, channel, 0xC0, program, 0)
+                },
+                midi::sequencer::ProcessedEventType::ControlChange { channel, controller, value } => {
+                    MidiEvent::new(self.current_sample, channel, 0xB0, controller, value)
+                },
+            };
+            
+            self.queue_midi_event(midi_event);
+        }
     }
 }

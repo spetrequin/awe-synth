@@ -271,6 +271,12 @@ impl<'a> MidiParser<'a> {
                 let program = self.read_u8()?;
                 Ok(MidiEventType::ProgramChange { channel, program })
             },
+            MIDI_EVENT_CONTROL_CHANGE => {
+                // Control Change
+                let controller = self.read_u8()?;
+                let value = self.read_u8()?;
+                Ok(MidiEventType::ControlChange { channel, controller, value })
+            },
             MIDI_EVENT_SYSTEM => {
                 // System event - check if it's a meta event (0xFF)
                 if actual_status == MIDI_STATUS_META_EVENT {
