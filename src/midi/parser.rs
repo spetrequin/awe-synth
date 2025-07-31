@@ -223,4 +223,49 @@ impl<'a> MidiParser<'a> {
         self.position += 4;
         Ok(value)
     }
+
+    /// Read a variable-length quantity (VLQ)
+    /// MIDI uses VLQ to encode delta times efficiently
+    fn read_vlq(&mut self) -> Result<u32, AweError> {
+        let mut value: u32 = 0;
+        let mut byte_count = 0;
+        
+        loop {
+            if self.position >= self.data.len() {
+                crate::log("ERROR: Unexpected end of file while reading VLQ");
+                return Err(AweError::InvalidMidiFile);
+            }
+            
+            let byte = self.data[self.position];
+            self.position += 1;
+            byte_count += 1;
+            
+            // Each byte contributes 7 bits to the value
+            value = (value << 7) | (byte & 0x7F) as u32;
+            
+            // If the high bit is not set, this is the last byte
+            if (byte & 0x80) == 0 {
+                break;
+            }
+            
+            // Prevent overflow - VLQ should not exceed 4 bytes
+            if byte_count > 4 {
+                crate::log(&format!("ERROR: VLQ too long ({} bytes)", byte_count));
+                return Err(AweError::InvalidMidiFile);
+            }
+        }
+        
+        Ok(value)
+    }
+
+    /// Read a single byte
+    fn read_u8(&mut self) -> Result<u8, AweError> {
+        if self.position >= self.data.len() {
+            crate::log("ERROR: Unexpected end of file while reading u8");
+            return Err(AweError::InvalidMidiFile);
+        }
+        let value = self.data[self.position];
+        self.position += 1;
+        Ok(value)
+    }
 }
