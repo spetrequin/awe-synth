@@ -1,11 +1,28 @@
 # Rust
 /target/
+tests/target/
 **/*.rs.bk
 Cargo.lock
+
+# Rust build artifacts
+**/*.rlib
+**/*.rmeta
+**/*.d
+**/*.o
+**/deps/
+**/incremental/
+**/.fingerprint/
 
 # WebAssembly
 /pkg/
 *.wasm
+
+# Build outputs and binaries
+/dist/
+/build/
+/out/
+**/debug/
+**/release/
 
 # Node.js
 node_modules/
@@ -22,6 +39,18 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+*.lock
+
+# Editor backups and temp files
+*~
+*.bak
+*.orig
 
 # Test files and SoundFonts
 *.mid
