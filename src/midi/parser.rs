@@ -297,8 +297,37 @@ impl<'a> MidiParser<'a> {
         let length = self.read_vlq()?;
         
         match meta_type {
+            0x51 => {
+                // Set Tempo (3 bytes: microseconds per quarter note)
+                if length != 3 {
+                    crate::log(&format!("ERROR: Invalid tempo event length: {} (expected 3)", length));
+                    return Err(AweError::InvalidMidiFile);
+                }
+                
+                let byte1 = self.read_u8()? as u32;
+                let byte2 = self.read_u8()? as u32;
+                let byte3 = self.read_u8()? as u32;
+                
+                let microseconds_per_quarter = (byte1 << 16) | (byte2 << 8) | byte3;
+                
+                // Convert to BPM for logging
+                let bpm = 60_000_000.0 / microseconds_per_quarter as f64;
+                crate::log(&format!("Set Tempo: {} microseconds/quarter ({:.1} BPM)", 
+                    microseconds_per_quarter, bpm));
+                
+                Ok(MidiEventType::MetaEvent(MetaEventType::SetTempo { 
+                    microseconds_per_quarter 
+                }))
+            },
             0x2F => {
                 // End of Track
+                if length != 0 {
+                    crate::log(&format!("WARNING: End of Track has non-zero length: {}", length));
+                    // Skip the data anyway
+                    for _ in 0..length {
+                        self.read_u8()?;
+                    }
+                }
                 Ok(MidiEventType::MetaEvent(MetaEventType::EndOfTrack))
             },
             _ => {
