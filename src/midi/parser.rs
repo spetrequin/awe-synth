@@ -1,18 +1,5 @@
 use crate::error::AweError;
-
-// MIDI event type constants (upper nibble of status byte >> 4)
-const MIDI_EVENT_NOTE_OFF: u8 = 0x8;
-const MIDI_EVENT_NOTE_ON: u8 = 0x9;
-const MIDI_EVENT_PROGRAM_CHANGE: u8 = 0xC;
-const MIDI_EVENT_CONTROL_CHANGE: u8 = 0xB;
-const MIDI_EVENT_PITCH_BEND: u8 = 0xE;
-const MIDI_EVENT_META: u8 = 0xF;
-
-// MIDI meta event type constants
-const META_EVENT_SET_TEMPO: u8 = 0x51;
-const META_EVENT_TIME_SIGNATURE: u8 = 0x58;
-const META_EVENT_TRACK_NAME: u8 = 0x03;
-const META_EVENT_END_OF_TRACK: u8 = 0x2F;
+use crate::midi::constants::*;
 
 /// Standard MIDI file structure
 pub struct MidiFile {
@@ -284,20 +271,26 @@ impl<'a> MidiParser<'a> {
                 let program = self.read_u8()?;
                 Ok(MidiEventType::ProgramChange { channel, program })
             },
-            0xFF => {
-                // Meta Event (special case - full status byte)
-                self.parse_meta_event()
+            MIDI_EVENT_SYSTEM => {
+                // System event - check if it's a meta event (0xFF)
+                if actual_status == MIDI_STATUS_META_EVENT {
+                    self.parse_meta_event()
+                } else {
+                    // Other system events (SysEx, etc.) - skip for now
+                    crate::log(&format!("Skipping system event: 0x{:02X}", actual_status));
+                    Ok(MidiEventType::MetaEvent(MetaEventType::EndOfTrack))
+                }
             },
             _ => {
                 // For now, skip unknown events
                 crate::log(&format!("Skipping unknown event type: 0x{:02X}", event_type));
                 // Skip the data bytes (most events have 1-2 data bytes)
                 match event_type {
-                    0xA | MIDI_EVENT_CONTROL_CHANGE | MIDI_EVENT_PITCH_BEND => { // 2 data bytes
+                    MIDI_EVENT_POLYPHONIC_PRESSURE | MIDI_EVENT_CONTROL_CHANGE | MIDI_EVENT_PITCH_BEND => { // 2 data bytes
                         self.read_u8()?;
                         self.read_u8()?;
                     },
-                    0xD => { // 1 data byte (Channel Pressure)
+                    MIDI_EVENT_CHANNEL_PRESSURE => { // 1 data byte
                         self.read_u8()?;
                     },
                     _ => {

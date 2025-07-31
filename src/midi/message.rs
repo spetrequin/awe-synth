@@ -1,3 +1,5 @@
+use super::constants::*;
+
 #[derive(Debug, Clone, Copy)]
 pub enum MidiMessage {
     NoteOn { channel: u8, note: u8, velocity: u8 },
@@ -19,10 +21,11 @@ impl MidiMessage {
         let status = data[0];
         let channel = status & 0x0F;
         
-        match status & 0xF0 {
-            0x90 => Some(MidiMessage::NoteOn { channel, note: data[1], velocity: data[2] }),
-            0x80 => Some(MidiMessage::NoteOff { channel, note: data[1], velocity: data[2] }),
-            0xC0 => Some(MidiMessage::ProgramChange { channel, program: data[1] }),
+        let event_type = (status & 0xF0) >> 4;
+        match event_type {
+            MIDI_EVENT_NOTE_ON => Some(MidiMessage::NoteOn { channel, note: data[1], velocity: data[2] }),
+            MIDI_EVENT_NOTE_OFF => Some(MidiMessage::NoteOff { channel, note: data[1], velocity: data[2] }),
+            MIDI_EVENT_PROGRAM_CHANGE => Some(MidiMessage::ProgramChange { channel, program: data[1] }),
             _ => None,
         }
     }
