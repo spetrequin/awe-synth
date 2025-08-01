@@ -1,4 +1,4 @@
-use crate::synth::envelope::DAHDSREnvelope;
+use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
 
 #[derive(Debug, Clone)]
 pub struct Voice {
@@ -6,6 +6,8 @@ pub struct Voice {
     pub velocity: u8,
     pub phase: f64,
     pub is_active: bool,
+    /// True when voice is generating audio (including release phase)
+    pub is_processing: bool,
     pub volume_envelope: DAHDSREnvelope,
 }
 
@@ -28,6 +30,7 @@ impl Voice {
             velocity: 0,
             phase: 0.0,
             is_active: false,
+            is_processing: false,
             volume_envelope,
         }
     }
@@ -37,6 +40,7 @@ impl Voice {
         self.velocity = velocity;
         self.phase = 0.0;
         self.is_active = true;
+        self.is_processing = true;
         
         // Trigger volume envelope for note-on event
         self.volume_envelope.trigger();
@@ -45,12 +49,22 @@ impl Voice {
     pub fn stop_note(&mut self) {
         // Trigger envelope release phase for note-off event
         self.volume_envelope.release();
+        // Mark voice as inactive for voice allocation, but still processing during release
         self.is_active = false;
+        // Keep is_processing = true until envelope reaches Off state
     }
     
     /// Get current envelope amplitude by processing one sample
     /// Returns exponential envelope level (0.0 to 1.0)
+    /// Also updates voice processing state based on envelope state
     pub fn get_envelope_amplitude(&mut self) -> f32 {
-        self.volume_envelope.process()
+        let amplitude = self.volume_envelope.process();
+        
+        // Voice stops processing when envelope reaches Off state
+        if self.volume_envelope.state == EnvelopeState::Off {
+            self.is_processing = false;
+        }
+        
+        amplitude
     }
 }

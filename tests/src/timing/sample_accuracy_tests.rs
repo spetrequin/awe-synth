@@ -553,6 +553,6 @@ mod tests {
         let period_us = period_seconds * 1_000_000.0;
         
         // Should be approximately 22.676 microseconds
-        assert!((period_us - 22.676).abs() < 0.001);
+        assert!((period_us - 22.676_f64).abs() < 0.001);
     }
 }

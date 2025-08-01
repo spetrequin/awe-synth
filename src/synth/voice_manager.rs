@@ -31,24 +31,22 @@ impl VoiceManager {
         }
     }
     
-    /// Process envelopes for all active voices (call once per audio sample)
-    /// Returns the number of voices that are still generating audio
+    /// Process envelopes for all processing voices (call once per audio sample)
+    /// Returns the number of voices that are still generating audio  
     pub fn process_envelopes(&mut self) -> u32 {
-        let mut active_count = 0;
+        let mut processing_count = 0;
         
         for voice in self.voices.iter_mut() {
-            if voice.is_active {
-                let amplitude = voice.get_envelope_amplitude();
+            if voice.is_processing {
+                let _amplitude = voice.get_envelope_amplitude();
                 
-                // Voice is considered inactive when envelope reaches silence
-                if amplitude <= 0.001 {
-                    voice.is_active = false;
-                } else {
-                    active_count += 1;
+                // Voice automatically updates is_processing in get_envelope_amplitude()
+                if voice.is_processing {
+                    processing_count += 1;
                 }
             }
         }
         
-        active_count
+        processing_count
     }
 }

@@ -10,6 +10,7 @@ pub mod timing;
 pub mod stress;
 pub mod mocks;
 pub mod utils;
+pub mod envelope;
 
 // Re-export main test modules
 pub use integration::IntegrationTestRunner;

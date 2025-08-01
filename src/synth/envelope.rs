@@ -9,7 +9,7 @@
  */
 
 /// EMU8000 envelope states for 6-stage DAHDSR envelope
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EnvelopeState {
     /// Envelope is inactive (voice not playing)
     Off,
@@ -61,6 +61,8 @@ pub struct DAHDSREnvelope {
     
     /// Sustain level (0.0 to 1.0, converted from centibels)
     pub sustain_level: f32,
+    /// Level when release phase started (for proper release calculation)
+    pub release_start_level: f32,
 }
 
 impl DAHDSREnvelope {
@@ -92,6 +94,7 @@ impl DAHDSREnvelope {
             decay_samples: (decay_seconds * sample_rate) as u32,
             release_samples: (release_seconds * sample_rate) as u32,
             sustain_level: centibels_to_linear(sustain_centibels),
+            release_start_level: 0.0,
         }
     }
     
@@ -107,6 +110,8 @@ impl DAHDSREnvelope {
     /// Transitions to Release stage from any active state
     pub fn release(&mut self) {
         if self.state != EnvelopeState::Off {
+            // Store the current level when release starts (for proper release calculation)
+            self.release_start_level = self.current_level;
             self.state = EnvelopeState::Release;
             self.stage_samples = 0;
         }
@@ -153,10 +158,10 @@ impl DAHDSREnvelope {
                 }
             },
             EnvelopeState::Decay => {
-                // Exponential fall from 1.0 to sustain_level
+                // Exponential fall from 1.0 to sustain_level (fast-start, slow-end)
                 if self.decay_samples > 0 {
                     let progress = (self.stage_samples as f32 / self.decay_samples as f32).min(1.0);
-                    let exp_progress = progress.powf(2.0); // EMU8000/FluidSynth exponential curve
+                    let exp_progress = 1.0 - (1.0 - progress).powf(2.0); // Fast-start exponential decay
                     self.current_level = 1.0 + (self.sustain_level - 1.0) * exp_progress;
                 }
                 self.stage_samples += 1;
@@ -171,15 +176,16 @@ impl DAHDSREnvelope {
                 self.current_level = self.sustain_level;
             },
             EnvelopeState::Release => {
-                // Exponential fall from current level to 0
+                // Exponential fall from release start level to 0 (fast-start, slow-end)
                 if self.release_samples > 0 {
                     let progress = (self.stage_samples as f32 / self.release_samples as f32).min(1.0);
-                    let exp_progress = progress.powf(2.0); // EMU8000/FluidSynth exponential curve
-                    let start_level = self.sustain_level; // Level when release started
-                    self.current_level = start_level * (1.0 - exp_progress);
+                    let exp_progress = 1.0 - (1.0 - progress).powf(2.0); // Fast-start exponential decay
+                    self.current_level = self.release_start_level * (1.0 - exp_progress);
                 }
                 self.stage_samples += 1;
-                if self.stage_samples >= self.release_samples || self.current_level <= 0.001 {
+                // Only check amplitude if we started from a non-zero level
+                let amplitude_finished = self.current_level <= 0.001 && self.release_start_level > 0.001;
+                if self.stage_samples >= self.release_samples || amplitude_finished {
                     self.state = EnvelopeState::Off;
                     self.current_level = 0.0;
                 }
