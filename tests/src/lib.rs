@@ -11,6 +11,7 @@ pub mod stress;
 pub mod mocks;
 pub mod utils;
 pub mod envelope;
+pub mod audio;
 
 // Re-export main test modules
 pub use integration::IntegrationTestRunner;

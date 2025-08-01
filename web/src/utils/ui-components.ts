@@ -457,7 +457,7 @@ export function setElementValue(
         (element as any)[property] = value;
         return true;
     } catch (error) {
-        DEBUG_LOGGERS.configLoader.error(`Failed to set ${property}: ${error}`);
+        DEBUG_LOGGERS.configLoader.error(`Failed to set ${property}`, error);
         return false;
     }
 }

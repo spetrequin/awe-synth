@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWE Player - EMU8000 Emulator</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            border-bottom: 2px solid #00ffff;
+            padding-bottom: 10px;
+        }
+        
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            background-color: #222;
+        }
+        
+        .audio-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        button {
+            background-color: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        button:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        
+        button:disabled {
+            background-color: #555;
+            color: #666;
+            border-color: #666;
+            cursor: not-allowed;
+        }
+        
+        .midi-input {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        
+        .piano-key {
+            width: 30px;
+            height: 80px;
+            border: 1px solid #333;
+            background-color: #444;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-size: 10px;
+            color: #888;
+            padding-bottom: 5px;
+        }
+        
+        .piano-key.white {
+            background-color: #eee;
+            color: #333;
+        }
+        
+        .piano-key.black {
+            background-color: #222;
+            color: #ccc;
+            height: 50px;
+            width: 20px;
+            margin: 0 -10px;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .piano-key:active, .piano-key.pressed {
+            background-color: #00ff00;
+            color: #000;
+        }
+        
+        #debug-log {
+            width: 100%;
+            height: 300px;
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #333;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+            overflow-y: scroll;
+        }
+        
+        .status {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .status-item {
+            padding: 5px 10px;
+            background-color: #333;
+            border-radius: 3px;
+        }
+        
+        .error {
+            color: #ff4444;
+        }
+        
+        .success {
+            color: #44ff44;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 AWE Player - EMU8000 Emulator</h1>
+        
+        <div class="section">
+            <h3>📊 System Status</h3>
+            <div class="status">
+                <div class="status-item" id="wasm-status">WASM: Loading...</div>
+                <div class="status-item" id="audio-status">Audio: Initializing...</div>
+                <div class="status-item" id="worklet-status">AudioWorklet: Pending...</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h3>🎛️ Audio Controls</h3>
+            <div class="audio-controls">
+                <button id="start-audio" disabled>Start Audio Context</button>
+                <button id="play-test-tone" disabled>Play Test Tone</button>
+                <button id="stop-audio" disabled>Stop Audio</button>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h3>🎹 MIDI Input (Phase 8 Testing)</h3>
+            <div class="midi-input">
+                <button class="piano-key white" data-note="60">C4</button>
+                <button class="piano-key black" data-note="61">C#</button>
+                <button class="piano-key white" data-note="62">D4</button>
+                <button class="piano-key black" data-note="63">D#</button>
+                <button class="piano-key white" data-note="64">E4</button>
+                <button class="piano-key white" data-note="65">F4</button>
+                <button class="piano-key black" data-note="66">F#</button>
+                <button class="piano-key white" data-note="67">G4</button>
+                <button class="piano-key black" data-note="68">G#</button>
+                <button class="piano-key white" data-note="69">A4</button>
+                <button class="piano-key black" data-note="70">A#</button>
+                <button class="piano-key white" data-note="71">B4</button>
+            </div>
+            <p>Click piano keys to test MIDI → WASM → AudioWorklet pipeline</p>
+        </div>
+        
+        <div class="section">
+            <h3>🔍 Debug Log (WASM crate::log output)</h3>
+            <textarea id="debug-log" readonly placeholder="Debug output will appear here..."></textarea>
+            <button id="clear-log">Clear Log</button>
+        </div>
+    </div>
+    
+    <!-- Load the main application -->
+    <script type="module" src="./dist/main.js"></script>
+</body>
+</html>

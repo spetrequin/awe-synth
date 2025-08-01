@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/main.ts",
+    "src/utils/debug-logger.ts"
+  ],
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  }
+}

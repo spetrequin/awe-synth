@@ -8,7 +8,9 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "serve": "npx serve . -p 3000",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "build-wasm": "cd .. && wasm-pack build --target web --out-dir web/wasm-pkg",
+    "build-all": "npm run build-wasm && npm run build"
   },
   "dependencies": {
     "webmidi": "^3.1.8"

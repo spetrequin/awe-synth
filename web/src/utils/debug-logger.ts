@@ -24,12 +24,16 @@ export class DebugLogger {
     /**
      * Log a debug message with component prefix
      */
-    public log(message: string): void {
+    public log(message: string, error?: any): void {
         if (!this.enabled) return;
         
         const logElement = DebugLogger.getLogElement();
         if (logElement) {
-            logElement.value += `[${this.componentName}] ${message}\n`;
+            let logMessage = `[${this.componentName}] ${message}`;
+            if (error !== undefined) {
+                logMessage += `: ${error}`;
+            }
+            logElement.value += logMessage + '\n';
             logElement.scrollTop = logElement.scrollHeight;
         }
     }
@@ -37,12 +41,16 @@ export class DebugLogger {
     /**
      * Log an error message with component prefix
      */
-    public error(message: string): void {
+    public error(message: string, error?: any): void {
         if (!this.enabled) return;
         
         const logElement = DebugLogger.getLogElement();
         if (logElement) {
-            logElement.value += `[${this.componentName}] ERROR: ${message}\n`;
+            let logMessage = `[${this.componentName}] ERROR: ${message}`;
+            if (error !== undefined) {
+                logMessage += `: ${error}`;
+            }
+            logElement.value += logMessage + '\n';
             logElement.scrollTop = logElement.scrollHeight;
         }
     }
@@ -50,12 +58,16 @@ export class DebugLogger {
     /**
      * Log a warning message with component prefix
      */
-    public warn(message: string): void {
+    public warn(message: string, error?: any): void {
         if (!this.enabled) return;
         
         const logElement = DebugLogger.getLogElement();
         if (logElement) {
-            logElement.value += `[${this.componentName}] WARNING: ${message}\n`;
+            let logMessage = `[${this.componentName}] WARNING: ${message}`;
+            if (error !== undefined) {
+                logMessage += `: ${error}`;
+            }
+            logElement.value += logMessage + '\n';
             logElement.scrollTop = logElement.scrollHeight;
         }
     }
