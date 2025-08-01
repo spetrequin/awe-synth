@@ -39,7 +39,7 @@ export class MidiSequencerBridge {
     private wasmPlayer?: WasmMidiPlayer;
     private playbackControls: PlaybackControls;
     private fileLoader: MidiFileLoader;
-    private updateTimer?: number;
+    private updateTimer?: number | undefined;
     private isInitialized = false;
 
     constructor() {

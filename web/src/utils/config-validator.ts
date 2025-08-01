@@ -324,6 +324,7 @@ export interface GMInstrument {
     program: number;
     name: string;
     category: string;
+    [key: string]: unknown;
 }
 
 export const gmInstrumentSchema: ConfigSchema<GMInstrument[]> = {
@@ -371,6 +372,7 @@ export interface CCControl {
     default: number;
     bipolar?: boolean;
     category?: string;
+    [key: string]: unknown;
 }
 
 export const ccControlSchema: ConfigSchema<CCControl[]> = {
@@ -418,6 +420,7 @@ export interface GMDrumNote {
     note: number;
     name: string;
     category: string;
+    [key: string]: unknown;
 }
 
 export const gmDrumSchema: ConfigSchema<GMDrumNote[]> = {
@@ -460,6 +463,7 @@ export interface GMDrumKit {
     program: number;
     name: string;
     description: string;
+    [key: string]: unknown;
 }
 
 export const gmDrumKitSchema: ConfigSchema<GMDrumKit[]> = {

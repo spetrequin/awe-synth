@@ -5,12 +5,12 @@
 
 // Enhanced Touch interface with force/pressure support
 export interface EnhancedTouch extends Touch {
-    readonly force?: number;           // iOS Safari force touch
-    readonly radiusX?: number;         // Touch area width  
-    readonly radiusY?: number;         // Touch area height
-    readonly rotationAngle?: number;   // Touch rotation
-    readonly altitudeAngle?: number;   // Apple Pencil altitude
-    readonly azimuthAngle?: number;    // Apple Pencil azimuth
+    readonly force: number;            // iOS Safari force touch (required in Touch interface)
+    readonly radiusX: number;          // Touch area width (required in Touch interface)
+    readonly radiusY: number;          // Touch area height (required in Touch interface)
+    readonly rotationAngle: number;    // Touch rotation (required in Touch interface)
+    readonly altitudeAngle?: number;   // Apple Pencil altitude (extension)
+    readonly azimuthAngle?: number;    // Apple Pencil azimuth (extension)
 }
 
 // Enhanced TouchEvent with typed touches

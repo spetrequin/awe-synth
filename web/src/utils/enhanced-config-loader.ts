@@ -9,7 +9,6 @@
 import { DEBUG_LOGGERS } from './debug-logger.js';
 import { 
     ConfigValidationError, 
-    ConfigSchemaError,
     ValidationResult,
     getConfigSchema,
     CONFIG_SCHEMAS
@@ -181,7 +180,7 @@ class EnhancedConfigurationLoader {
             };
 
         } catch (error) {
-            if (error.name === 'AbortError') {
+            if (error instanceof Error && error.name === 'AbortError') {
                 throw new ConfigLoadError(
                     `Config load timeout: ${configName} (${timeout}ms)`,
                     configName,
@@ -199,7 +198,7 @@ class EnhancedConfigurationLoader {
                 configName,
                 0,
                 'UNKNOWN',
-                error
+                error instanceof Error ? error : undefined
             );
         } finally {
             clearTimeout(timeoutId);
@@ -324,11 +323,16 @@ class EnhancedConfigurationLoader {
      * List available schemas
      */
     public getAvailableSchemas(): Array<{ name: string; version: string; description?: string }> {
-        return Array.from(CONFIG_SCHEMAS.entries()).map(([name, schema]) => ({
-            name,
-            version: schema.version,
-            description: schema.description
-        }));
+        return Array.from(CONFIG_SCHEMAS.entries()).map(([name, schema]): { name: string; version: string; description?: string } => {
+            const result: { name: string; version: string; description?: string } = {
+                name,
+                version: schema.version
+            };
+            if (schema.description !== undefined) {
+                result.description = schema.description;
+            }
+            return result;
+        });
     }
 }
 

@@ -146,13 +146,13 @@ export function analyzeVelocityRange(velocities: number[]): {
     };
     
     for (const velocity of velocities) {
-        if (velocity <= 31) distribution['pp (0-31)']++;
-        else if (velocity <= 47) distribution['p (32-47)']++;
-        else if (velocity <= 63) distribution['mp (48-63)']++;
-        else if (velocity <= 79) distribution['mf (64-79)']++;
-        else if (velocity <= 95) distribution['f (80-95)']++;
-        else if (velocity <= 111) distribution['ff (96-111)']++;
-        else distribution['fff (112-127)']++;
+        if (velocity <= 31) distribution['pp (0-31)']!++;
+        else if (velocity <= 47) distribution['p (32-47)']!++;
+        else if (velocity <= 63) distribution['mp (48-63)']!++;
+        else if (velocity <= 79) distribution['mf (64-79)']!++;
+        else if (velocity <= 95) distribution['f (80-95)']!++;
+        else if (velocity <= 111) distribution['ff (96-111)']!++;
+        else distribution['fff (112-127)']!++;
     }
     
     return {
