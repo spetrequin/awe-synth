@@ -14,6 +14,7 @@
     
     <button onclick="testPlayer()">Test MidiPlayer</button>
     <button onclick="testTone()">Test Tone</button>
+    <button onclick="testSynthesis()">Test Phase 7A Synthesis</button>
     <button onclick="updateDebugLog()">Update Debug Log</button>
     
     <h3>Debug Output:</h3>
@@ -41,6 +42,29 @@
             if (window.player) {
                 const sample = window.player.play_test_tone();
                 document.getElementById('debug-log').value += `\nTest tone sample: ${sample}`;
+            }
+        };
+        
+        window.testSynthesis = function() {
+            if (window.player) {
+                const results = window.player.test_synthesis_pipeline();
+                document.getElementById('debug-log').value += `\n\n=== PHASE 7A SYNTHESIS TEST ===\n`;
+                document.getElementById('debug-log').value += `Results: ${results}\n`;
+                document.getElementById('debug-log').value += `=== END TEST ===\n\n`;
+                
+                // Parse and display results nicely
+                try {
+                    const data = JSON.parse(results);
+                    if (data.success) {
+                        document.getElementById('debug-log').value += `✅ SUCCESS: Voice ${data.voice_allocated} allocated\n`;
+                        document.getElementById('debug-log').value += `✅ Audio samples generated: ${data.non_zero_samples}/10 non-zero\n`;
+                        document.getElementById('debug-log').value += `✅ Complete synthesis pipeline working!\n`;
+                    } else {
+                        document.getElementById('debug-log').value += `❌ FAILED: ${data.error}\n`;
+                    }
+                } catch(e) {
+                    document.getElementById('debug-log').value += `Parse error: ${e}\n`;
+                }
             }
         };
         

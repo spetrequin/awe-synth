@@ -31,6 +31,22 @@ impl VoiceManager {
         }
     }
     
+    /// Process all active voices and return mixed audio sample
+    /// This is the main audio processing method - call once per sample
+    pub fn process(&mut self) -> f32 {
+        let mut mixed_output = 0.0;
+        
+        for voice in self.voices.iter_mut() {
+            if voice.is_processing {
+                let voice_sample = voice.generate_sample(self.sample_rate);
+                mixed_output += voice_sample;
+            }
+        }
+        
+        // Simple mixing - divide by max voices to prevent clipping
+        mixed_output / 32.0
+    }
+    
     /// Process envelopes for all processing voices (call once per audio sample)
     /// Returns the number of voices that are still generating audio  
     pub fn process_envelopes(&mut self) -> u32 {

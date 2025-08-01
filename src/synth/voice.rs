@@ -1,4 +1,5 @@
 use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
+use crate::synth::oscillator::{Oscillator, midi_note_to_frequency};
 
 #[derive(Debug, Clone)]
 pub struct Voice {
@@ -9,6 +10,7 @@ pub struct Voice {
     /// True when voice is generating audio (including release phase)
     pub is_processing: bool,
     pub volume_envelope: DAHDSREnvelope,
+    pub oscillator: Oscillator,
 }
 
 impl Voice {
@@ -32,6 +34,7 @@ impl Voice {
             is_active: false,
             is_processing: false,
             volume_envelope,
+            oscillator: Oscillator::new(440.0), // Default frequency, will be updated in start_note
         }
     }
     
@@ -41,6 +44,10 @@ impl Voice {
         self.phase = 0.0;
         self.is_active = true;
         self.is_processing = true;
+        
+        // Set oscillator frequency from MIDI note number
+        self.oscillator.frequency = midi_note_to_frequency(note);
+        self.oscillator.phase = 0.0; // Reset phase for clean note start
         
         // Trigger volume envelope for note-on event
         self.volume_envelope.trigger();
@@ -66,5 +73,22 @@ impl Voice {
         }
         
         amplitude
+    }
+    
+    /// Generate one audio sample combining oscillator and envelope
+    /// Returns final audio sample (-1.0 to 1.0)
+    pub fn generate_sample(&mut self, sample_rate: f32) -> f32 {
+        if !self.is_processing {
+            return 0.0;
+        }
+        
+        // Generate oscillator sample
+        let oscillator_output = self.oscillator.generate_sample(sample_rate);
+        
+        // Get envelope amplitude (also processes envelope state)
+        let envelope_amplitude = self.get_envelope_amplitude();
+        
+        // Combine oscillator with envelope
+        oscillator_output * envelope_amplitude
     }
 }

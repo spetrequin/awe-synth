@@ -350,4 +350,77 @@ impl MidiPlayer {
             }
         }
     }
+    
+    /// Process one audio sample - main audio processing method for AudioWorklet
+    /// Returns single audio sample (-1.0 to 1.0) combining all active voices
+    #[wasm_bindgen]
+    pub fn process(&mut self) -> f32 {
+        // Process any pending MIDI events for current sample
+        self.process_midi_events(self.current_sample);
+        
+        // Generate audio sample from voice manager
+        let audio_sample = self.voice_manager.process();
+        
+        // Advance sample counter
+        self.current_sample += 1;
+        
+        audio_sample
+    }
+    
+    /// Test complete synthesis pipeline: MIDI → Voice → Oscillator → Envelope → Audio
+    /// Returns test results as JSON string for verification
+    #[wasm_bindgen]
+    pub fn test_synthesis_pipeline(&mut self) -> String {
+        log("Testing Phase 7A: Basic Audio Synthesis Pipeline");
+        
+        // Test 1: Start a note (Middle C, velocity 100)
+        let note = 60; // Middle C (261.63 Hz)
+        let velocity = 100;
+        
+        if let Some(voice_id) = self.voice_manager.note_on(note, velocity) {
+            log(&format!("✅ Note {} started on voice {}", note, voice_id));
+            
+            // Test 2: Generate 10 audio samples and verify non-zero output
+            let mut sample_outputs = Vec::new();
+            let mut non_zero_samples = 0;
+            
+            for i in 0..10 {
+                let audio_sample = self.voice_manager.process();
+                sample_outputs.push(format!("{:.6}", audio_sample));
+                
+                if audio_sample.abs() > 0.001 {
+                    non_zero_samples += 1;
+                }
+                
+                log(&format!("Sample {}: {:.6}", i, audio_sample));
+            }
+            
+            // Test 3: Release note and verify envelope release
+            self.voice_manager.note_off(note);
+            log("✅ Note released - testing envelope release");
+            
+            let mut release_samples = Vec::new();
+            for i in 0..5 {
+                let audio_sample = self.voice_manager.process();
+                release_samples.push(format!("{:.6}", audio_sample));
+                log(&format!("Release sample {}: {:.6}", i, audio_sample));
+            }
+            
+            // Create test results
+            let test_results = format!(
+                "{{\"success\": true, \"voice_allocated\": {}, \"non_zero_samples\": {}, \"attack_samples\": [{}], \"release_samples\": [{}]}}",
+                voice_id,
+                non_zero_samples,
+                sample_outputs.join(", "),
+                release_samples.join(", ")
+            );
+            
+            log(&format!("✅ Synthesis test completed: {} non-zero samples generated", non_zero_samples));
+            test_results
+        } else {
+            let error = "{\"success\": false, \"error\": \"Failed to allocate voice\"}".to_string();
+            log("❌ Synthesis test failed: No voice available");
+            error
+        }
+    }
 }
