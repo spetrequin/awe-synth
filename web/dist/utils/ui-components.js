@@ -311,7 +311,7 @@ export function setElementValue(element, property, value, validator) {
         return true;
     }
     catch (error) {
-        DEBUG_LOGGERS.configLoader.error(`Failed to set ${property}: ${error}`);
+        DEBUG_LOGGERS.configLoader.error(`Failed to set ${property}`, error);
         return false;
     }
 }

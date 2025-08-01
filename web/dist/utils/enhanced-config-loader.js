@@ -142,7 +142,7 @@ class EnhancedConfigurationLoader {
             }
             catch (error) {
                 errors.push({ name, error: error });
-                DEBUG_LOGGERS.configLoader.error(`Failed to preload config ${name}: ${error}`);
+                DEBUG_LOGGERS.configLoader.error(`Failed to preload config ${name}`, error);
             }
         });
         await Promise.allSettled(promises);

@@ -6,44 +6,58 @@
  * All debug messages go to the debug-log textarea as per CLAUDE.md requirements.
  */
 export class DebugLogger {
+    componentName;
+    enabled;
+    static logElement = null;
     constructor(options) {
-        var _a;
         this.componentName = options.componentName;
-        this.enabled = (_a = options.enabled) !== null && _a !== void 0 ? _a : true;
+        this.enabled = options.enabled ?? true;
     }
     /**
      * Log a debug message with component prefix
      */
-    log(message) {
+    log(message, error) {
         if (!this.enabled)
             return;
         const logElement = DebugLogger.getLogElement();
         if (logElement) {
-            logElement.value += `[${this.componentName}] ${message}\n`;
+            let logMessage = `[${this.componentName}] ${message}`;
+            if (error !== undefined) {
+                logMessage += `: ${error}`;
+            }
+            logElement.value += logMessage + '\n';
             logElement.scrollTop = logElement.scrollHeight;
         }
     }
     /**
      * Log an error message with component prefix
      */
-    error(message) {
+    error(message, error) {
         if (!this.enabled)
             return;
         const logElement = DebugLogger.getLogElement();
         if (logElement) {
-            logElement.value += `[${this.componentName}] ERROR: ${message}\n`;
+            let logMessage = `[${this.componentName}] ERROR: ${message}`;
+            if (error !== undefined) {
+                logMessage += `: ${error}`;
+            }
+            logElement.value += logMessage + '\n';
             logElement.scrollTop = logElement.scrollHeight;
         }
     }
     /**
      * Log a warning message with component prefix
      */
-    warn(message) {
+    warn(message, error) {
         if (!this.enabled)
             return;
         const logElement = DebugLogger.getLogElement();
         if (logElement) {
-            logElement.value += `[${this.componentName}] WARNING: ${message}\n`;
+            let logMessage = `[${this.componentName}] WARNING: ${message}`;
+            if (error !== undefined) {
+                logMessage += `: ${error}`;
+            }
+            logElement.value += logMessage + '\n';
             logElement.scrollTop = logElement.scrollHeight;
         }
     }
@@ -86,7 +100,6 @@ export class DebugLogger {
         return (message) => logger.log(message);
     }
 }
-DebugLogger.logElement = null;
 // Convenience function for quick debug logging without creating a logger instance
 export function debugLog(componentName, message) {
     const logger = new DebugLogger({ componentName });
@@ -102,3 +115,4 @@ export const DEBUG_LOGGERS = {
     midiFile: new DebugLogger({ componentName: 'MIDI File' }),
     synthesis: new DebugLogger({ componentName: 'Synthesis' })
 };
+//# sourceMappingURL=debug-logger.js.map

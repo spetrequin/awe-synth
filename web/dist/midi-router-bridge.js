@@ -11,10 +11,20 @@ const log = (message) => DEBUG_LOGGERS.midiFile.log(message);
  * MIDI Router Bridge - connects MIDI router to WASM synthesis
  */
 export class MidiRouterBridge {
+    router;
+    wasmPlayer;
+    wasmMidiEvent;
+    config;
+    processingTimer;
+    lastProcessTime = 0;
+    currentSampleTime = 0;
     constructor(config = {}) {
-        this.lastProcessTime = 0;
-        this.currentSampleTime = 0;
-        this.config = Object.assign({ processingInterval: 10, sampleRate: 44100, debugLogging: false }, config);
+        this.config = {
+            processingInterval: 10, // 10ms = ~100Hz processing rate
+            sampleRate: 44100,
+            debugLogging: false,
+            ...config
+        };
         // Create MIDI router with sample rate config
         this.router = new MidiRouter({
             sampleRate: this.config.sampleRate,
@@ -187,3 +197,4 @@ export class MidiRouterBridge {
         log('MidiRouterBridge: Destroyed');
     }
 }
+//# sourceMappingURL=midi-router-bridge.js.map

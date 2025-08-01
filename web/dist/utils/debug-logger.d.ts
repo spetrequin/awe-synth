@@ -17,15 +17,15 @@ export declare class DebugLogger {
     /**
      * Log a debug message with component prefix
      */
-    log(message: string): void;
+    log(message: string, error?: any): void;
     /**
      * Log an error message with component prefix
      */
-    error(message: string): void;
+    error(message: string, error?: any): void;
     /**
      * Log a warning message with component prefix
      */
-    warn(message: string): void;
+    warn(message: string, error?: any): void;
     /**
      * Enable/disable logging for this component
      */

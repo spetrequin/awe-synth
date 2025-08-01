@@ -107,7 +107,6 @@ export declare class MidiRouter {
     private eventQueue;
     private outputCallback?;
     private stats;
-    private lastProcessTime;
     private latencyHistory;
     private isProcessing;
     constructor(config?: Partial<MidiRouterConfig>);

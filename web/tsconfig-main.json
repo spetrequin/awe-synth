@@ -2,7 +2,11 @@
   "extends": "./tsconfig.json",
   "include": [
     "src/main.ts",
-    "src/utils/debug-logger.ts"
+    "src/utils/debug-logger.ts",
+    "src/audio-worklet.ts",
+    "src/audio-worklet-manager.ts",
+    "src/audio-buffer-manager.ts",
+    "src/types/audio-worklet.d.ts"
   ],
   "compilerOptions": {
     "noUnusedLocals": false,

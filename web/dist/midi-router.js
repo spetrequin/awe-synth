@@ -33,13 +33,22 @@ export const MIDI_SOURCE_PRIORITY = {
  * handles timing synchronization, and routes to WASM synthesis engine.
  */
 export class MidiRouter {
+    config;
+    sources = {};
+    eventQueue = [];
+    outputCallback;
+    stats;
+    // private lastProcessTime = 0;
+    latencyHistory = [];
+    isProcessing = false;
     constructor(config = {}) {
-        this.sources = {};
-        this.eventQueue = [];
-        // private lastProcessTime = 0;
-        this.latencyHistory = [];
-        this.isProcessing = false;
-        this.config = Object.assign({ maxQueueSize: 1000, sampleRate: 44100, baseTimestamp: performance.now(), debugLogging: false }, config);
+        this.config = {
+            maxQueueSize: 1000,
+            sampleRate: 44100,
+            baseTimestamp: performance.now(),
+            debugLogging: false,
+            ...config
+        };
         this.stats = {
             totalEvents: 0,
             eventsBySource: {
@@ -62,9 +71,12 @@ export class MidiRouter {
      */
     registerSource(sourceConfig) {
         log(`MidiRouter: Registering source '${sourceConfig.name}' (${sourceConfig.source})`);
-        this.sources[sourceConfig.source] = Object.assign(Object.assign({}, sourceConfig), { onEvent: (event) => {
+        this.sources[sourceConfig.source] = {
+            ...sourceConfig,
+            onEvent: (event) => {
                 this.handleSourceEvent(sourceConfig.source, event);
-            } });
+            }
+        };
         this.stats.eventsBySource[sourceConfig.source] = 0;
     }
     /**
@@ -180,7 +192,7 @@ export class MidiRouter {
      * Get current router statistics
      */
     getStats() {
-        return Object.assign({}, this.stats);
+        return { ...this.stats };
     }
     /**
      * Reset router statistics
@@ -321,3 +333,4 @@ export class MidiRouter {
         log('MidiRouter: Destroyed');
     }
 }
+//# sourceMappingURL=midi-router.js.map

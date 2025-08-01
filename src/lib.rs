@@ -6,6 +6,7 @@ pub mod midi;
 pub mod synth;
 pub mod soundfont;
 pub mod effects;
+pub mod worklet;
 
 use midi::sequencer::{MidiSequencer, PlaybackState};
 use midi::constants::*;
@@ -421,6 +422,140 @@ impl MidiPlayer {
             let error = "{\"success\": false, \"error\": \"Failed to allocate voice\"}".to_string();
             log("❌ Synthesis test failed: No voice available");
             error
+        }
+    }
+}
+
+// ===== AUDIOWORKLET INTEGRATION EXPORTS =====
+
+/// Global AudioWorklet-optimized exports for efficient real-time audio processing
+/// These functions are designed for maximum performance in AudioWorklet context
+
+static mut GLOBAL_WORKLET_BRIDGE: Option<crate::worklet::AudioWorkletBridge> = None;
+
+/// Initialize global AudioWorklet bridge with specified sample rate
+/// Must be called once before using other AudioWorklet functions
+#[wasm_bindgen]
+pub fn init_audio_worklet(sample_rate: f32) -> bool {
+    unsafe {
+        GLOBAL_WORKLET_BRIDGE = Some(crate::worklet::AudioWorkletBridge::new(sample_rate));
+        log(&format!("Global AudioWorklet bridge initialized at {}Hz", sample_rate));
+        true
+    }
+}
+
+/// Process audio buffer using global AudioWorklet bridge
+/// Optimized for AudioWorklet process() callback - minimal overhead
+#[wasm_bindgen]
+pub fn process_audio_buffer(buffer_length: usize) -> Vec<f32> {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.process_audio_buffer(buffer_length)
+        } else {
+            log("Error: AudioWorklet bridge not initialized - call init_audio_worklet() first");
+            vec![0.0; buffer_length] // Return silence
+        }
+    }
+}
+
+/// Get sample rate from global AudioWorklet bridge
+#[wasm_bindgen]
+pub fn get_sample_rate() -> f32 {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_sample_rate()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            44100.0 // Default sample rate
+        }
+    }
+}
+
+/// Queue MIDI event through global AudioWorklet bridge
+/// Optimized for real-time MIDI input from AudioWorklet
+#[wasm_bindgen]
+pub fn queue_midi_event_global(timestamp: u64, channel: u8, message_type: u8, data1: u8, data2: u8) {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.queue_midi_event(timestamp, channel, message_type, data1, data2);
+        } else {
+            log("Error: AudioWorklet bridge not initialized - MIDI event dropped");
+        }
+    }
+}
+
+/// Process stereo buffer (interleaved) using global bridge
+#[wasm_bindgen]
+pub fn process_stereo_buffer_global(buffer_length: usize) -> Vec<f32> {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.process_stereo_buffer(buffer_length)
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            vec![0.0; buffer_length] // Return silence
+        }
+    }
+}
+
+/// Set buffer size for global AudioWorklet bridge
+#[wasm_bindgen]
+pub fn set_buffer_size_global(size: usize) {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.set_buffer_size(size);
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+/// Get current buffer size from global bridge
+#[wasm_bindgen]
+pub fn get_buffer_size_global() -> usize {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_buffer_size()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            128 // Default buffer size
+        }
+    }
+}
+
+/// Reset audio state in global bridge (stop all voices, clear events)
+#[wasm_bindgen]
+pub fn reset_audio_state_global() {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.reset_audio_state();
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+/// Test global AudioWorklet bridge functionality
+#[wasm_bindgen]
+pub fn test_audio_worklet_global(buffer_size: usize) -> String {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.test_worklet_bridge(buffer_size)
+        } else {
+            let error = r#"{"success": false, "error": "AudioWorklet bridge not initialized"}"#;
+            log("Error: AudioWorklet bridge not initialized for testing");
+            error.to_string()
+        }
+    }
+}
+
+/// Get debug log from global bridge
+#[wasm_bindgen]
+pub fn get_debug_log_global() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_debug_log()
+        } else {
+            "AudioWorklet bridge not initialized".to_string()
         }
     }
 }
