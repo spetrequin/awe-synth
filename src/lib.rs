@@ -7,6 +7,7 @@ pub mod synth;
 pub mod soundfont;
 pub mod effects;
 pub mod worklet;
+pub mod audio;
 
 use midi::sequencer::{MidiSequencer, PlaybackState};
 use midi::constants::*;
@@ -30,7 +31,8 @@ pub fn log(message: &str) {
 }
 
 #[wasm_bindgen]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct MidiEvent {
     pub timestamp: u64,
     pub channel: u8,
@@ -558,4 +560,225 @@ pub fn get_debug_log_global() -> String {
             "AudioWorklet bridge not initialized".to_string()
         }
     }
+}
+
+// ===== BUFFER MANAGEMENT EXPORTS =====
+
+/// Set device information for buffer optimization
+#[wasm_bindgen]
+pub fn set_device_info_global(hardware_concurrency: u32, device_memory_gb: u32) {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.set_device_info(hardware_concurrency, device_memory_gb);
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+/// Record processing time for buffer management
+#[wasm_bindgen]
+pub fn record_processing_time_global(processing_time_ms: f32, buffer_size: usize) {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.record_processing_time(processing_time_ms, buffer_size);
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+/// Record buffer underrun (audio glitch)
+#[wasm_bindgen]
+pub fn record_underrun_global() {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.record_underrun();
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+/// Get buffer performance metrics as JSON
+#[wasm_bindgen]
+pub fn get_buffer_metrics_global() -> String {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_buffer_metrics()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            "{}".to_string()
+        }
+    }
+}
+
+/// Get buffer status summary as JSON
+#[wasm_bindgen]
+pub fn get_buffer_status_global() -> String {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_buffer_status()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            "{}".to_string()
+        }
+    }
+}
+
+/// Get recommended buffer size for target latency
+#[wasm_bindgen]
+pub fn get_recommended_buffer_size_global(target_latency_ms: f32) -> u32 {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_recommended_buffer_size(target_latency_ms)
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            256 // Default buffer size
+        }
+    }
+}
+
+/// Get current buffer latency in milliseconds
+#[wasm_bindgen]
+pub fn get_current_latency_ms_global() -> f32 {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_current_latency_ms()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            5.8 // Default latency for 256 samples at 44.1kHz
+        }
+    }
+}
+
+/// Enable or disable adaptive buffer sizing
+#[wasm_bindgen]
+pub fn set_adaptive_mode_global(enabled: bool) {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.set_adaptive_mode(enabled);
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+// ===== PIPELINE MANAGEMENT EXPORTS =====
+
+/// Get pipeline status as string
+#[wasm_bindgen]
+pub fn get_pipeline_status_global() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_pipeline_status()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            "Error".to_string()
+        }
+    }
+}
+
+/// Check if pipeline is ready for processing
+#[wasm_bindgen]
+pub fn is_pipeline_ready_global() -> bool {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.is_pipeline_ready()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            false
+        }
+    }
+}
+
+/// Get comprehensive pipeline statistics as JSON
+#[wasm_bindgen]
+pub fn get_pipeline_stats_global() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_pipeline_stats()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            "{}".to_string()
+        }
+    }
+}
+
+/// Reset pipeline state
+#[wasm_bindgen]
+pub fn reset_pipeline_global() {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.reset_pipeline();
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+        }
+    }
+}
+
+/// Get combined audio and pipeline status as JSON
+#[wasm_bindgen]
+pub fn get_comprehensive_status_global() -> String {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            bridge.get_comprehensive_status()
+        } else {
+            log("Error: AudioWorklet bridge not initialized");
+            r#"{"error": "AudioWorklet bridge not initialized"}"#.to_string()
+        }
+    }
+}
+
+// ===== MIDI TEST SEQUENCE EXPORTS =====
+
+// Re-export MIDI test sequence functions for global access
+pub use midi::test_sequences::{
+    init_test_sequence_generator,
+    generate_c_major_scale_test,
+    generate_chromatic_scale_test,
+    generate_arpeggio_test,
+    generate_chord_test,
+    generate_velocity_test,
+    midi_note_to_name,
+    note_name_to_midi,
+    execute_test_sequence,
+    quick_c_major_test,
+};
+
+// ===== UTILITY EXPORTS =====
+
+/// Initialize all global systems with sample rate
+#[wasm_bindgen]
+pub fn init_all_systems(sample_rate: f32) -> bool {
+    let mut success = true;
+    
+    // Initialize AudioWorklet bridge
+    if !init_audio_worklet(sample_rate) {
+        log("❌ Failed to initialize AudioWorklet bridge");
+        success = false;
+    }
+    
+    // Initialize MIDI test sequence generator
+    init_test_sequence_generator(sample_rate);
+    
+    log(&format!("🚀 AWE Player systems initialized at {}Hz", sample_rate));
+    success
+}
+
+/// Get system status overview as JSON
+#[wasm_bindgen]
+pub fn get_system_status() -> String {
+    let pipeline_ready = is_pipeline_ready_global();
+    let buffer_status = get_buffer_status_global();
+    let pipeline_stats = get_pipeline_stats_global();
+    
+    format!(r#"{{"pipelineReady": {}, "bufferStatus": {}, "pipelineStats": {}}}"#,
+        pipeline_ready, buffer_status, pipeline_stats)
+}
+
+/// Get AWE Player version and build info
+#[wasm_bindgen]
+pub fn get_version_info() -> String {
+    r#"{"name": "AWE Player", "version": "0.1.0", "phase": "8C", "architecture": "Rust-Centric"}"#.to_string()
 }

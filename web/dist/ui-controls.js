@@ -1,21 +1,21 @@
 /**
- * AWE Player - UI Controls Module
+ * AWE Player - UI Controls Module (Simplified DOM Interface)
  * Part of AWE Player EMU8000 Emulator
  *
- * Provides organized UI control functionality for audio playback interface
- * Manages audio context, AudioWorklet, and MIDI input controls
+ * Pure DOM interaction layer - audio logic moved to Rust
+ * Handles UI events and delegates audio operations to WASM/Rust
  */
 import { DebugLogger } from './utils/debug-logger.js';
 import { AudioWorkletManager, isAudioWorkletSupported } from './audio-worklet-manager.js';
 /**
- * UI Control Manager - coordinates all UI interactions
+ * UI Control Manager - Pure DOM interface for audio controls
+ * Audio logic delegated to Rust WASM modules
  */
 export class UIControlManager {
     logger;
     wasmModule = null;
     audioContext = null;
     audioWorkletManager = null;
-    midiPlayer = null;
     // DOM Elements
     wasmStatus;
     audioStatus;
@@ -26,10 +26,9 @@ export class UIControlManager {
     clearLogBtn;
     debugLogTextarea;
     pianoKeys;
-    constructor(wasmModule, midiPlayer) {
+    constructor(wasmModule) {
         this.logger = new DebugLogger({ componentName: 'UIControls', enabled: true });
         this.wasmModule = wasmModule;
-        this.midiPlayer = midiPlayer;
         // Get DOM elements
         this.wasmStatus = document.getElementById('wasm-status');
         this.audioStatus = document.getElementById('audio-status');
@@ -125,7 +124,7 @@ export class UIControlManager {
         }
     }
     /**
-     * Handle playing a test tone (Phase 8A testing)
+     * Handle playing a test tone (delegated to Rust WASM)
      */
     handlePlayTestTone() {
         if (!this.audioWorkletManager || !this.audioWorkletManager.isReady()) {
@@ -133,18 +132,19 @@ export class UIControlManager {
             return;
         }
         try {
-            this.logger.log('🎵 Playing test tone (Middle C)...');
-            // Play Middle C (MIDI note 60) with velocity 100
-            this.audioWorkletManager.noteOn(0, 60, 100);
-            // Schedule note off after 500ms
-            setTimeout(() => {
-                this.audioWorkletManager.noteOff(0, 60);
-                this.logger.log('🎵 Test tone stopped');
-            }, 500);
-            // Get buffer metrics after a short delay
-            setTimeout(() => {
-                this.audioWorkletManager.getBufferMetrics();
-            }, 1000);
+            this.logger.log('🎵 Playing test tone via Rust WASM...');
+            // Use Rust WASM export to queue MIDI event (Middle C, velocity 100)
+            if (this.wasmModule.queue_midi_event_global) {
+                this.wasmModule.queue_midi_event_global(0, 0, 0x90, 60, 100); // Note On
+                // Schedule note off after 500ms
+                setTimeout(() => {
+                    this.wasmModule.queue_midi_event_global(0, 0, 0x80, 60, 0); // Note Off
+                    this.logger.log('🎵 Test tone stopped');
+                }, 500);
+            }
+            else {
+                this.logger.log('❌ WASM MIDI functions not available');
+            }
         }
         catch (error) {
             this.logger.log('❌ Failed to play test tone', error);
@@ -173,34 +173,38 @@ export class UIControlManager {
         }
     }
     /**
-     * Handle note on events (MIDI testing)
+     * Handle note on events (delegated to Rust WASM)
      */
     handleNoteOn(note, keyElement) {
         if (!this.audioWorkletManager || !this.audioWorkletManager.isReady())
             return;
         try {
-            // Send note on to AudioWorklet
-            this.audioWorkletManager.noteOn(0, note, 100); // Channel 0, velocity 100
+            // Send note on via Rust WASM
+            if (this.wasmModule.queue_midi_event_global) {
+                this.wasmModule.queue_midi_event_global(0, 0, 0x90, note, 100); // Channel 0, velocity 100
+            }
             // Visual feedback
             keyElement.classList.add('pressed');
-            this.logger.log(`🎹 Note ON: ${note} (${this.getNoteNameFromMIDI(note)})`);
+            this.logger.log(`🎹 Note ON: ${note} (${this.getNoteNameFromRust(note)})`);
         }
         catch (error) {
             this.logger.log(`❌ Failed to trigger note ${note}`, error);
         }
     }
     /**
-     * Handle note off events (MIDI testing)
+     * Handle note off events (delegated to Rust WASM)
      */
     handleNoteOff(note, keyElement) {
         if (!this.audioWorkletManager || !this.audioWorkletManager.isReady())
             return;
         try {
-            // Send note off to AudioWorklet
-            this.audioWorkletManager.noteOff(0, note); // Channel 0
+            // Send note off via Rust WASM
+            if (this.wasmModule.queue_midi_event_global) {
+                this.wasmModule.queue_midi_event_global(0, 0, 0x80, note, 0); // Channel 0, note off
+            }
             // Visual feedback
             keyElement.classList.remove('pressed');
-            this.logger.log(`🎹 Note OFF: ${note} (${this.getNoteNameFromMIDI(note)})`);
+            this.logger.log(`🎹 Note OFF: ${note} (${this.getNoteNameFromRust(note)})`);
         }
         catch (error) {
             this.logger.log(`❌ Failed to release note ${note}`, error);
@@ -221,61 +225,70 @@ export class UIControlManager {
         element.className = `status-item ${type}`;
     }
     /**
-     * Convert MIDI note number to note name
+     * Convert MIDI note number to note name (delegated to Rust WASM)
      */
-    getNoteNameFromMIDI(note) {
-        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const octave = Math.floor(note / 12) - 1;
-        const noteName = noteNames[note % 12];
-        return `${noteName}${octave}`;
+    getNoteNameFromRust(note) {
+        if (this.wasmModule.midi_note_to_name) {
+            try {
+                return this.wasmModule.midi_note_to_name(note);
+            }
+            catch (error) {
+                this.logger.log(`❌ Failed to get note name from Rust: ${error}`);
+            }
+        }
+        // Fallback if Rust function not available
+        return `Note${note}`;
     }
     /**
-     * Test the complete audio pipeline
+     * Test the complete audio pipeline (delegated to Rust WASM)
      */
     testAudioPipeline() {
         if (!this.audioWorkletManager || !this.audioWorkletManager.isReady()) {
             this.logger.log('❌ Cannot test - AudioWorklet not ready');
             return;
         }
-        this.logger.log('🧪 Testing audio pipeline with C major scale...');
-        // Play C major scale
-        const scale = [60, 62, 64, 65, 67, 69, 71, 72]; // C D E F G A B C
-        let noteIndex = 0;
-        const playNextNote = () => {
-            if (noteIndex < scale.length) {
-                const note = scale[noteIndex];
-                this.logger.log(`🎵 Playing ${this.getNoteNameFromMIDI(note)}`);
-                // Note on
-                this.audioWorkletManager.noteOn(0, note, 80);
-                // Note off after 200ms
-                setTimeout(() => {
-                    this.audioWorkletManager.noteOff(0, note);
-                }, 200);
-                noteIndex++;
-                // Next note after 250ms
-                if (noteIndex < scale.length) {
-                    setTimeout(playNextNote, 250);
+        try {
+            this.logger.log('🧪 Testing audio pipeline with Rust C major scale...');
+            // Use Rust WASM export for C major scale test
+            if (this.wasmModule.quick_c_major_test) {
+                const result = this.wasmModule.quick_c_major_test();
+                const parsed = JSON.parse(result);
+                if (parsed.success) {
+                    this.logger.log(`✅ C major scale test started: ${parsed.events_queued} events queued`);
                 }
                 else {
-                    // Test complete - show metrics
-                    setTimeout(() => {
-                        this.logger.log('✅ Audio pipeline test complete!');
-                        this.audioWorkletManager.getBufferMetrics();
-                        this.audioWorkletManager.getStats();
-                    }, 500);
+                    this.logger.log('❌ Failed to start C major scale test');
                 }
             }
-        };
-        playNextNote();
+            else if (this.wasmModule.generate_c_major_scale_test && this.wasmModule.execute_test_sequence) {
+                // Alternative approach using separate generation and execution
+                const sequenceJson = this.wasmModule.generate_c_major_scale_test();
+                const eventsQueued = this.wasmModule.execute_test_sequence(sequenceJson);
+                this.logger.log(`✅ C major scale test: ${eventsQueued} events queued`);
+            }
+            else {
+                this.logger.log('❌ Rust MIDI test functions not available');
+            }
+        }
+        catch (error) {
+            this.logger.log('❌ Failed to execute Rust audio pipeline test', error);
+        }
     }
     /**
      * Set up periodic debug log updates from WASM
      */
     setupDebugLogUpdates() {
         setInterval(() => {
-            if (this.midiPlayer) {
+            if (this.wasmModule) {
                 try {
-                    const wasmLog = this.midiPlayer.get_debug_log();
+                    // Try global debug log first, fallback to bridge debug log
+                    let wasmLog = '';
+                    if (this.wasmModule.get_debug_log_global) {
+                        wasmLog = this.wasmModule.get_debug_log_global();
+                    }
+                    else if (this.wasmModule.get_debug_log) {
+                        wasmLog = this.wasmModule.get_debug_log();
+                    }
                     if (wasmLog && wasmLog.trim() !== this.debugLogTextarea.value.trim()) {
                         this.debugLogTextarea.value = wasmLog;
                         this.debugLogTextarea.scrollTop = this.debugLogTextarea.scrollHeight;

@@ -23,7 +23,7 @@ async function main() {
         // Step 1: Load WASM module
         await initializeWASM();
         // Step 2: Initialize UI Control Manager
-        uiControlManager = new UIControlManager(wasmModule, midiPlayer);
+        uiControlManager = new UIControlManager(wasmModule);
         uiControlManager.initialize();
         logger.log('✅ AWE Player initialization complete');
     }

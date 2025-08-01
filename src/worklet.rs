@@ -8,6 +8,132 @@
 
 use wasm_bindgen::prelude::*;
 use crate::{MidiPlayer, log};
+use crate::audio::{AudioBufferManager, BufferSize};
+
+/// Pipeline status for audio worklet coordination
+#[derive(Debug, Clone, PartialEq)]
+pub enum PipelineStatus {
+    Initializing,
+    Ready,
+    Error(String),
+    Reset,
+    BufferSizeChanged,
+    AdaptiveModeChanged,
+}
+
+/// Audio pipeline coordination and management
+/// Handles all the logic that was previously in TypeScript AudioWorkletManager
+pub struct AudioPipelineManager {
+    current_sample_time: u64,
+    is_initialized: bool,
+    status: PipelineStatus,
+    sample_rate: f32,
+    connected_to_destination: bool,
+    last_status_report_time: u64,
+    status_report_interval: u64, // Report status every N samples
+}
+
+impl AudioPipelineManager {
+    /// Create new pipeline manager
+    pub fn new(sample_rate: f32) -> Self {
+        Self {
+            current_sample_time: 0,
+            is_initialized: false,
+            status: PipelineStatus::Initializing,
+            sample_rate,
+            connected_to_destination: false,
+            last_status_report_time: 0,
+            status_report_interval: (sample_rate * 5.0) as u64, // Report every 5 seconds
+        }
+    }
+    
+    /// Initialize the pipeline
+    pub fn initialize(&mut self) -> Result<(), String> {
+        if self.is_initialized {
+            return Err("Pipeline already initialized".to_string());
+        }
+        
+        self.status = PipelineStatus::Ready;
+        self.is_initialized = true;
+        self.connected_to_destination = true;
+        
+        crate::log(&format!("🎵 AudioPipeline initialized: {}Hz, ready for processing", self.sample_rate));
+        Ok(())
+    }
+    
+    /// Update sample time and check for status reports
+    pub fn advance_sample_time(&mut self, samples: u64) {
+        self.current_sample_time += samples;
+        
+        // Periodic status reporting
+        if self.current_sample_time - self.last_status_report_time >= self.status_report_interval {
+            self.report_pipeline_status();
+            self.last_status_report_time = self.current_sample_time;
+        }
+    }
+    
+    /// Set pipeline status
+    pub fn set_status(&mut self, status: PipelineStatus) {
+        if status != self.status {
+            let old_status = std::mem::replace(&mut self.status, status.clone());
+            crate::log(&format!("🔄 Pipeline status: {:?} → {:?}", old_status, status));
+        }
+    }
+    
+    /// Get current status
+    pub fn get_status(&self) -> &PipelineStatus {
+        &self.status
+    }
+    
+    /// Check if pipeline is ready for processing
+    pub fn is_ready(&self) -> bool {
+        self.is_initialized && matches!(self.status, PipelineStatus::Ready)
+    }
+    
+    /// Handle pipeline reset
+    pub fn reset(&mut self) {
+        self.current_sample_time = 0;
+        self.last_status_report_time = 0;
+        self.status = PipelineStatus::Reset;
+        crate::log("🔄 Pipeline reset - sample time zeroed");
+        
+        // Return to ready state after reset
+        self.status = PipelineStatus::Ready;
+    }
+    
+    /// Handle buffer size change notification
+    pub fn on_buffer_size_changed(&mut self, new_size: usize) {
+        self.status = PipelineStatus::BufferSizeChanged;
+        crate::log(&format!("🔧 Pipeline notified of buffer size change: {} samples", new_size));
+        
+        // Return to ready state
+        self.status = PipelineStatus::Ready;
+    }
+    
+    /// Handle adaptive mode change notification
+    pub fn on_adaptive_mode_changed(&mut self, enabled: bool) {
+        self.status = PipelineStatus::AdaptiveModeChanged;
+        crate::log(&format!("🤖 Pipeline notified of adaptive mode change: {}", 
+            if enabled { "ENABLED" } else { "DISABLED" }));
+        
+        // Return to ready state
+        self.status = PipelineStatus::Ready;
+    }
+    
+    /// Report pipeline status with timing information
+    fn report_pipeline_status(&self) {
+        let uptime_seconds = self.current_sample_time as f32 / self.sample_rate;
+        crate::log(&format!("📊 Pipeline status: {:?} | Uptime: {:.1}s | Sample: {} | Connected: {}", 
+            self.status, uptime_seconds, self.current_sample_time, self.connected_to_destination));
+    }
+    
+    /// Get pipeline statistics as JSON string
+    pub fn get_pipeline_stats(&self) -> String {
+        let uptime_seconds = self.current_sample_time as f32 / self.sample_rate;
+        format!(r#"{{"sampleTime": {}, "uptimeSeconds": {:.1}, "sampleRate": {}, "status": "{:?}", "isReady": {}, "connected": {}}}"#,
+            self.current_sample_time, uptime_seconds, self.sample_rate, self.status, self.is_ready(), self.connected_to_destination)
+    }
+}
 
 /// AudioWorklet bridge for real-time audio processing
 /// Manages buffer-based audio processing between Web Audio API and WASM
@@ -16,6 +142,8 @@ pub struct AudioWorkletBridge {
     midi_player: MidiPlayer,
     sample_rate: f32,
     buffer_size: usize,
+    buffer_manager: AudioBufferManager,
+    pipeline_manager: AudioPipelineManager,
 }
 
 #[wasm_bindgen]
@@ -25,10 +153,20 @@ impl AudioWorkletBridge {
     pub fn new(sample_rate: f32) -> AudioWorkletBridge {
         log(&format!("AudioWorkletBridge::new() - Sample rate: {}Hz", sample_rate));
         
+        let mut buffer_manager = AudioBufferManager::new(None);
+        buffer_manager.set_sample_rate(sample_rate);
+        
+        let mut pipeline_manager = AudioPipelineManager::new(sample_rate);
+        if let Err(e) = pipeline_manager.initialize() {
+            log(&format!("⚠️ Pipeline initialization warning: {}", e));
+        }
+        
         AudioWorkletBridge {
             midi_player: MidiPlayer::new(),
             sample_rate,
             buffer_size: 128, // Default Web Audio buffer size
+            buffer_manager,
+            pipeline_manager,
         }
     }
     
@@ -43,10 +181,12 @@ impl AudioWorkletBridge {
     pub fn set_buffer_size(&mut self, size: usize) {
         if size == 128 || size == 256 || size == 512 {
             self.buffer_size = size;
+            self.pipeline_manager.on_buffer_size_changed(size);
             log(&format!("AudioWorkletBridge: Buffer size set to {}", size));
         } else {
             log(&format!("AudioWorkletBridge: Invalid buffer size {} - using 128", size));
             self.buffer_size = 128;
+            self.pipeline_manager.on_buffer_size_changed(128);
         }
     }
     
@@ -61,6 +201,12 @@ impl AudioWorkletBridge {
     /// Returns number of samples processed
     #[wasm_bindgen]
     pub fn process_audio_buffer(&mut self, buffer_length: usize) -> Vec<f32> {
+        // Check pipeline readiness
+        if !self.pipeline_manager.is_ready() {
+            log(&format!("⚠️ Pipeline not ready: {:?}", self.pipeline_manager.get_status()));
+            return vec![0.0; buffer_length.min(1024)];
+        }
+        
         // Validate buffer size
         if buffer_length > 1024 {
             log(&format!("AudioWorkletBridge: Buffer size {} too large, capping at 1024", buffer_length));
@@ -70,10 +216,18 @@ impl AudioWorkletBridge {
         let mut output_buffer = Vec::with_capacity(actual_length);
         
         // Generate audio samples using MidiPlayer::process()
+        // Note: In WASM context, precise timing measurements are limited
+        // We'll use a simple estimation based on sample count for now
         for _ in 0..actual_length {
             let sample = self.midi_player.process();
             output_buffer.push(sample);
         }
+        
+        // Estimate processing time based on buffer size and sample rate
+        // This is a placeholder until we have proper WASM timing
+        let estimated_processing_time_ms = (actual_length as f32 / self.sample_rate) * 1000.0 * 0.1; // Assume 10% CPU usage
+        self.buffer_manager.record_processing_time(estimated_processing_time_ms, actual_length);
+        self.pipeline_manager.advance_sample_time(actual_length as u64);
         
         output_buffer
     }
@@ -133,6 +287,78 @@ impl AudioWorkletBridge {
         self.midi_player.queue_midi_event(event);
     }
     
+    // === Buffer Manager Methods ===
+    
+    /// Set device information for buffer optimization
+    #[wasm_bindgen]
+    pub fn set_device_info(&mut self, hardware_concurrency: u32, device_memory_gb: u32) {
+        self.buffer_manager.set_device_info(hardware_concurrency, device_memory_gb);
+    }
+    
+    /// Record processing time for buffer performance monitoring
+    #[wasm_bindgen]
+    pub fn record_processing_time(&mut self, processing_time_ms: f32, buffer_size: usize) {
+        self.buffer_manager.record_processing_time(processing_time_ms, buffer_size);
+    }
+    
+    /// Record buffer underrun (audio glitch)
+    #[wasm_bindgen]
+    pub fn record_underrun(&mut self) {
+        self.buffer_manager.record_underrun();
+    }
+    
+    /// Record buffer overrun (processing too fast)
+    #[wasm_bindgen]
+    pub fn record_overrun(&mut self) {
+        self.buffer_manager.record_overrun();
+    }
+    
+    /// Get buffer performance metrics as JSON string
+    #[wasm_bindgen]
+    pub fn get_buffer_metrics(&mut self) -> String {
+        serde_json::to_string(&self.buffer_manager.get_metrics()).unwrap_or_else(|_| "{}".to_string())
+    }
+    
+    /// Get buffer status summary as JSON string
+    #[wasm_bindgen]
+    pub fn get_buffer_status(&mut self) -> String {
+        self.buffer_manager.get_status_summary()
+    }
+    
+    /// Get recommended buffer size for target latency
+    #[wasm_bindgen]
+    pub fn get_recommended_buffer_size(&self, target_latency_ms: f32) -> u32 {
+        self.buffer_manager.get_recommended_buffer_size(target_latency_ms).as_u32()
+    }
+    
+    /// Get current buffer latency in milliseconds
+    #[wasm_bindgen]
+    pub fn get_current_latency_ms(&self) -> f32 {
+        self.buffer_manager.get_current_latency_ms()
+    }
+    
+    /// Set buffer size (affects buffer manager and worklet)
+    #[wasm_bindgen]
+    pub fn set_optimal_buffer_size(&mut self, size: u32) {
+        if let Some(buffer_size) = BufferSize::from_usize(size as usize) {
+            self.buffer_manager.set_buffer_size(buffer_size);
+            self.buffer_size = size as usize;
+        }
+    }
+    
+    /// Enable or disable adaptive buffer sizing
+    #[wasm_bindgen]
+    pub fn set_adaptive_mode(&mut self, enabled: bool) {
+        self.buffer_manager.set_adaptive_mode(enabled);
+        self.pipeline_manager.on_adaptive_mode_changed(enabled);
+    }
+    
+    /// Reset buffer performance metrics
+    #[wasm_bindgen]
+    pub fn reset_buffer_metrics(&mut self) {
+        self.buffer_manager.reset_metrics();
+    }
+    
     /// Get debug log from internal systems
     #[wasm_bindgen]
     pub fn get_debug_log(&self) -> String {
@@ -178,7 +404,8 @@ impl AudioWorkletBridge {
     pub fn reset_audio_state(&mut self) {
         // Create a new MidiPlayer to reset all state
         self.midi_player = MidiPlayer::new();
-        log("AudioWorkletBridge: Audio state reset - all voices stopped");
+        self.pipeline_manager.reset();
+        log("AudioWorkletBridge: Audio state reset - all voices stopped, pipeline reset");
     }
     
     /// Get current audio statistics for monitoring
@@ -190,6 +417,41 @@ impl AudioWorkletBridge {
             self.sample_rate,
             self.buffer_size
         )
+    }
+    
+    // === Pipeline Management Methods ===
+    
+    /// Get pipeline status as string for JavaScript
+    #[wasm_bindgen]
+    pub fn get_pipeline_status(&self) -> String {
+        format!("{:?}", self.pipeline_manager.get_status())
+    }
+    
+    /// Check if pipeline is ready for processing
+    #[wasm_bindgen]
+    pub fn is_pipeline_ready(&self) -> bool {
+        self.pipeline_manager.is_ready()
+    }
+    
+    /// Get comprehensive pipeline statistics as JSON
+    #[wasm_bindgen]
+    pub fn get_pipeline_stats(&self) -> String {
+        self.pipeline_manager.get_pipeline_stats()
+    }
+    
+    /// Force pipeline status update (for testing/debugging)
+    #[wasm_bindgen]
+    pub fn reset_pipeline(&mut self) {
+        self.pipeline_manager.reset();
+    }
+    
+    /// Get combined audio and pipeline status as JSON
+    #[wasm_bindgen]
+    pub fn get_comprehensive_status(&mut self) -> String {
+        let buffer_status = self.buffer_manager.get_status_summary();
+        let pipeline_stats = self.pipeline_manager.get_pipeline_stats();
+        
+        format!(r#"{{"bufferManager": {}, "pipeline": {}}}"#, buffer_status, pipeline_stats)
     }
 }
 

@@ -15,7 +15,6 @@ const logger = new DebugLogger({ componentName: 'Main', enabled: true });
 
 // Global state
 let wasmModule: any = null;
-let midiPlayer: any = null;
 let uiControlManager: UIControlManager | null = null;
 
 /**
@@ -29,7 +28,7 @@ async function main(): Promise<void> {
         await initializeWASM();
         
         // Step 2: Initialize UI Control Manager
-        uiControlManager = new UIControlManager(wasmModule, midiPlayer);
+        uiControlManager = new UIControlManager(wasmModule);
         uiControlManager.initialize();
         
         logger.log('✅ AWE Player initialization complete');

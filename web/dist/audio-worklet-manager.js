@@ -1,21 +1,20 @@
 /**
- * AWE Player - AudioWorklet Manager
+ * AWE Player - AudioWorklet Manager (Simplified Browser API Bridge)
  * Part of AWE Player EMU8000 Emulator
  *
- * Manages AudioWorklet lifecycle from the main thread
- * Handles setup, communication, and cleanup of the AudioWorklet processor
+ * Pure browser API bridge for AudioWorklet lifecycle management
+ * Audio logic moved to Rust for better performance and centralization
  */
 import { DebugLogger } from './utils/debug-logger.js';
-import { calculateOptimalBufferSize, bufferSizeToLatency } from './audio-buffer-manager.js';
 /**
- * AudioWorklet Manager - handles all AudioWorklet communication from main thread
+ * AudioWorklet Manager - Pure browser API bridge for AudioWorklet lifecycle
+ * All audio logic moved to Rust - this only handles browser API communication
  */
 export class AudioWorkletManager {
     audioContext = null;
     audioWorkletNode = null;
     logger;
     isInitialized = false;
-    currentSampleTime = 0;
     onStatusChange;
     onError;
     constructor() {
@@ -67,135 +66,31 @@ export class AudioWorkletManager {
         this.onError = callback;
     }
     /**
-     * Send MIDI event to AudioWorklet
+     * Send raw message to AudioWorklet (for direct browser API communication)
      */
-    sendMidiEvent(channel, messageType, data1, data2, timestamp) {
+    sendMessage(message) {
         if (!this.audioWorkletNode || !this.isInitialized) {
-            this.logger.log('❌ Cannot send MIDI event - AudioWorklet not ready');
+            this.logger.log('❌ Cannot send message - AudioWorklet not ready');
             return;
         }
-        const message = {
-            type: 'midi',
-            timestamp: timestamp || this.currentSampleTime,
-            channel,
-            messageType,
-            data1,
-            data2
-        };
         try {
             this.audioWorkletNode.port.postMessage(message);
-            this.logger.log(`🎹 MIDI event sent: Ch${channel} Type:0x${messageType.toString(16)} Data:${data1},${data2}`);
+            this.logger.log(`📤 Message sent to AudioWorklet: ${message.type}`);
         }
         catch (error) {
-            this.logger.log('❌ Failed to send MIDI event', error);
+            this.logger.log('❌ Failed to send message to AudioWorklet', error);
         }
     }
     /**
-     * Send Note On event
+     * Send control command to AudioWorklet
      */
-    noteOn(channel, note, velocity) {
-        this.sendMidiEvent(channel, 0x90, note, velocity);
-    }
-    /**
-     * Send Note Off event
-     */
-    noteOff(channel, note) {
-        this.sendMidiEvent(channel, 0x80, note, 0);
-    }
-    /**
-     * Send Control Change event
-     */
-    controlChange(channel, controller, value) {
-        this.sendMidiEvent(channel, 0xB0, controller, value);
-    }
-    /**
-     * Send Program Change event
-     */
-    programChange(channel, program) {
-        this.sendMidiEvent(channel, 0xC0, program, 0);
-    }
-    /**
-     * Reset audio state (stop all voices, clear events)
-     */
-    resetAudio() {
-        if (!this.audioWorkletNode) {
-            this.logger.log('❌ Cannot reset - AudioWorklet not initialized');
-            return;
-        }
+    sendControlCommand(command, value) {
         const message = {
             type: 'control',
-            command: 'reset'
+            command,
+            ...(value !== undefined && { value })
         };
-        this.audioWorkletNode.port.postMessage(message);
-        this.logger.log('🔄 Audio reset requested');
-    }
-    /**
-     * Set buffer size (128, 256, or 512)
-     */
-    setBufferSize(size) {
-        if (!this.audioWorkletNode) {
-            this.logger.log('❌ Cannot set buffer size - AudioWorklet not initialized');
-            return;
-        }
-        const message = {
-            type: 'control',
-            command: 'setBufferSize',
-            value: size
-        };
-        this.audioWorkletNode.port.postMessage(message);
-        const latencyMs = bufferSizeToLatency(size, this.audioContext?.sampleRate || 44100);
-        this.logger.log(`🔧 Buffer size change requested: ${size} samples (${latencyMs.toFixed(1)}ms latency)`);
-    }
-    /**
-     * Set adaptive buffer sizing mode
-     */
-    setAdaptiveMode(enabled) {
-        if (!this.audioWorkletNode) {
-            this.logger.log('❌ Cannot set adaptive mode - AudioWorklet not initialized');
-            return;
-        }
-        const message = {
-            type: 'control',
-            command: 'setAdaptive',
-            enabled
-        };
-        this.audioWorkletNode.port.postMessage(message);
-        this.logger.log(`🤖 Adaptive buffer mode change requested: ${enabled ? 'ENABLED' : 'DISABLED'}`);
-    }
-    /**
-     * Get optimal buffer size for target latency
-     */
-    getOptimalBufferSize(targetLatencyMs) {
-        const sampleRate = this.audioContext?.sampleRate || 44100;
-        return calculateOptimalBufferSize(sampleRate, targetLatencyMs);
-    }
-    /**
-     * Get buffer metrics from AudioWorklet
-     */
-    getBufferMetrics() {
-        if (!this.audioWorkletNode) {
-            this.logger.log('❌ Cannot get buffer metrics - AudioWorklet not initialized');
-            return;
-        }
-        const message = {
-            type: 'control',
-            command: 'getBufferMetrics'
-        };
-        this.audioWorkletNode.port.postMessage(message);
-    }
-    /**
-     * Get current statistics from AudioWorklet
-     */
-    getStats() {
-        if (!this.audioWorkletNode) {
-            this.logger.log('❌ Cannot get stats - AudioWorklet not initialized');
-            return;
-        }
-        const message = {
-            type: 'control',
-            command: 'getStats'
-        };
-        this.audioWorkletNode.port.postMessage(message);
+        this.sendMessage(message);
     }
     /**
      * Check if AudioWorklet is ready
@@ -222,7 +117,7 @@ export class AudioWorkletManager {
         this.logger.log('🧹 AudioWorklet cleaned up');
     }
     /**
-     * Handle messages from AudioWorklet
+     * Handle messages from AudioWorklet (simplified - just logging and status updates)
      */
     handleWorkletMessage(event) {
         const message = event.data;
@@ -235,17 +130,12 @@ export class AudioWorkletManager {
                     this.logger.log(`❌ AudioWorklet error: ${message.error}`);
                     this.onError?.(message.error);
                     break;
-                case 'stats':
-                    this.handleStatsMessage(message);
-                    break;
                 case 'debug':
-                    this.logger.log(`🔍 ${message.message} (${message.count})`);
-                    break;
-                case 'bufferMetrics':
-                    this.handleBufferMetricsMessage(message);
+                    this.logger.log(`🔍 AudioWorklet: ${message.message}`);
                     break;
                 default:
-                    this.logger.log(`❓ Unknown worklet message type: ${message.type}`);
+                    // Pass through all other messages to logger
+                    this.logger.log(`📨 AudioWorklet message: ${message.type}`);
             }
         }
         catch (error) {
@@ -253,7 +143,7 @@ export class AudioWorkletManager {
         }
     }
     /**
-     * Handle status messages from AudioWorklet
+     * Handle status messages from AudioWorklet (simplified)
      */
     handleStatusMessage(message) {
         const status = message.status;
@@ -263,70 +153,19 @@ export class AudioWorkletManager {
                 break;
             case 'ready':
                 this.isInitialized = true;
-                this.logger.log(`✅ AudioWorklet ready: ${message.sampleRate}Hz, buffer ${message.bufferSize}`);
+                this.logger.log('✅ AudioWorklet ready');
                 break;
             case 'reset':
-                this.currentSampleTime = 0;
                 this.logger.log('🔄 AudioWorklet reset complete');
-                break;
-            case 'bufferSizeChanged':
-                const latencyInfo = message.latencyMs ? ` (${message.latencyMs.toFixed(1)}ms latency)` : '';
-                this.logger.log(`🔧 Buffer size changed to ${message.bufferSize} samples${latencyInfo}`);
-                break;
-            case 'adaptiveModeChanged':
-                this.logger.log(`🤖 Adaptive buffer mode: ${message.adaptiveMode ? 'ENABLED' : 'DISABLED'}`);
                 break;
             case 'error':
                 this.logger.log(`❌ AudioWorklet error status: ${message.error || 'Unknown error'}`);
                 break;
+            default:
+                this.logger.log(`📊 AudioWorklet status: ${status}`);
+                break;
         }
         this.onStatusChange?.(status);
-    }
-    /**
-     * Handle statistics messages from AudioWorklet
-     */
-    handleStatsMessage(message) {
-        this.currentSampleTime = message.sampleTime;
-        // Log detailed stats occasionally with buffer metrics
-        if (message.sampleTime % (44100 * 5) < 1000) { // Every ~5 seconds
-            let statsMessage = `📊 AudioWorklet stats: ${message.sampleTime} samples, ${message.bufferSize} buffer, ${message.sampleRate}Hz`;
-            if (message.bufferMetrics) {
-                const metrics = message.bufferMetrics;
-                statsMessage += ` | Avg processing: ${metrics.averageProcessingTime.toFixed(2)}ms`;
-                if (metrics.underruns > 0) {
-                    statsMessage += ` | ⚠️ ${metrics.underruns} underruns`;
-                }
-            }
-            if (message.bufferConfig) {
-                statsMessage += ` | Latency: ${message.bufferConfig.latencyMs}ms`;
-            }
-            this.logger.log(statsMessage);
-        }
-        // Update debug log if provided
-        if (message.debugLog && message.debugLog.trim()) {
-            const debugTextarea = document.getElementById('debug-log');
-            if (debugTextarea) {
-                debugTextarea.value = message.debugLog;
-                debugTextarea.scrollTop = debugTextarea.scrollHeight;
-            }
-        }
-    }
-    /**
-     * Handle buffer metrics messages from AudioWorklet
-     */
-    handleBufferMetricsMessage(message) {
-        if (message.metrics && message.config) {
-            const metrics = message.metrics;
-            const config = message.config;
-            this.logger.log(`📊 Buffer Metrics Report:`);
-            this.logger.log(`   Buffer: ${config.size} samples (${config.latencyMs}ms, ${config.cpuUsage} CPU usage)`);
-            this.logger.log(`   Performance: ${metrics.averageProcessingTime.toFixed(2)}ms avg, ${metrics.maxProcessingTime.toFixed(2)}ms max`);
-            this.logger.log(`   Reliability: ${metrics.underruns} underruns, ${metrics.overruns} overruns`);
-            this.logger.log(`   Uptime: ${(metrics.uptime / 1000).toFixed(1)}s, ${metrics.samplesProcessed} samples processed`);
-            if (message.statusSummary) {
-                this.logger.log(`   Summary: ${message.statusSummary}`);
-            }
-        }
     }
 }
 /**
@@ -336,16 +175,5 @@ export function isAudioWorkletSupported() {
     return ('AudioContext' in window &&
         'audioWorklet' in AudioContext.prototype &&
         'addModule' in AudioWorklet.prototype);
-}
-/**
- * Utility function to get optimal buffer size based on sample rate and target latency
- */
-export function getOptimalBufferSize(sampleRate, targetLatencyMs) {
-    const targetSamples = (sampleRate * targetLatencyMs) / 1000;
-    if (targetSamples <= 128)
-        return 128;
-    if (targetSamples <= 256)
-        return 256;
-    return 512;
 }
 //# sourceMappingURL=audio-worklet-manager.js.map

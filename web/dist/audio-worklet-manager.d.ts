@@ -1,23 +1,24 @@
 /**
- * AWE Player - AudioWorklet Manager
+ * AWE Player - AudioWorklet Manager (Simplified Browser API Bridge)
  * Part of AWE Player EMU8000 Emulator
  *
- * Manages AudioWorklet lifecycle from the main thread
- * Handles setup, communication, and cleanup of the AudioWorklet processor
+ * Pure browser API bridge for AudioWorklet lifecycle management
+ * Audio logic moved to Rust for better performance and centralization
  */
+import type { WorkletMessage } from './audio-worklet.js';
 /**
  * AudioWorklet status types
  */
 type WorkletStatus = 'initializing' | 'ready' | 'error' | 'reset' | 'bufferSizeChanged' | 'adaptiveModeChanged';
 /**
- * AudioWorklet Manager - handles all AudioWorklet communication from main thread
+ * AudioWorklet Manager - Pure browser API bridge for AudioWorklet lifecycle
+ * All audio logic moved to Rust - this only handles browser API communication
  */
 export declare class AudioWorkletManager {
     private audioContext;
     private audioWorkletNode;
     private logger;
     private isInitialized;
-    private currentSampleTime;
     private onStatusChange?;
     private onError?;
     constructor();
@@ -34,49 +35,13 @@ export declare class AudioWorkletManager {
      */
     setErrorCallback(callback: (error: string) => void): void;
     /**
-     * Send MIDI event to AudioWorklet
+     * Send raw message to AudioWorklet (for direct browser API communication)
      */
-    sendMidiEvent(channel: number, messageType: number, data1: number, data2: number, timestamp?: number): void;
+    sendMessage(message: WorkletMessage): void;
     /**
-     * Send Note On event
+     * Send control command to AudioWorklet
      */
-    noteOn(channel: number, note: number, velocity: number): void;
-    /**
-     * Send Note Off event
-     */
-    noteOff(channel: number, note: number): void;
-    /**
-     * Send Control Change event
-     */
-    controlChange(channel: number, controller: number, value: number): void;
-    /**
-     * Send Program Change event
-     */
-    programChange(channel: number, program: number): void;
-    /**
-     * Reset audio state (stop all voices, clear events)
-     */
-    resetAudio(): void;
-    /**
-     * Set buffer size (128, 256, or 512)
-     */
-    setBufferSize(size: 128 | 256 | 512): void;
-    /**
-     * Set adaptive buffer sizing mode
-     */
-    setAdaptiveMode(enabled: boolean): void;
-    /**
-     * Get optimal buffer size for target latency
-     */
-    getOptimalBufferSize(targetLatencyMs: number): 128 | 256 | 512;
-    /**
-     * Get buffer metrics from AudioWorklet
-     */
-    getBufferMetrics(): void;
-    /**
-     * Get current statistics from AudioWorklet
-     */
-    getStats(): void;
+    sendControlCommand(command: string, value?: any): void;
     /**
      * Check if AudioWorklet is ready
      */
@@ -90,29 +55,17 @@ export declare class AudioWorkletManager {
      */
     cleanup(): void;
     /**
-     * Handle messages from AudioWorklet
+     * Handle messages from AudioWorklet (simplified - just logging and status updates)
      */
     private handleWorkletMessage;
     /**
-     * Handle status messages from AudioWorklet
+     * Handle status messages from AudioWorklet (simplified)
      */
     private handleStatusMessage;
-    /**
-     * Handle statistics messages from AudioWorklet
-     */
-    private handleStatsMessage;
-    /**
-     * Handle buffer metrics messages from AudioWorklet
-     */
-    private handleBufferMetricsMessage;
 }
 /**
  * Utility function to check AudioWorklet compatibility
  */
 export declare function isAudioWorkletSupported(): boolean;
-/**
- * Utility function to get optimal buffer size based on sample rate and target latency
- */
-export declare function getOptimalBufferSize(sampleRate: number, targetLatencyMs: number): 128 | 256 | 512;
 export {};
 //# sourceMappingURL=audio-worklet-manager.d.ts.map
