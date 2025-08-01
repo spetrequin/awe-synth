@@ -60,11 +60,7 @@ async function initializeWASM(): Promise<void> {
         
         wasmModule = wasmPkg;
         
-        // Create MidiPlayer instance
-        midiPlayer = new wasmModule.MidiPlayer();
-        
         logger.log('✅ WASM module loaded successfully');
-        logger.log('🎹 MidiPlayer instance created');
         
     } catch (error) {
         throw new Error(`Failed to load WASM module: ${error}`);

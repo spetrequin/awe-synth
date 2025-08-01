@@ -1,16 +1,11 @@
 /**
- * AWE Player - AudioWorkletProcessor Implementation
- * Part of AWE Player EMU8000 Emulator
+ * AWE Player - Simplified AudioWorkletProcessor for Phase 8C
  * 
- * AudioWorkletProcessor that bridges Web Audio API to WASM synthesis engine
- * Provides real-time audio processing with minimal latency
+ * Simplified processor that bridges Web Audio API to Rust WASM synthesis engine
+ * All audio logic, buffer management, and MIDI handling now in Rust
  */
 
 /// <reference path="./types/audio-worklet.d.ts" />
-
-// Import WASM module types for TypeScript
-import type * as WasmModule from '../wasm-pkg/awe_synth.js';
-import { AudioBufferManager, type BufferMetrics } from './audio-buffer-manager.js';
 
 /**
  * MIDI Event interface for AudioWorklet communication
@@ -29,9 +24,8 @@ interface MidiEventMessage {
  */
 interface ControlMessage {
     type: 'control';
-    command: 'reset' | 'setBufferSize' | 'getStats' | 'setAdaptive' | 'getBufferMetrics';
-    value?: number;
-    enabled?: boolean;
+    command: 'reset' | 'getStats' | 'initSystems';
+    sampleRate?: number;
 }
 
 /**
@@ -40,24 +34,17 @@ interface ControlMessage {
 type WorkletMessage = MidiEventMessage | ControlMessage;
 
 /**
- * AWE Player AudioWorkletProcessor
+ * Simplified AWE Player AudioWorkletProcessor
  * 
- * This processor runs in the AudioWorklet context (separate thread)
- * and provides real-time audio synthesis using the WASM engine
+ * Pure bridge to Rust WASM - no TypeScript audio logic
  */
 class AwePlayerProcessor extends AudioWorkletProcessor {
-    private wasmModule: typeof WasmModule | null = null;
+    private wasmModule: any = null;
     private isInitialized = false;
     private currentSampleTime = 0;
-    private bufferManager: AudioBufferManager;
-    private debugMessageCount = 0;
-    private processingStartTime = 0;
 
     constructor() {
         super();
-        
-        // Initialize buffer manager
-        this.bufferManager = new AudioBufferManager();
         
         // Listen for messages from main thread
         this.port.onmessage = this.handleMessage.bind(this);
@@ -80,25 +67,20 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
             // Initialize WASM
             await this.wasmModule.default();
             
-            // Initialize the global AudioWorklet bridge
+            // Initialize all Rust systems with sample rate
             const sampleRate = (globalThis as any).sampleRate || 44100;
-            const initResult = this.wasmModule.init_audio_worklet(sampleRate);
+            const initResult = this.wasmModule.init_all_systems(sampleRate);
             
             if (initResult) {
-                // Configure buffer manager with sample rate
-                this.bufferManager.setSampleRate(sampleRate);
-                
                 this.isInitialized = true;
                 this.sendMessage({ 
                     type: 'status', 
                     status: 'ready', 
-                    sampleRate,
-                    bufferSize: this.bufferManager.getCurrentBufferSize(),
-                    latencyMs: this.bufferManager.getCurrentLatencyMs()
+                    sampleRate
                 });
-                this.debugLog(`AWE Player AudioWorklet initialized at ${sampleRate}Hz with ${this.bufferManager.getCurrentBufferSize()} sample buffer`);
+                this.debugLog(`AWE Player AudioWorklet initialized - all systems ready at ${sampleRate}Hz`);
             } else {
-                throw new Error('Failed to initialize WASM AudioWorklet bridge');
+                throw new Error('Failed to initialize Rust audio systems');
             }
             
         } catch (error) {
@@ -111,8 +93,7 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
     }
 
     /**
-     * Main audio processing callback - called by Web Audio API
-     * This runs on the audio thread and must be extremely efficient
+     * Main audio processing callback - pure bridge to Rust
      */
     process(
         inputs: Float32Array[][],
@@ -131,10 +112,7 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
         }
 
         try {
-            // Start timing for buffer management
-            this.processingStartTime = performance.now();
-            
-            // Get the first output (we assume mono or stereo)
+            // Get the first output
             const output = outputs[0];
             if (!output || output.length === 0) {
                 return true;
@@ -146,21 +124,15 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
             }
 
             const outputLength = firstChannel.length;
-            
-            // Update WASM buffer size if needed
-            const currentBufferSize = this.bufferManager.getCurrentBufferSize();
-            if (outputLength !== currentBufferSize) {
-                this.wasmModule.set_buffer_size_global(outputLength);
-            }
 
-            // Process audio based on channel configuration
+            // All processing logic is now in Rust - just call WASM functions
             if (output.length === 1) {
                 // Mono output
                 const audioBuffer = this.wasmModule.process_audio_buffer(outputLength);
                 output[0]!.set(audioBuffer);
                 
             } else if (output.length === 2) {
-                // Stereo output - use interleaved processing
+                // Stereo output - Rust handles interleaving/de-interleaving
                 const stereoLength = outputLength * 2;
                 const interleavedBuffer = this.wasmModule.process_stereo_buffer_global(stereoLength);
                 
@@ -171,7 +143,7 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
                 }
                 
             } else {
-                // Multi-channel output (>2 channels) - duplicate mono to all channels
+                // Multi-channel output - duplicate mono to all channels
                 const audioBuffer = this.wasmModule.process_audio_buffer(outputLength);
                 for (const channel of output) {
                     channel.set(audioBuffer);
@@ -181,28 +153,22 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
             // Update sample time counter
             this.currentSampleTime += outputLength;
             
-            // Record processing time for buffer management
-            const processingTime = performance.now() - this.processingStartTime;
-            this.bufferManager.recordProcessingTime(processingTime, outputLength);
-            
-            // Periodically send stats to main thread (every ~1 second)
+            // Rust handles all performance monitoring and buffer management
+            // Periodically send basic stats to main thread (every ~1 second)
             if (this.currentSampleTime % 44100 < outputLength) {
-                const bufferMetrics = this.bufferManager.getMetrics();
                 this.sendMessage({
                     type: 'stats',
                     sampleTime: this.currentSampleTime,
                     bufferSize: outputLength,
-                    sampleRate: this.wasmModule.get_sample_rate(),
-                    bufferMetrics,
-                    bufferConfig: this.bufferManager.getCurrentConfig()
+                    systemStatus: this.wasmModule.get_system_status()
                 });
             }
 
         } catch (error) {
-            // Record processing error and fill with silence
-            this.bufferManager.recordUnderrun();
+            // Let Rust handle error recording
             this.sendMessage({ type: 'error', error: `Audio processing error: ${error}` });
             
+            // Fill with silence on error
             for (const output of outputs) {
                 for (const channel of output) {
                     channel.fill(0);
@@ -227,7 +193,7 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
         try {
             switch (message.type) {
                 case 'midi':
-                    // Queue MIDI event with current sample time
+                    // Queue MIDI event - Rust handles all MIDI logic
                     this.wasmModule.queue_midi_event_global(
                         BigInt(message.timestamp || this.currentSampleTime),
                         message.channel,
@@ -263,61 +229,34 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
 
         switch (message.command) {
             case 'reset':
+                // Rust handles all state reset
                 this.wasmModule.reset_audio_state_global();
                 this.currentSampleTime = 0;
                 this.sendMessage({ type: 'status', status: 'reset' });
                 this.debugLog('Audio state reset');
                 break;
 
-            case 'setBufferSize':
-                if (message.value && [128, 256, 512].includes(message.value)) {
-                    this.bufferManager.setBufferSize(message.value as 128 | 256 | 512);
-                    this.wasmModule.set_buffer_size_global(message.value);
-                    this.sendMessage({ 
-                        type: 'status', 
-                        status: 'bufferSizeChanged', 
-                        bufferSize: message.value,
-                        latencyMs: this.bufferManager.getCurrentLatencyMs()
-                    });
-                    this.debugLog(`Buffer size changed to ${message.value} (${this.bufferManager.getCurrentLatencyMs().toFixed(1)}ms)`);
-                }
-                break;
-
-            case 'setAdaptive':
-                if (typeof message.enabled === 'boolean') {
-                    this.bufferManager.setAdaptiveMode(message.enabled);
-                    this.sendMessage({
-                        type: 'status',
-                        status: 'adaptiveModeChanged',
-                        adaptiveMode: message.enabled
-                    });
-                    this.debugLog(`Adaptive buffer mode: ${message.enabled ? 'ENABLED' : 'DISABLED'}`);
-                }
-                break;
-
-            case 'getBufferMetrics':
-                const metrics = this.bufferManager.getMetrics();
-                const config = this.bufferManager.getCurrentConfig();
-                this.sendMessage({
-                    type: 'bufferMetrics',
-                    metrics,
-                    config,
-                    statusSummary: this.bufferManager.getStatusSummary()
-                });
-                break;
-
             case 'getStats':
-                const bufferMetrics = this.bufferManager.getMetrics();
+                // All stats come from Rust now
                 const stats = {
                     type: 'stats',
                     sampleTime: this.currentSampleTime,
-                    bufferSize: this.bufferManager.getCurrentBufferSize(),
-                    sampleRate: this.wasmModule.get_sample_rate(),
-                    debugLog: this.wasmModule.get_debug_log_global(),
-                    bufferMetrics,
-                    bufferConfig: this.bufferManager.getCurrentConfig()
+                    systemStatus: this.wasmModule.get_system_status(),
+                    debugLog: this.wasmModule.get_debug_log_global()
                 };
                 this.sendMessage(stats);
+                break;
+
+            case 'initSystems':
+                // Re-initialize systems if needed
+                if (message.sampleRate) {
+                    const initResult = this.wasmModule.init_all_systems(message.sampleRate);
+                    this.sendMessage({ 
+                        type: 'status', 
+                        status: initResult ? 'reinitialized' : 'init_failed',
+                        sampleRate: message.sampleRate
+                    });
+                }
                 break;
         }
     }
@@ -338,22 +277,17 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
      * Debug logging with rate limiting
      */
     private debugLog(message: string): void {
-        // Limit debug messages to prevent overwhelming the main thread
-        this.debugMessageCount++;
-        if (this.debugMessageCount % 100 === 0 || this.debugMessageCount < 10) {
-            this.sendMessage({ 
-                type: 'debug', 
-                message: `[AudioWorklet] ${message}`,
-                count: this.debugMessageCount
-            });
-        }
+        this.sendMessage({ 
+            type: 'debug', 
+            message: `[AudioWorklet] ${message}`
+        });
     }
 
     /**
-     * Cleanup when processor is destroyed
+     * No AudioParams needed
      */
     static get parameterDescriptors() {
-        return []; // No AudioParams needed for this processor
+        return [];
     }
 }
 
