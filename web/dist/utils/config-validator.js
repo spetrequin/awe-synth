@@ -6,7 +6,7 @@
  * with runtime type checking and detailed error reporting.
  */
 import { DEBUG_LOGGERS } from './debug-logger.js';
-import { isValidMIDIProgram, isValidMIDICCValue, isValidMIDIPitchBend } from '../midi-constants.js';
+import { isValidMIDIProgram, isValidMIDIValue, isValidMIDIPitchBend } from '../midi-constants.js';
 // ===== VALIDATION ERROR TYPES =====
 export class ConfigValidationError extends Error {
     configName;
@@ -131,7 +131,7 @@ export const validators = {
         if (allowPitchBend && isValidMIDIPitchBend(value)) {
             return value;
         }
-        if (isValidMIDICCValue(value)) {
+        if (isValidMIDIValue(value)) {
             return value;
         }
         const range = allowPitchBend ? '0-127 or -8192-8191' : '0-127';

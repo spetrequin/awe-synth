@@ -5,10 +5,10 @@
 import { MIDI_CHANNELS } from './midi-constants.js';
 import { enhancedConfigLoader } from './utils/enhanced-config-loader.js';
 import { DEBUG_LOGGERS } from './utils/debug-logger.js';
-import { VELOCITY_CONSTANTS } from './velocity-curves.js';
+// Removed unused import: VELOCITY_CONSTANTS
 import { UI_CONSTANTS } from './midi-constants.js';
-import { createModeSelector, createSelect, createSection, injectStyles } from './utils/ui-components.js';
-import { generateComponentStyles } from './utils/ui-styles.js';
+import { createModeSelector, createSelect, createSection } from './utils/ui-components.js';
+import { generateComponentStyles, injectStyles } from './utils/ui-styles.js';
 // ===== JSON CONFIG LOADERS =====
 let gmInstrumentsCache = null;
 let gmDrumsCache = null;
@@ -171,11 +171,13 @@ export class GMSoundLibrary {
             selected: category === 'All'
         }));
         const select = createSelect(categoryOptions, async (category) => await this.displayInstruments(category), 'category-select');
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'Category: ';
         const container = createSection({
             title: '',
             className: 'category-filter',
             content: [
-                document.createTextNode('Category: '),
+                labelSpan,
                 select
             ]
         });
@@ -189,11 +191,13 @@ export class GMSoundLibrary {
             selected: category === 'All'
         }));
         const select = createSelect(categoryOptions, async (category) => await this.displayDrumMap(category), 'category-select');
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'Category: ';
         const container = createSection({
             title: '',
             className: 'category-filter',
             content: [
-                document.createTextNode('Category: '),
+                labelSpan,
                 select
             ]
         });
@@ -252,11 +256,13 @@ export class GMSoundLibrary {
             text: `${kit.name} - ${kit.description}`
         }));
         const select = createSelect(kitOptions, (value) => this.selectDrumKit(parseInt(value)), 'kit-select');
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'Drum Kit: ';
         const container = createSection({
             title: '',
             className: 'drum-kit-selector',
             content: [
-                document.createTextNode('Drum Kit: '),
+                labelSpan,
                 select
             ]
         });
@@ -280,7 +286,6 @@ export class GMSoundLibrary {
      * Trigger drum sound
      */
     triggerDrum(note) {
-        const velocity = VELOCITY_CONSTANTS.DRUM_TRIGGER;
         this.keyboard.handleKeyPress(note, new MouseEvent('click'));
         setTimeout(() => this.keyboard.handleKeyRelease(note), UI_CONSTANTS.DRUM_TRIGGER_DURATION_MS);
     }

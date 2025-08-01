@@ -3,10 +3,10 @@
  * Part of AWE Player EMU8000 Emulator
  */
 export interface EnhancedTouch extends Touch {
-    readonly force?: number;
-    readonly radiusX?: number;
-    readonly radiusY?: number;
-    readonly rotationAngle?: number;
+    readonly force: number;
+    readonly radiusX: number;
+    readonly radiusY: number;
+    readonly rotationAngle: number;
     readonly altitudeAngle?: number;
     readonly azimuthAngle?: number;
 }

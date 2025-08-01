@@ -780,5 +780,354 @@ pub fn get_system_status() -> String {
 /// Get AWE Player version and build info
 #[wasm_bindgen]
 pub fn get_version_info() -> String {
-    r#"{"name": "AWE Player", "version": "0.1.0", "phase": "8C", "architecture": "Rust-Centric"}"#.to_string()
+    r#"{"name": "AWE Player", "version": "0.1.0", "phase": "9A.7", "architecture": "Rust-Centric"}"#.to_string()
+}
+
+// ===== SOUNDFONT 2.0 EXPORTS =====
+
+/// Initialize SoundFont module
+#[wasm_bindgen]
+pub fn init_soundfont_module() -> String {
+    match soundfont::SoundFontModule::initialize() {
+        Ok(_) => {
+            log("SoundFont module initialized successfully");
+            r#"{"success": true, "message": "SoundFont module ready", "version": "SF2.0"}"#.to_string()
+        }
+        Err(e) => {
+            log(&format!("SoundFont module initialization failed: {}", e));
+            format!(r#"{{"success": false, "error": "{}"}}"#, e)
+        }
+    }
+}
+
+/// Validate SoundFont file header
+#[wasm_bindgen]
+pub fn validate_soundfont_header(data: &[u8]) -> String {
+    match soundfont::SoundFontModule::validate_soundfont_header(data) {
+        Ok(valid) => {
+            if valid {
+                log("SoundFont header validation passed");
+                r#"{"valid": true, "format": "SF2.0", "message": "Valid SoundFont file"}"#.to_string()
+            } else {
+                log("SoundFont header validation failed - invalid format");
+                r#"{"valid": false, "error": "Invalid SoundFont format"}"#.to_string()
+            }
+        }
+        Err(e) => {
+            log(&format!("SoundFont header validation error: {}", e));
+            format!(r#"{{"valid": false, "error": "{}"}}"#, e)
+        }
+    }
+}
+
+/// Get SoundFont module information
+#[wasm_bindgen]
+pub fn get_soundfont_info() -> String {
+    format!(r#"{{"version": "{}", "supports": ["SF2.0", "SF2.01", "SF2.1"], "status": "initialized"}}"#,
+        soundfont::SoundFontModule::get_format_version())
+}
+
+/// Test SoundFont module functionality
+#[wasm_bindgen]
+pub fn test_soundfont_module() -> String {
+    // Test basic functionality with dummy data
+    let test_data = b"RIFF\x00\x00\x00\x00sfbk";
+    match soundfont::SoundFontModule::validate_soundfont_header(test_data) {
+        Ok(_) => {
+            log("SoundFont module test passed");
+            r#"{"test": "passed", "module": "functional", "ready": true}"#.to_string()
+        }
+        Err(e) => {
+            log(&format!("SoundFont module test failed: {}", e));
+            format!(r#"{{"test": "failed", "error": "{}"}}"#, e)
+        }
+    }
+}
+
+/// Parse complete SoundFont file (Task 9A.4)
+#[wasm_bindgen]
+pub fn parse_soundfont_file(data: &[u8]) -> String {
+    match soundfont::SoundFontParser::parse_soundfont(data) {
+        Ok(soundfont) => {
+            log(&format!("SoundFont parsing successful: '{}' v{}", 
+                       soundfont.header.name, soundfont.header.version));
+            format!(r#"{{"success": true, "name": "{}", "version": "{}", "engine": "{}", "presets": {}, "instruments": {}, "samples": {}}}"#,
+                   soundfont.header.name,
+                   soundfont.header.version,
+                   soundfont.header.engine,
+                   soundfont.presets.len(),
+                   soundfont.instruments.len(),
+                   soundfont.samples.len())
+        }
+        Err(e) => {
+            log(&format!("SoundFont parsing failed: {}", e));
+            format!(r#"{{"success": false, "error": "{}"}}"#, e)
+        }
+    }
+}
+
+/// Test SoundFont header parsing with real SF2 data
+#[wasm_bindgen]
+pub fn test_soundfont_parsing() -> String {
+    // Create minimal valid SF2 file structure for testing
+    let mut test_sf2 = Vec::new();
+    
+    // RIFF header: "RIFF" + file_size + "sfbk"
+    test_sf2.extend_from_slice(b"RIFF");
+    test_sf2.extend_from_slice(&(400u32).to_le_bytes()); // file size placeholder
+    test_sf2.extend_from_slice(b"sfbk");
+    
+    // LIST chunk with INFO
+    test_sf2.extend_from_slice(b"LIST");
+    test_sf2.extend_from_slice(&(80u32).to_le_bytes()); // LIST size
+    test_sf2.extend_from_slice(b"INFO");
+    
+    // ifil chunk (version)
+    test_sf2.extend_from_slice(b"ifil");
+    test_sf2.extend_from_slice(&(4u32).to_le_bytes());
+    test_sf2.extend_from_slice(&(2u16).to_le_bytes()); // major version 2
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // minor version 0
+    
+    // isng chunk (sound engine)
+    test_sf2.extend_from_slice(b"isng");
+    test_sf2.extend_from_slice(&(8u32).to_le_bytes());
+    test_sf2.extend_from_slice(b"EMU8000\0");
+    
+    // INAM chunk (name)
+    test_sf2.extend_from_slice(b"INAM");
+    test_sf2.extend_from_slice(&(12u32).to_le_bytes());
+    test_sf2.extend_from_slice(b"Test SF2\0\0\0\0");
+    
+    // LIST chunk with sdta (sample data)
+    test_sf2.extend_from_slice(b"LIST");
+    test_sf2.extend_from_slice(&(20u32).to_le_bytes()); // sdta LIST size
+    test_sf2.extend_from_slice(b"sdta");
+    
+    // smpl chunk (16-bit sample data)
+    test_sf2.extend_from_slice(b"smpl");
+    test_sf2.extend_from_slice(&(8u32).to_le_bytes()); // 4 samples * 2 bytes
+    // Add 4 test samples (440Hz sine wave approximation)
+    test_sf2.extend_from_slice(&(0i16).to_le_bytes());     // Sample 0
+    test_sf2.extend_from_slice(&(16383i16).to_le_bytes()); // Sample 1 (half max)
+    test_sf2.extend_from_slice(&(0i16).to_le_bytes());     // Sample 2
+    test_sf2.extend_from_slice(&(-16383i16).to_le_bytes());// Sample 3 (half min)
+    
+    // LIST chunk with pdta (preset data)
+    test_sf2.extend_from_slice(b"LIST");
+    test_sf2.extend_from_slice(&(200u32).to_le_bytes()); // pdta LIST size
+    test_sf2.extend_from_slice(b"pdta");
+    
+    // shdr chunk (sample headers) - 46 bytes per sample + 46 byte terminal
+    test_sf2.extend_from_slice(b"shdr");
+    test_sf2.extend_from_slice(&(92u32).to_le_bytes()); // 2 samples * 46 bytes
+    
+    // Sample header 1
+    let mut sample_header = [0u8; 46];
+    sample_header[0..9].copy_from_slice(b"TestSamp\0"); // Sample name
+    sample_header[20..24].copy_from_slice(&(0u32).to_le_bytes()); // start offset
+    sample_header[24..28].copy_from_slice(&(4u32).to_le_bytes()); // end offset
+    sample_header[28..32].copy_from_slice(&(0u32).to_le_bytes()); // loop start
+    sample_header[32..36].copy_from_slice(&(4u32).to_le_bytes()); // loop end
+    sample_header[36..40].copy_from_slice(&(44100u32).to_le_bytes()); // sample rate
+    sample_header[40] = 60; // original pitch (middle C)
+    sample_header[41] = 0;  // pitch correction
+    sample_header[42..44].copy_from_slice(&(0u16).to_le_bytes()); // sample link
+    sample_header[44..46].copy_from_slice(&(1u16).to_le_bytes()); // sample type (mono)
+    test_sf2.extend_from_slice(&sample_header);
+    
+    // Terminal sample header (empty)
+    test_sf2.extend_from_slice(&[0u8; 46]);
+    
+    // Add basic preset structures for complete test
+    // phdr chunk (preset headers) - 38 bytes per preset + 38 byte terminal
+    test_sf2.extend_from_slice(b"phdr");
+    test_sf2.extend_from_slice(&(76u32).to_le_bytes()); // 2 presets * 38 bytes
+    
+    // Preset header 1
+    let mut preset_header = [0u8; 38];
+    preset_header[0..9].copy_from_slice(b"TestPset\0"); // Preset name
+    preset_header[20] = 0; preset_header[21] = 0; // program 0
+    preset_header[22] = 0; preset_header[23] = 0; // bank 0
+    preset_header[24] = 0; preset_header[25] = 0; // bag index 0
+    test_sf2.extend_from_slice(&preset_header);
+    
+    // Terminal preset header (empty)
+    test_sf2.extend_from_slice(&[0u8; 38]);
+    
+    // pbag chunk (preset bags) - 4 bytes each
+    test_sf2.extend_from_slice(b"pbag");
+    test_sf2.extend_from_slice(&(8u32).to_le_bytes()); // 2 bags * 4 bytes
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // gen index 0
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // mod index 0
+    test_sf2.extend_from_slice(&(1u16).to_le_bytes()); // gen index 1 (terminal)
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // mod index 0
+    
+    // pgen chunk (preset generators) - 4 bytes each
+    test_sf2.extend_from_slice(b"pgen");
+    test_sf2.extend_from_slice(&(8u32).to_le_bytes()); // 2 generators * 4 bytes
+    test_sf2.extend_from_slice(&(41u16).to_le_bytes()); // Instrument generator
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes());  // instrument ID 0
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes());  // terminal generator
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes());  // value 0
+    
+    // inst chunk (instrument headers) - 22 bytes per instrument + 22 byte terminal
+    test_sf2.extend_from_slice(b"inst");
+    test_sf2.extend_from_slice(&(44u32).to_le_bytes()); // 2 instruments * 22 bytes
+    
+    // Instrument header 1
+    let mut inst_header = [0u8; 22];
+    inst_header[0..9].copy_from_slice(b"TestInst\0"); // Instrument name
+    inst_header[20] = 0; inst_header[21] = 0; // bag index 0
+    test_sf2.extend_from_slice(&inst_header);
+    
+    // Terminal instrument header (empty)
+    test_sf2.extend_from_slice(&[0u8; 22]);
+    
+    // ibag chunk (instrument bags) - 4 bytes each
+    test_sf2.extend_from_slice(b"ibag");
+    test_sf2.extend_from_slice(&(8u32).to_le_bytes()); // 2 bags * 4 bytes
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // gen index 0
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // mod index 0
+    test_sf2.extend_from_slice(&(1u16).to_le_bytes()); // gen index 1 (terminal)
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes()); // mod index 0
+    
+    // igen chunk (instrument generators) - 4 bytes each
+    test_sf2.extend_from_slice(b"igen");
+    test_sf2.extend_from_slice(&(8u32).to_le_bytes()); // 2 generators * 4 bytes
+    test_sf2.extend_from_slice(&(53u16).to_le_bytes()); // SampleID generator
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes());  // sample ID 0
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes());  // terminal generator
+    test_sf2.extend_from_slice(&(0u16).to_le_bytes());  // value 0
+    
+    // Test parsing
+    parse_soundfont_file(&test_sf2)
+}
+
+/// Load SoundFont into MidiPlayer for synthesis
+#[wasm_bindgen]
+pub fn load_soundfont_into_player(data: &[u8]) -> String {
+    // Parse SoundFont file
+    let soundfont = match soundfont::SoundFontParser::parse_soundfont(data) {
+        Ok(sf) => sf,
+        Err(e) => {
+            log(&format!("SoundFont parsing failed: {}", e));
+            return format!(r#"{{"success": false, "error": "Parsing failed: {}"}}"#, e);
+        }
+    };
+    
+    log(&format!("SoundFont parsed successfully: '{}' with {} presets, {} instruments, {} samples",
+               soundfont.header.name, soundfont.presets.len(), 
+               soundfont.instruments.len(), soundfont.samples.len()));
+    
+    // Get the global AudioWorklet bridge and load SoundFont
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            match bridge.load_soundfont_internal(soundfont) {
+                Ok(()) => {
+                    log("SoundFont loaded successfully into synthesis engine");
+                    r#"{"success": true, "message": "SoundFont loaded into synthesis engine"}"#.to_string()
+                }
+                Err(e) => {
+                    log(&format!("Failed to load SoundFont into synthesis engine: {}", e));
+                    format!(r#"{{"success": false, "error": "{}"}}"#, e)
+                }
+            }
+        } else {
+            let error = "AudioWorklet bridge not initialized - call init_audio_worklet() first";
+            log(error);
+            format!(r#"{{"success": false, "error": "{}"}}"#, error)
+        }
+    }
+}
+
+/// Select preset by bank and program number
+#[wasm_bindgen]
+pub fn select_preset_global(bank: u16, program: u8) -> String {
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            match bridge.select_preset_internal(bank, program) {
+                Ok(preset_info) => {
+                    log(&format!("Preset selected: {}", preset_info));
+                    format!(r#"{{"success": true, "preset": "{}"}}"#, preset_info)
+                }
+                Err(e) => {
+                    log(&format!("Preset selection failed: {}", e));
+                    format!(r#"{{"success": false, "error": "{}"}}"#, e)
+                }
+            }
+        } else {
+            let error = "AudioWorklet bridge not initialized";
+            log(error);
+            format!(r#"{{"success": false, "error": "{}"}}"#, error)
+        }
+    }
+}
+
+/// Get current preset information
+#[wasm_bindgen]
+pub fn get_current_preset_info_global() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            match bridge.get_current_preset_info_internal() {
+                Some(info) => {
+                    format!(r#"{{"success": true, "preset": "{}"}}"#, info)
+                }
+                None => {
+                    r#"{"success": false, "error": "No preset selected"}"#.to_string()
+                }
+            }
+        } else {
+            r#"{"success": false, "error": "AudioWorklet bridge not initialized"}"#.to_string()
+        }
+    }
+}
+
+/// Test SoundFont synthesis with MIDI events
+#[wasm_bindgen]
+pub fn test_soundfont_synthesis() -> String {
+    log("Testing SoundFont synthesis pipeline...");
+    
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            if !bridge.is_soundfont_loaded_internal() {
+                let error = "No SoundFont loaded - load SoundFont first";
+                log(error);
+                return format!(r#"{{"success": false, "error": "{}"}}"#, error);
+            }
+            
+            // Test note sequence: C4, E4, G4 (C major chord)
+            let test_notes = [60, 64, 67]; // MIDI note numbers
+            let mut test_results = Vec::new();
+            
+            for &note in &test_notes {
+                // Trigger note
+                bridge.queue_midi_event(0, 0, 0x90, note, 100); // Note On
+                
+                // Generate a few samples
+                let mut samples = Vec::new();
+                for _ in 0..10 {
+                    let buffer = bridge.process_audio_buffer(1);
+                    if !buffer.is_empty() {
+                        samples.push(format!("{:.4}", buffer[0]));
+                    }
+                }
+                
+                // Release note
+                bridge.queue_midi_event(100, 0, 0x80, note, 0); // Note Off
+                
+                test_results.push(format!("Note {}: [{}]", note, samples.join(", ")));
+                log(&format!("Test note {} generated {} samples", note, samples.len()));
+            }
+            
+            let result = format!(r#"{{"success": true, "test_results": [{}]}}"#, 
+                               test_results.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", "));
+            
+            log("SoundFont synthesis test completed");
+            result
+        } else {
+            let error = "AudioWorklet bridge not initialized";
+            log(error);
+            format!(r#"{{"success": false, "error": "{}"}}"#, error)
+        }
+    }
 }

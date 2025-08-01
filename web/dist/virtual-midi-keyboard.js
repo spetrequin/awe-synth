@@ -8,11 +8,11 @@ import { DEBUG_LOGGERS } from './utils/debug-logger.js';
 import { injectStyles, generateComponentStyles } from './utils/ui-styles.js';
 import { isValidMIDIProgram, isValidMIDIChannel, MIDI_CC, UI_CONSTANTS } from './midi-constants.js';
 import { VelocityCurveProcessor, VELOCITY_CONSTANTS } from './velocity-curves.js';
-// Default options for backward compatibility
-const DEFAULT_VELOCITY_OPTIONS = {
-    velocityProfile: 'natural',
-    velocitySensitivity: 1.0
-};
+// Default options for backward compatibility (currently unused but kept for future use)
+// const DEFAULT_VELOCITY_OPTIONS: VirtualKeyboardOptions = {
+//     velocityProfile: 'natural',
+//     velocitySensitivity: 1.0
+// };
 export class VirtualMidiKeyboard {
     keys = new Map();
     currentOctave = 4; // C4 = Middle C

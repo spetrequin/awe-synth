@@ -1,9 +1,8 @@
 /**
- * AWE Player - AudioWorkletProcessor Implementation
- * Part of AWE Player EMU8000 Emulator
+ * AWE Player - Simplified AudioWorkletProcessor for Phase 8C
  *
- * AudioWorkletProcessor that bridges Web Audio API to WASM synthesis engine
- * Provides real-time audio processing with minimal latency
+ * Simplified processor that bridges Web Audio API to Rust WASM synthesis engine
+ * All audio logic, buffer management, and MIDI handling now in Rust
  */
 /**
  * MIDI Event interface for AudioWorklet communication
@@ -21,9 +20,8 @@ interface MidiEventMessage {
  */
 interface ControlMessage {
     type: 'control';
-    command: 'reset' | 'setBufferSize' | 'getStats' | 'setAdaptive' | 'getBufferMetrics';
-    value?: number;
-    enabled?: boolean;
+    command: 'reset' | 'getStats' | 'initSystems';
+    sampleRate?: number;
 }
 /**
  * AudioWorklet message types

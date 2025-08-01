@@ -25,6 +25,6 @@ export declare class GamepadInputHandler extends BaseInputHandler {
     /**
      * Set custom button-to-note mapping
      */
-    setButtonMapping(mapping: Map<number, number>): void;
+    setButtonMapping(_mapping: Map<number, number>): void;
 }
 //# sourceMappingURL=gamepad-input-handler.d.ts.map

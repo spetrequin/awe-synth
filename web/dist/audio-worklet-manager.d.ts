@@ -15,7 +15,6 @@ type WorkletStatus = 'initializing' | 'ready' | 'error' | 'reset' | 'bufferSizeC
  * All audio logic moved to Rust - this only handles browser API communication
  */
 export declare class AudioWorkletManager {
-    private audioContext;
     private audioWorkletNode;
     private logger;
     private isInitialized;

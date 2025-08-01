@@ -12,7 +12,6 @@ import { UIControlManager } from './ui-controls.js';
 const logger = new DebugLogger({ componentName: 'Main', enabled: true });
 // Global state
 let wasmModule = null;
-let midiPlayer = null;
 let uiControlManager = null;
 /**
  * Initialize the application
@@ -51,10 +50,7 @@ async function initializeWASM() {
         const wasmPkg = await import('./wasm-pkg/awe_synth.js');
         await wasmPkg.default(); // Initialize WASM
         wasmModule = wasmPkg;
-        // Create MidiPlayer instance
-        midiPlayer = new wasmModule.MidiPlayer();
         logger.log('✅ WASM module loaded successfully');
-        logger.log('🎹 MidiPlayer instance created');
     }
     catch (error) {
         throw new Error(`Failed to load WASM module: ${error}`);

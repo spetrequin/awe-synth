@@ -11,7 +11,6 @@ import { DebugLogger } from './utils/debug-logger.js';
  * All audio logic moved to Rust - this only handles browser API communication
  */
 export class AudioWorkletManager {
-    audioContext = null;
     audioWorkletNode = null;
     logger;
     isInitialized = false;
@@ -25,7 +24,6 @@ export class AudioWorkletManager {
      */
     async initialize(audioContext) {
         try {
-            this.audioContext = audioContext;
             this.logger.log('🎵 Initializing AudioWorklet...');
             // Add the AudioWorklet module
             const workletUrl = new URL('./dist/audio-worklet.js', window.location.href);
@@ -112,7 +110,6 @@ export class AudioWorkletManager {
             this.audioWorkletNode.disconnect();
             this.audioWorkletNode = null;
         }
-        this.audioContext = null;
         this.isInitialized = false;
         this.logger.log('🧹 AudioWorklet cleaned up');
     }

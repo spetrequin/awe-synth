@@ -6,6 +6,7 @@
  * caching, error handling, and schema enforcement.
  */
 import { ConfigValidationError } from './config-validator.js';
+export { ConfigValidationError, ConfigSchemaError } from './config-validator.js';
 export interface ConfigMetadata {
     name: string;
     version: string;
@@ -95,5 +96,4 @@ export declare const configLoader: {
     isCached: (configName: string) => boolean;
 };
 export declare const preloadCommonConfigs: () => Promise<void>;
-export {};
 //# sourceMappingURL=enhanced-config-loader.d.ts.map

@@ -8,8 +8,8 @@ import { ComputerKeyboardInputHandler } from './input-handlers/keyboard-input-ha
 import { PointerInputHandler } from './input-handlers/pointer-input-handler.js';
 import { GamepadInputHandler } from './input-handlers/gamepad-input-handler.js';
 import { DEBUG_LOGGERS } from './utils/debug-logger.js';
-import { createSection, createSelect, createSlider, createCheckbox, createLabeledField, createNumberRange, injectStyles } from './utils/ui-components.js';
-import { generateComponentStyles } from './utils/ui-styles.js';
+import { createSection, createSelect, createSlider, createCheckbox, createLabeledField, createNumberRange } from './utils/ui-components.js';
+import { generateComponentStyles, injectStyles } from './utils/ui-styles.js';
 export class InputManager {
     keyboard;
     velocityProcessor;

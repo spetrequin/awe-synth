@@ -7,6 +7,8 @@
  */
 import { DEBUG_LOGGERS } from './debug-logger.js';
 import { ConfigValidationError, getConfigSchema, CONFIG_SCHEMAS } from './config-validator.js';
+// Re-export validation error classes for backward compatibility
+export { ConfigValidationError, ConfigSchemaError } from './config-validator.js';
 // ===== ENHANCED CONFIGURATION LOADER =====
 class EnhancedConfigurationLoader {
     cache = new Map();
@@ -100,13 +102,13 @@ class EnhancedConfigurationLoader {
             };
         }
         catch (error) {
-            if (error.name === 'AbortError') {
+            if (error instanceof Error && error.name === 'AbortError') {
                 throw new ConfigLoadError(`Config load timeout: ${configName} (${timeout}ms)`, configName, 0, 'TIMEOUT');
             }
             if (error instanceof ConfigValidationError || error instanceof ConfigLoadError) {
                 throw error;
             }
-            throw new ConfigLoadError(`Failed to load config ${configName}: ${error}`, configName, 0, 'UNKNOWN', error);
+            throw new ConfigLoadError(`Failed to load config ${configName}: ${error}`, configName, 0, 'UNKNOWN', error instanceof Error ? error : undefined);
         }
         finally {
             clearTimeout(timeoutId);
@@ -201,11 +203,16 @@ class EnhancedConfigurationLoader {
      * List available schemas
      */
     getAvailableSchemas() {
-        return Array.from(CONFIG_SCHEMAS.entries()).map(([name, schema]) => ({
-            name,
-            version: schema.version,
-            description: schema.description
-        }));
+        return Array.from(CONFIG_SCHEMAS.entries()).map(([name, schema]) => {
+            const result = {
+                name,
+                version: schema.version
+            };
+            if (schema.description !== undefined) {
+                result.description = schema.description;
+            }
+            return result;
+        });
     }
 }
 // ===== ERROR CLASSES =====
