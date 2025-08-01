@@ -208,10 +208,10 @@ Phase 7B Audio Synthesis Testing has been **successfully completed** with 59+ te
 **14.3** **[PENDING]** Implement MIDI device state management (connect/disconnect)  
 
 ## 🔢 **Easy Reference System**
-**Current Phase**: Phase 9A SoundFont Integration 🔄 **READY TO START**  
+**Current Phase**: Phase 8C Architecture Refactoring 🔄 **IN_PROGRESS**  
 **Progress**: Phase 7A, 7B, 8A, 8B Complete (36/36 synthesis + testing + web interface tasks completed)  
-**Commands**: Just specify the phase (e.g., "9A.1", "9A.2", "9B.1", "10A")  
-**Next Task**: 9A.1 - Create src/soundfont/mod.rs - Basic SoundFont module structure with error types
+**Commands**: Just specify the phase (e.g., "8C.1", "8C.2", "9A.1", "9B.1")  
+**Next Task**: 8C.1 - Move AudioBufferManager logic to Rust - create src/audio/buffer_manager.rs
 
 **New Strategy**: Alternating Implementation + Testing (see DEVELOPMENT_SEQUENCE.md)
 
@@ -344,6 +344,40 @@ Phase 7B Audio Synthesis Testing has been **successfully completed** with 59+ te
 ✅ **Browser Compatibility**: Full support for modern browsers with AudioWorklet API
 ✅ **Real-time Testing**: Automated C major scale test with performance metrics
 
+### **Phase 8C Micro-Tasks (7 tasks) - IN_PROGRESS 🔄**
+**8C.1** **[PENDING]** Move AudioBufferManager logic to Rust - create src/audio/buffer_manager.rs
+**8C.2** **[PENDING]** Move audio pipeline coordination to Rust - enhance src/worklet.rs with pipeline management
+**8C.3** **[PENDING]** Move MIDI test generation to Rust - create src/midi/test_sequences.rs for C major scale
+**8C.4** **[PENDING]** Simplify AudioWorkletManager to pure browser API bridge - remove audio logic
+**8C.5** **[PENDING]** Simplify UIControlManager to pure DOM interactions - remove synthesis logic
+**8C.6** **[PENDING]** Update WASM exports for new Rust-centric audio architecture
+**8C.7** **[PENDING]** Test refactored architecture - verify identical audio behavior with cleaner separation
+
+#### **Phase 8C Strategy and Goals**
+
+**Primary Objective:** Refactor TypeScript/Rust boundaries to achieve true "thin client" architecture with all audio processing in Rust.
+
+**Phase 8C Focus:** Architecture Refactoring for Clean Separation
+- Move AudioBufferManager performance decisions to Rust (280 lines TS → ~200 lines Rust)
+- Move audio pipeline coordination from TypeScript to enhanced Rust worklet bridge
+- Move MIDI test sequence generation to Rust synthesis engine
+- Simplify TypeScript to pure browser API interactions (DOM, WebAudio, file loading only)
+- Update WASM exports for cleaner Rust-centric API design
+- Comprehensive testing to ensure identical audio behavior after refactoring
+
+**Strategic Benefits:**
+✅ **Better Phase 9 Foundation** - SoundFont integration will be cleaner with proper separation
+✅ **Performance Improvement** - More logic in Rust = better real-time audio performance
+✅ **Maintainability** - Clear boundaries between UI and audio processing
+✅ **Testing Simplification** - Easier to test audio logic when centralized in Rust
+✅ **Architecture Alignment** - True "thin client" (TypeScript UI) + "thick server" (Rust audio)
+
+**Expected Impact:**
+- TypeScript codebase: ~1000 lines → ~400 lines (60% reduction)
+- Enhanced Rust audio processing capabilities with centralized logic
+- Clean separation of concerns between UI interactions and synthesis
+- Improved real-time performance with reduced JavaScript/WASM boundary crossings
+
 #### **Phase 8 Complete - Web Audio Integration Success ✅**
 
 **Primary Objective:** Bridge the completed WASM audio synthesis engine to the browser's Web Audio API for real-time playback.
@@ -371,8 +405,9 @@ Phase 7B Audio Synthesis Testing has been **successfully completed** with 59+ te
 - ✅ **Phase 6A/6B**: EMU8000 6-Stage DAHDSR Envelope System (29 tasks)
 - ✅ **Phase 7A/7B**: Complete Audio Synthesis Engine + Testing (24 tasks)  
 - ✅ **Phase 8A/8B**: Web Audio Integration + Browser Interface (12 tasks)
+- 🔄 **Phase 8C**: Architecture Refactoring for Clean Separation (7 tasks) - IN_PROGRESS
 
-**Total Progress**: 65/65 foundational tasks complete across synthesis, testing, and web audio
+**Total Progress**: 65/65 foundational tasks complete + 7 architecture refactoring tasks
 
 ### **Current Architecture Status**
 ✅ **Synthesis Engine**: 32-voice polyphonic synthesis with EMU8000-authentic envelopes  
@@ -382,8 +417,13 @@ Phase 7B Audio Synthesis Testing has been **successfully completed** with 59+ te
 ✅ **Debug System**: Complete in-app logging and performance monitoring  
 ✅ **Browser Interface**: Production-ready web application with modular UI architecture  
 
-### **Ready for Phase 9: SoundFont Integration**
-**Current Limitation**: Sine wave synthesis only (no authentic instrument sounds)  
+### **Current Focus: Phase 8C Architecture Refactoring**
+**Strategic Decision**: Before SoundFont integration, refactor TypeScript/Rust boundaries for cleaner architecture  
+**Current Issue**: Too much audio/synthesis logic in TypeScript (should be UI-only)  
+**Phase 8C Goal**: Move all audio processing to Rust, simplify TypeScript to pure browser interactions  
+**Benefits**: Better foundation for Phase 9, improved performance, cleaner separation of concerns  
+
+### **Next: Phase 9 SoundFont Integration (After 8C)**
 **Phase 9 Goal**: Replace sine waves with authentic SoundFont 2.0 instrument samples  
 **Expected Impact**: Transform from basic synthesizer to professional EMU8000 emulator
 
