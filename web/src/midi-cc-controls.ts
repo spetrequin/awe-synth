@@ -7,9 +7,9 @@ import { MidiBridge } from './midi-bridge.js';
 import { CCControl, getControlByCC, QUICK_SELECT_CONTROLS, getControlGroups, getCCControlDefinitions } from './midi-cc-definitions.js';
 import { ControlGroupBuilder } from './cc-controls/control-group-builder.js';
 import { DEBUG_LOGGERS } from './utils/debug-logger.js';
-import { isValidMIDIChannel, MIDI_CC } from './midi-constants.js';
-import { createSection, createButtonGroup, createPresetSection, injectStyles } from './utils/ui-components.js';
-import { generateComponentStyles } from './utils/ui-styles.js';
+import { isValidMIDIChannel, MIDI_CC, UI_CONSTANTS } from './midi-constants.js';
+import { createPresetSection } from './utils/ui-components.js';
+import { generateComponentStyles, injectStyles } from './utils/ui-styles.js';
 
 export class MidiCCControls {
     private midiBridge: MidiBridge;

@@ -23,11 +23,11 @@ export interface VirtualKeyboardOptions {
     velocitySensitivity?: number;
 }
 
-// Default options for backward compatibility
-const DEFAULT_VELOCITY_OPTIONS: VirtualKeyboardOptions = {
-    velocityProfile: 'natural',
-    velocitySensitivity: 1.0
-};
+// Default options for backward compatibility (currently unused but kept for future use)
+// const DEFAULT_VELOCITY_OPTIONS: VirtualKeyboardOptions = {
+//     velocityProfile: 'natural',
+//     velocitySensitivity: 1.0
+// };
 
 export class VirtualMidiKeyboard {
     private keys: Map<number, VirtualKey> = new Map();

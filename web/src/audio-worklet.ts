@@ -96,9 +96,9 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
      * Main audio processing callback - pure bridge to Rust
      */
     process(
-        inputs: Float32Array[][],
+        _inputs: Float32Array[][],
         outputs: Float32Array[][],
-        parameters: Record<string, Float32Array>
+        _parameters: Record<string, Float32Array>
     ): boolean {
         // Return early if not initialized
         if (!this.isInitialized || !this.wasmModule) {

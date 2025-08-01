@@ -4,7 +4,7 @@
  */
 
 import { BaseInputHandler, InputHandlerOptions } from './base-input-handler.js';
-import { EnhancedTouch, EnhancedTouchEvent } from '../types/input-types.js';
+import { EnhancedTouch } from '../types/input-types.js';
 import { INPUT_TIMING } from '../midi-constants.js';
 
 interface TouchInfo {

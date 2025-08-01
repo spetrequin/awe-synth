@@ -4,7 +4,7 @@
  */
 
 import { MIDI_NOTES, noteToFullName } from '../midi-constants.js';
-import { isBlackKey as isBlackKeyNote, isWhiteKey as isWhiteKeyNote } from '../types/midi-types.js';
+import { isBlackKey as isBlackKeyNote } from '../types/midi-types.js';
 
 export interface KeyLayout {
     noteNumber: number;

@@ -136,22 +136,28 @@ export class GamepadInputHandler extends BaseInputHandler {
         if (gamepad.axes.length < 2) return;
         
         // Left stick X-axis for pitch bend
-        const pitchBendValue = Math.round(gamepad.axes[0] * 8191); // -8191 to +8191
-        if (Math.abs(pitchBendValue) > 100) { // Dead zone
-            this.keyboard.getMidiBridge().sendPitchBend(
-                this.keyboard.getCurrentChannel(),
-                pitchBendValue
-            );
+        const xAxis = gamepad.axes[0];
+        if (xAxis !== undefined) {
+            const pitchBendValue = Math.round(xAxis * 8191); // -8191 to +8191
+            if (Math.abs(pitchBendValue) > 100) { // Dead zone
+                this.keyboard.getMidiBridge().sendPitchBend(
+                    this.keyboard.getCurrentChannel(),
+                    pitchBendValue
+                );
+            }
         }
         
         // Left stick Y-axis for modulation
-        const modulationValue = Math.round((gamepad.axes[1] + 1) * 63.5); // 0-127
-        if (modulationValue > 5) { // Dead zone
-            this.keyboard.getMidiBridge().sendControlChange(
-                this.keyboard.getCurrentChannel(),
-                1, // Modulation wheel
-                modulationValue
-            );
+        const yAxis = gamepad.axes[1];
+        if (yAxis !== undefined) {
+            const modulationValue = Math.round((yAxis + 1) * 63.5); // 0-127
+            if (modulationValue > 5) { // Dead zone
+                this.keyboard.getMidiBridge().sendControlChange(
+                    this.keyboard.getCurrentChannel(),
+                    1, // Modulation wheel
+                    modulationValue
+                );
+            }
         }
     }
     
@@ -167,7 +173,7 @@ export class GamepadInputHandler extends BaseInputHandler {
     /**
      * Set custom button-to-note mapping
      */
-    public setButtonMapping(mapping: Map<number, number>): void {
+    public setButtonMapping(_mapping: Map<number, number>): void {
         // Could be implemented for customizable mappings
         this.log('Custom button mapping not yet implemented');
     }

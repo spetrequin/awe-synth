@@ -15,6 +15,9 @@ import {
     CONFIG_SCHEMAS
 } from './config-validator.js';
 
+// Re-export validation error classes for backward compatibility
+export { ConfigValidationError, ConfigSchemaError } from './config-validator.js';
+
 // ===== ENHANCED CONFIG INTERFACES =====
 
 export interface ConfigMetadata {

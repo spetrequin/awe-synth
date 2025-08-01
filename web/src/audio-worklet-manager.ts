@@ -7,7 +7,7 @@
  */
 
 import { DebugLogger } from './utils/debug-logger.js';
-import type { WorkletMessage, ControlMessage } from './audio-worklet.js';
+import type { WorkletMessage } from './audio-worklet.js';
 
 /**
  * AudioWorklet status types

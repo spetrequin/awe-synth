@@ -8,10 +8,10 @@ import { MIDI_CHANNELS } from './midi-constants.js';
 import { enhancedConfigLoader } from './utils/enhanced-config-loader.js';
 import { GMInstrument, GMDrumNote, GMDrumKit } from './utils/config-validator.js';
 import { DEBUG_LOGGERS } from './utils/debug-logger.js';
-import { VELOCITY_CONSTANTS } from './velocity-curves.js';
-import { UI_CONSTANTS, MIDI_CC } from './midi-constants.js';
-import { createModeSelector, createSelect, createSection, getContainer, injectStyles } from './utils/ui-components.js';
-import { generateComponentStyles } from './utils/ui-styles.js';
+// Removed unused import: VELOCITY_CONSTANTS
+import { UI_CONSTANTS } from './midi-constants.js';
+import { createModeSelector, createSelect, createSection } from './utils/ui-components.js';
+import { generateComponentStyles, injectStyles } from './utils/ui-styles.js';
 
 // ===== INTERFACE DEFINITIONS =====
 
@@ -228,11 +228,14 @@ export class GMSoundLibrary {
             'category-select'
         );
         
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'Category: ';
+        
         const container = createSection({
             title: '',
             className: 'category-filter',
             content: [
-                document.createTextNode('Category: '),
+                labelSpan,
                 select
             ]
         });
@@ -254,11 +257,14 @@ export class GMSoundLibrary {
             'category-select'
         );
         
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'Category: ';
+        
         const container = createSection({
             title: '',
             className: 'category-filter',
             content: [
-                document.createTextNode('Category: '),
+                labelSpan,
                 select
             ]
         });
@@ -338,11 +344,14 @@ export class GMSoundLibrary {
             'kit-select'
         );
         
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = 'Drum Kit: ';
+        
         const container = createSection({
             title: '',
             className: 'drum-kit-selector',
             content: [
-                document.createTextNode('Drum Kit: '),
+                labelSpan,
                 select
             ]
         });
@@ -370,7 +379,6 @@ export class GMSoundLibrary {
      * Trigger drum sound
      */
     public triggerDrum(note: number): void {
-        const velocity = VELOCITY_CONSTANTS.DRUM_TRIGGER;
         this.keyboard.handleKeyPress(note, new MouseEvent('click'));
         setTimeout(() => this.keyboard.handleKeyRelease(note), UI_CONSTANTS.DRUM_TRIGGER_DURATION_MS);
     }
