@@ -1,0 +1,107 @@
+/// SoundFont 2.0 Testing Module
+/// 
+/// This module provides comprehensive testing for the AWE Player SoundFont implementation,
+/// including parser validation, sample extraction, preset hierarchy, and integration tests.
+
+// Test modules for different aspects of SoundFont functionality
+// These will be implemented in subsequent tasks
+// pub mod parser_tests;
+// pub mod sample_tests;
+// pub mod preset_tests;
+// pub mod generator_tests;
+// pub mod integration_tests;
+// pub mod performance_tests;
+
+// Re-export commonly used test utilities
+pub use crate::utils::*;
+
+/// Test data constants for SoundFont testing
+pub mod test_data {
+    /// Path to test SoundFont files
+    pub const TEST_SF2_PATH: &str = "../reference/soundfonts/";
+    
+    /// Small test SF2 file for unit testing
+    pub const SMALL_SF2: &str = "test_small.sf2";
+    
+    /// Medium test SF2 file for integration testing
+    pub const MEDIUM_SF2: &str = "test_medium.sf2";
+    
+    /// Large test SF2 file for performance testing
+    pub const LARGE_SF2: &str = "test_large.sf2";
+    
+    /// Malformed SF2 file for error handling tests
+    pub const INVALID_SF2: &str = "test_invalid.sf2";
+}
+
+/// Common test utilities for SoundFont testing
+pub mod utils {
+    use awe_synth::soundfont::SoundFont;
+    use std::fs;
+    use std::path::Path;
+    
+    /// Load a test SoundFont file
+    pub fn load_test_soundfont(filename: &str) -> Result<Vec<u8>, std::io::Error> {
+        let path = Path::new(super::test_data::TEST_SF2_PATH).join(filename);
+        fs::read(path)
+    }
+    
+    /// Create a minimal valid SF2 file for testing
+    pub fn create_minimal_sf2() -> Vec<u8> {
+        let mut data = Vec::new();
+        
+        // RIFF header
+        data.extend_from_slice(b"RIFF");
+        data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // Size (to be filled)
+        data.extend_from_slice(b"sfbk");
+        
+        // INFO list chunk
+        data.extend_from_slice(b"LIST");
+        data.extend_from_slice(&[0x04, 0x00, 0x00, 0x00]); // Size
+        data.extend_from_slice(b"INFO");
+        
+        // Update RIFF size
+        let size = (data.len() - 8) as u32;
+        data[4..8].copy_from_slice(&size.to_le_bytes());
+        
+        data
+    }
+    
+    /// Verify basic SF2 structure
+    pub fn verify_sf2_structure(sf: &SoundFont) -> Result<(), String> {
+        // Verify header is present
+        if sf.header.name.is_empty() {
+            return Err("Missing SoundFont name".to_string());
+        }
+        
+        if sf.samples.is_empty() && sf.presets.is_empty() {
+            return Err("No samples or presets found".to_string());
+        }
+        
+        Ok(())
+    }
+    
+    /// Compare two samples for equality (with tolerance for floating point)
+    pub fn samples_equal(a: &[i16], b: &[i16], tolerance: i16) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        
+        a.iter().zip(b.iter()).all(|(x, y)| {
+            (x - y).abs() <= tolerance
+        })
+    }
+}
+
+#[cfg(test)]
+mod soundfont_test_framework {
+    use super::*;
+    
+    #[test]
+    fn test_framework_setup() {
+        // Verify test utilities compile
+        let minimal_sf2 = utils::create_minimal_sf2();
+        assert!(minimal_sf2.len() > 20, "Minimal SF2 should have header");
+        assert_eq!(&minimal_sf2[0..4], b"RIFF");
+        assert_eq!(&minimal_sf2[8..12], b"sfbk");
+    }
+}
