@@ -15,3 +15,4 @@ pub mod multi_soundfont_tests; // Phase 10B.7 - Multi-SoundFont testing with dif
 pub mod multi_zone_layering_tests; // Phase 10B.9 - EMU8000 multi-zone sample selection
 pub mod velocity_crossfading_tests; // Phase 10B.10 - Velocity crossfading between overlapping layers
 pub mod round_robin_tests; // Phase 10B.11 - Round-robin and multi-sample zone selection
+pub mod performance_baseline_tests; // Phase 10B.8 - Sample-based synthesis vs sine wave baseline performance
