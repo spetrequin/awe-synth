@@ -919,4 +919,32 @@ impl VoiceManager {
         
         processing_count
     }
+    
+    /// Get the number of active voices (multi-zone, sample, and legacy combined)
+    pub fn get_active_voice_count(&self) -> usize {
+        let mut active_count = 0;
+        
+        // Count active multi-zone voices
+        for voice in self.multi_zone_voices.iter() {
+            if voice.is_active {
+                active_count += 1;
+            }
+        }
+        
+        // Count active sample voices
+        for voice in self.sample_voices.iter() {
+            if voice.is_active {
+                active_count += 1;
+            }
+        }
+        
+        // Count active legacy voices
+        for voice in self.voices.iter() {
+            if voice.is_active {
+                active_count += 1;
+            }
+        }
+        
+        active_count
+    }
 }
