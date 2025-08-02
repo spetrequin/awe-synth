@@ -6,7 +6,7 @@
 // Test modules for different aspects of SoundFont functionality
 pub mod parser_tests;
 pub mod sample_tests;
-// pub mod preset_tests;      // Task 9B.4
+pub mod preset_tests;
 // pub mod generator_tests;   // Future enhancement
 // pub mod integration_tests; // Task 9B.5
 // pub mod performance_tests; // Task 9B.6
