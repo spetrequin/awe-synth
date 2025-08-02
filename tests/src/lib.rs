@@ -10,6 +10,7 @@ pub mod timing;
 pub mod stress;
 pub mod mocks;
 pub mod utils;
+pub mod effects; // Phase 11B - EMU8000 effects testing
 pub mod envelope;
 pub mod audio;
 pub mod soundfont;
