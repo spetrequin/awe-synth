@@ -209,33 +209,136 @@ Phase 9A SoundFont 2.0 Implementation has been **successfully completed**. Compl
 **10B.10** **[COMPLETED]** ✅ Add velocity crossfading between overlapping sample layers
 **10B.11** **[COMPLETED]** ✅ Test round-robin and multi-sample zone selection algorithms
 
-### **Phase 11: Low-Pass Filter (EMU8000 Core Feature)**
-**11A** **[PENDING]** 🔧 Implement low-pass filter (EMU8000 style)
-**11B** **[PENDING]** 🔄 Test filter frequency response and EMU8000 compliance
+### **Phase 11A: Low-Pass Filter Implementation** (8 micro-tasks)
+**11A.1** **[PENDING]** Create src/effects/filter.rs - EMU8000 2-pole low-pass filter struct (20 lines)
+**11A.2** **[PENDING]** Implement LowPassFilter::new() with cutoff frequency and resonance parameters (15 lines)
+**11A.3** **[PENDING]** Add LowPassFilter::process() method with 2-pole filtering algorithm (25 lines)
+**11A.4** **[PENDING]** Add cutoff frequency range validation (100Hz-8kHz EMU8000 limits) (10 lines)
+**11A.5** **[PENDING]** Implement resonance control (0-40dB peak at cutoff frequency) (15 lines)
+**11A.6** **[PENDING]** Add filter coefficient calculation for real-time cutoff changes (20 lines)
+**11A.7** **[PENDING]** Update Voice struct to include low_pass_filter field (5 lines)
+**11A.8** **[PENDING]** Integrate filter into Voice::generate_sample() audio pipeline (10 lines)
 
-## 🚀 Phase 12-14: UI Integration and Final Features
+### **Phase 11B: Low-Pass Filter Testing** (7 micro-tasks)
+**11B.1** **[PENDING]** Create tests/src/effects/mod.rs - effects testing module structure (10 lines)
+**11B.2** **[PENDING]** Create tests/src/effects/filter_tests.rs - comprehensive filter testing (30 lines)
+**11B.3** **[PENDING]** Test filter frequency response across EMU8000 range (100Hz-8kHz) (25 lines)
+**11B.4** **[PENDING]** Test resonance response and peak gain validation (0-40dB) (20 lines)
+**11B.5** **[PENDING]** Test real-time cutoff frequency changes without artifacts (25 lines)
+**11B.6** **[PENDING]** Test filter integration with voice synthesis pipeline (20 lines)
+**11B.7** **[PENDING]** Create filter performance benchmark for 32-voice processing (15 lines)
 
-### **Phase 12: UI and Complete Integration**
-**12.1** **[PENDING]** Create web/src/ui-controls.ts for play/pause/stop interface  
-**12.2** **[PENDING]** Update index.html to load TypeScript modules and MIDI interface  
-**12.3** **[PENDING]** Build and test MIDI input→WASM→audio output pipeline  
+### **Phase 12A: Modulation Envelope Implementation** (8 micro-tasks)
+**12A.1** **[PENDING]** Create src/synth/mod_envelope.rs - 6-stage modulation envelope (25 lines)
+**12A.2** **[PENDING]** Implement ModulationEnvelope::new() with SoundFont generators 26-32 (20 lines)
+**12A.3** **[PENDING]** Add ModulationEnvelope::process() with exponential curves (20 lines)
+**12A.4** **[PENDING]** Add key scaling for modulation envelope timing (generators 31-32) (15 lines)
+**12A.5** **[PENDING]** Update Voice struct to include modulation_envelope field (5 lines)
+**12A.6** **[PENDING]** Add modulation envelope trigger/release methods (10 lines)
+**12A.7** **[PENDING]** Integrate modulation envelope with Voice lifecycle (10 lines)
+**12A.8** **[PENDING]** Add modulation envelope output for filter/pitch control (10 lines)
 
-### **Phase 13: Comprehensive Testing**
-**13.1** **[PENDING]** Test virtual keyboard: 88 keys + GM instruments + CC controls  
-**13.2** **[PENDING]** Test MIDI file loading: multi-track, tempo changes, complex timing  
-**13.3** **[PENDING]** 🔄 INTEGRATION CHECK: Verify MIDI file events affect synthesis parameters  
-**13.4** **[PENDING]** Test with real MIDI hardware device and verify sample-accurate timing
+### **Phase 12B: Modulation Envelope Testing** (6 micro-tasks)
+**12B.1** **[PENDING]** Create tests/src/envelope/mod_envelope_tests.rs - modulation envelope testing (30 lines)
+**12B.2** **[PENDING]** Test modulation envelope state transitions and timing (25 lines)
+**12B.3** **[PENDING]** Test key scaling effects on modulation envelope timing (20 lines)
+**12B.4** **[PENDING]** Test modulation envelope integration with voice synthesis (20 lines)
+**12B.5** **[PENDING]** Test modulation envelope SoundFont generator compliance (25 lines) 
+**12B.6** **[PENDING]** Create modulation envelope performance benchmarks (15 lines)
 
-### **Phase 14: Hardware MIDI Support** (Lower Priority)
-**14.1** **[PENDING]** Create web/src/midi-input.ts - WebMIDI device discovery and connection  
-**14.2** **[PENDING]** Implement MIDI message parsing and validation in midi-input.ts  
-**14.3** **[PENDING]** Implement MIDI device state management (connect/disconnect)  
+### **Phase 13A: Dual LFO System Implementation** (10 micro-tasks)
+**13A.1** **[PENDING]** Create src/effects/lfo.rs - LFO structure with triangle waveform (20 lines)
+**13A.2** **[PENDING]** Implement LFO::new() with frequency and delay parameters (15 lines)
+**13A.3** **[PENDING]** Add LFO::process() method with triangle wave generation (20 lines)
+**13A.4** **[PENDING]** Add LFO frequency range validation (0.1Hz-20Hz EMU8000 limits) (10 lines)
+**13A.5** **[PENDING]** Implement LFO delay timing before modulation starts (15 lines)
+**13A.6** **[PENDING]** Create LFO1 for tremolo (volume) and filter cutoff modulation (15 lines)
+**13A.7** **[PENDING]** Create LFO2 for vibrato (pitch) modulation only (15 lines)
+**13A.8** **[PENDING]** Update Voice struct to include lfo1 and lfo2 fields (5 lines)
+**13A.9** **[PENDING]** Add LFO parameter conversion from SoundFont generators (20 lines)
+**13A.10** **[PENDING]** Integrate LFOs with Voice synthesis pipeline (15 lines)
+
+### **Phase 13B: Dual LFO System Testing** (7 micro-tasks)
+**13B.1** **[PENDING]** Create tests/src/effects/lfo_tests.rs - comprehensive LFO testing (30 lines)
+**13B.2** **[PENDING]** Test LFO frequency range and triangle waveform accuracy (25 lines)
+**13B.3** **[PENDING]** Test LFO delay timing and modulation start behavior (20 lines)
+**13B.4** **[PENDING]** Test LFO1 tremolo and filter cutoff modulation effects (25 lines)
+**13B.5** **[PENDING]** Test LFO2 vibrato pitch modulation effects (20 lines)
+**13B.6** **[PENDING]** Test dual LFO system integration with voice synthesis (25 lines)
+**13B.7** **[PENDING]** Create LFO performance benchmarks for 32-voice processing (15 lines)
+
+### **Phase 14A: Filter Modulation Routing** (6 micro-tasks)
+**14A.1** **[PENDING]** Create src/effects/modulation.rs - modulation routing system (25 lines)
+**14A.2** **[PENDING]** Implement filter cutoff modulation from LFO1 + ModEnv (20 lines)
+**14A.3** **[PENDING]** Add velocity-to-filter modulation routing (15 lines)
+**14A.4** **[PENDING]** Add SoundFont generator support for filter modulation depth (15 lines)
+**14A.5** **[PENDING]** Integrate modulation routing with Voice filter processing (15 lines)
+**14A.6** **[PENDING]** Test real-time filter modulation without audio artifacts (20 lines)
+
+### **Phase 14B: Pitch Modulation Routing** (6 micro-tasks)
+**14B.1** **[PENDING]** Implement pitch modulation from LFO2 + ModEnv routing (20 lines)
+**14B.2** **[PENDING]** Add pitch bend integration with modulation system (15 lines)
+**14B.3** **[PENDING]** Add SoundFont generator support for pitch modulation depth (15 lines)
+**14B.4** **[PENDING]** Integrate pitch modulation with sample playback rate (15 lines)
+**14B.5** **[PENDING]** Test vibrato and pitch envelope effects on synthesis (20 lines)
+**14B.6** **[PENDING]** Create comprehensive pitch modulation performance tests (20 lines)
+
+## 🌊 Phase 15-16: Global Effects and Final Integration
+
+### **Phase 15A: Global Reverb Implementation** (8 micro-tasks)
+**15A.1** **[PENDING]** Create src/effects/reverb.rs - multi-tap delay reverb algorithm (30 lines)
+**15A.2** **[PENDING]** Implement Reverb::new() with room size and decay parameters (20 lines)
+**15A.3** **[PENDING]** Add reverb delay line allocation and management (25 lines)
+**15A.4** **[PENDING]** Implement multi-tap delay with feedback and diffusion (30 lines)
+**15A.5** **[PENDING]** Add reverb parameter control from SoundFont generators (15 lines)
+**15A.6** **[PENDING]** Create global reverb processor for voice mixing (20 lines)
+**15A.7** **[PENDING]** Add reverb send level control per voice (15 lines)
+**15A.8** **[PENDING]** Integrate reverb with VoiceManager output processing (15 lines)
+
+### **Phase 15B: Global Chorus Implementation** (8 micro-tasks)
+**15B.1** **[PENDING]** Create src/effects/chorus.rs - pitch-modulated delay chorus (30 lines)
+**15B.2** **[PENDING]** Implement Chorus::new() with rate, depth, and feedback parameters (20 lines)
+**15B.3** **[PENDING]** Add chorus delay line with pitch modulation LFO (25 lines)
+**15B.4** **[PENDING]** Implement chorus feedback and wet/dry mixing (20 lines)
+**15B.5** **[PENDING]** Add chorus parameter control from SoundFont generators (15 lines)
+**15B.6** **[PENDING]** Create global chorus processor for voice mixing (20 lines)
+**15B.7** **[PENDING]** Add chorus send level control per voice (15 lines)
+**15B.8** **[PENDING]** Integrate chorus with VoiceManager output processing (15 lines)
+
+### **Phase 16: Global Effects Testing** (8 micro-tasks)
+**16.1** **[PENDING]** Create tests/src/effects/reverb_tests.rs - comprehensive reverb testing (30 lines)
+**16.2** **[PENDING]** Create tests/src/effects/chorus_tests.rs - comprehensive chorus testing (30 lines)
+**16.3** **[PENDING]** Test reverb algorithm accuracy and room size effects (25 lines)
+**16.4** **[PENDING]** Test chorus pitch modulation and delay effects (25 lines)
+**16.5** **[PENDING]** Test global effects integration with 32-voice processing (25 lines)
+**16.6** **[PENDING]** Test effects send level control and wet/dry mixing (20 lines)
+**16.7** **[PENDING]** Create global effects performance benchmarks (20 lines)
+**16.8** **[PENDING]** Test complete EMU8000 effects pipeline integration (25 lines)
+
+## 🚀 Phase 17-19: UI Integration and Final Features
+
+### **Phase 17: UI and Complete Integration**
+**17.1** **[PENDING]** Create web/src/ui-controls.ts for play/pause/stop interface  
+**17.2** **[PENDING]** Update index.html to load TypeScript modules and MIDI interface  
+**17.3** **[PENDING]** Build and test MIDI input→WASM→audio output pipeline  
+
+### **Phase 18: Comprehensive Testing**
+**18.1** **[PENDING]** Test virtual keyboard: 88 keys + GM instruments + CC controls  
+**18.2** **[PENDING]** Test MIDI file loading: multi-track, tempo changes, complex timing  
+**18.3** **[PENDING]** 🔄 INTEGRATION CHECK: Verify MIDI file events affect synthesis parameters  
+**18.4** **[PENDING]** Test with real MIDI hardware device and verify sample-accurate timing
+
+### **Phase 19: Hardware MIDI Support** (Lower Priority)
+**19.1** **[PENDING]** Create web/src/midi-input.ts - WebMIDI device discovery and connection  
+**19.2** **[PENDING]** Implement MIDI message parsing and validation in midi-input.ts  
+**19.3** **[PENDING]** Implement MIDI device state management (connect/disconnect)  
 
 ## 🔢 **Easy Reference System**
-**Current Phase**: Phase 10B Sample-Based Synthesis Testing 🔄 **CURRENT**  
-**Progress**: Phase 8C, 9A, 9B Complete + Phase 10B Significant Progress (5/11 tasks complete)  
-**Commands**: Just specify the phase (e.g., "10A.1", "10A.2", "10B.3", "11A.1")  
-**Next Task**: 10B.3 - Verify sample loop point accuracy and seamless looping behavior
+**Current Phase**: Phase 10B Sample-Based Synthesis Testing ✅ **COMPLETE**  
+**Next Phase**: Phase 11A Low-Pass Filter Implementation 🔄 **READY**  
+**Progress**: Phase 8C, 9A, 9B, 10B Complete (85+ tasks)  
+**Commands**: Just specify the phase (e.g., "11A.1", "11A.2", "11B.1", "12A.1")  
+**Next Task**: 11A.1 - Create src/effects/filter.rs - EMU8000 2-pole low-pass filter struct
 
 **New Strategy**: Alternating Implementation + Testing (see DEVELOPMENT_SEQUENCE.md)
 

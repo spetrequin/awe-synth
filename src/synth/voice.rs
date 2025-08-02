@@ -2,6 +2,7 @@ use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
 use crate::synth::oscillator::{Oscillator, midi_note_to_frequency};
 use crate::synth::sample_player::{SamplePlayer, InterpolationMethod};
 use crate::soundfont::types::SoundFontSample;
+use crate::effects::filter::LowPassFilter;
 use crate::log;
 
 #[derive(Debug, Clone)]
@@ -20,6 +21,9 @@ pub struct Voice {
     pub sample_position: f64,     // Current position in sample data
     pub sample_rate_ratio: f64,   // Ratio for sample rate conversion
     pub is_soundfont_voice: bool, // True if playing SoundFont sample, false for sine wave
+    
+    // EMU8000 per-voice effects
+    pub low_pass_filter: LowPassFilter, // 2-pole resonant filter (100Hz-8kHz)
 }
 
 impl Voice {
@@ -48,6 +52,8 @@ impl Voice {
             sample_position: 0.0,
             sample_rate_ratio: 1.0,
             is_soundfont_voice: false,
+            // Initialize filter with EMU8000 default parameters
+            low_pass_filter: LowPassFilter::new(44100.0, 8000.0, 0.7), // Wide open, minimal resonance
         }
     }
     
@@ -145,11 +151,14 @@ impl Voice {
             self.oscillator.generate_sample(sample_rate)
         };
         
+        // Apply low-pass filter to audio output (EMU8000 per-voice filtering)
+        let filtered_output = self.low_pass_filter.process(audio_output);
+        
         // Get envelope amplitude (also processes envelope state)
         let envelope_amplitude = self.get_envelope_amplitude();
         
-        // Combine audio with envelope modulation
-        audio_output * envelope_amplitude
+        // Combine filtered audio with envelope modulation
+        filtered_output * envelope_amplitude
     }
     
     /// Generate sample from SoundFont sample data
