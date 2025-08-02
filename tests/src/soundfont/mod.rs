@@ -19,6 +19,15 @@ pub mod test_data {
     /// Path to test SoundFont files
     pub const TEST_SF2_PATH: &str = "../reference/soundfonts/";
     
+    /// Path to real SoundFont files
+    pub const REAL_SF2_PATH: &str = "../resources/sf2/";
+    
+    /// Creative Technology 2MB GM SoundFont
+    pub const CT2MGM_SF2: &str = "gm/CT2MGM.SF2";
+    
+    /// Creative Technology 8MB GM SoundFont (if available)
+    pub const CT8MGM_SF2: &str = "gm/CT8MGM.SF2";
+    
     /// Small test SF2 file for unit testing
     pub const SMALL_SF2: &str = "test_small.sf2";
     
@@ -41,6 +50,12 @@ pub mod utils {
     /// Load a test SoundFont file
     pub fn load_test_soundfont(filename: &str) -> Result<Vec<u8>, std::io::Error> {
         let path = Path::new(super::test_data::TEST_SF2_PATH).join(filename);
+        fs::read(path)
+    }
+    
+    /// Load a real SoundFont file from resources
+    pub fn load_real_soundfont(filename: &str) -> Result<Vec<u8>, std::io::Error> {
+        let path = Path::new(super::test_data::REAL_SF2_PATH).join(filename);
         fs::read(path)
     }
     

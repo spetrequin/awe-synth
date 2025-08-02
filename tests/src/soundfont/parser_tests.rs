@@ -7,7 +7,7 @@
 /// - Boundary condition testing
 
 use awe_synth::soundfont::{SoundFontParser, SoundFontError};
-use crate::soundfont::utils;
+use crate::soundfont::{utils, test_data};
 
 #[cfg(test)]
 mod parser_unit_tests {
@@ -363,6 +363,137 @@ mod riff_parser_tests {
         assert!(!chunk.has_id(b"FAIL"));
         assert_eq!(chunk.data_size(), 16);
         assert_eq!(chunk.data(), &[1, 2, 3, 4]);
+    }
+}
+
+/// Real SoundFont file tests
+#[cfg(test)]
+mod real_soundfont_tests {
+    use super::*;
+    
+    #[test]
+    fn test_parse_ct2mgm_soundfont() {
+        // Load the real Creative Technology 2MB GM SoundFont
+        let data = utils::load_real_soundfont(test_data::CT2MGM_SF2);
+        assert!(data.is_ok(), "Failed to load CT2MGM.SF2: {:?}", data.err());
+        
+        let sf2_data = data.unwrap();
+        assert!(sf2_data.len() > 1_000_000, "CT2MGM.SF2 should be > 1MB");
+        
+        // Parse the real SoundFont
+        let result = SoundFontParser::parse_soundfont(&sf2_data);
+        assert!(result.is_ok(), "Failed to parse CT2MGM.SF2: {:?}", result.err());
+        
+        let sf = result.unwrap();
+        
+        // Validate header information
+        assert!(!sf.header.name.is_empty(), "SoundFont should have a name");
+        assert_eq!(sf.header.version.major, 2, "Should be SoundFont 2.x");
+        
+        // GM SoundFont should have at least 128 presets
+        assert!(sf.presets.len() >= 128, "GM SoundFont should have at least 128 presets");
+        
+        // Should have instruments and samples
+        assert!(!sf.instruments.is_empty(), "Should have instruments");
+        assert!(!sf.samples.is_empty(), "Should have samples");
+        
+        println!("CT2MGM.SF2 parsed successfully:");
+        println!("  Name: {}", sf.header.name);
+        println!("  Version: {}.{}", sf.header.version.major, sf.header.version.minor);
+        println!("  Presets: {}", sf.presets.len());
+        println!("  Instruments: {}", sf.instruments.len());
+        println!("  Samples: {}", sf.samples.len());
+    }
+    
+    #[test]
+    fn test_ct2mgm_preset_programs() {
+        // Load and parse the SoundFont
+        let data = utils::load_real_soundfont(test_data::CT2MGM_SF2).unwrap();
+        let sf = SoundFontParser::parse_soundfont(&data).unwrap();
+        
+        // Check for standard GM preset programs (0-127)
+        let mut found_programs = std::collections::HashSet::new();
+        
+        for preset in &sf.presets {
+            if preset.bank == 0 {  // GM bank
+                found_programs.insert(preset.program);
+            }
+        }
+        
+        // GM should have programs 0-127
+        for program in 0..128 {
+            assert!(
+                found_programs.contains(&program),
+                "Missing GM program {} in bank 0", 
+                program
+            );
+        }
+    }
+    
+    #[test]
+    fn test_ct2mgm_sample_data() {
+        // Load and parse the SoundFont
+        let data = utils::load_real_soundfont(test_data::CT2MGM_SF2).unwrap();
+        let sf = SoundFontParser::parse_soundfont(&data).unwrap();
+        
+        // Verify sample data
+        for sample in &sf.samples {
+            // Check sample properties
+            assert!(sample.sample_rate > 0, "Sample {} should have valid sample rate", sample.name);
+            assert!(sample.end_offset > sample.start_offset, "Sample {} should have valid offsets", sample.name);
+            
+            // If it has a loop, verify loop points
+            if sample.loop_end > sample.loop_start {
+                assert!(sample.loop_start >= sample.start_offset, "Loop start should be after sample start");
+                assert!(sample.loop_end <= sample.end_offset, "Loop end should be before sample end");
+            }
+            
+            // Verify pitch information
+            assert!(sample.original_pitch <= 127, "Original pitch should be valid MIDI note");
+            assert!(sample.pitch_correction >= -50 && sample.pitch_correction <= 50, 
+                    "Pitch correction should be in valid range");
+        }
+    }
+    
+    #[test]
+    fn test_ct2mgm_riff_structure() {
+        // Load the SoundFont
+        let data = utils::load_real_soundfont(test_data::CT2MGM_SF2).unwrap();
+        
+        // Verify RIFF structure manually
+        assert_eq!(&data[0..4], b"RIFF", "Should start with RIFF");
+        assert_eq!(&data[8..12], b"sfbk", "Should be sfbk format");
+        
+        // Parse RIFF chunks
+        let riff = awe_synth::soundfont::riff_parser::RiffParser::parse_soundfont_riff(&data).unwrap();
+        
+        // Should have the three main LIST chunks
+        let list_chunks: Vec<_> = riff.chunks.iter()
+            .filter(|c| c.has_id(b"LIST"))
+            .collect();
+        
+        assert!(list_chunks.len() >= 3, "Should have at least 3 LIST chunks (INFO, sdta, pdta)");
+        
+        // Verify LIST types
+        let mut has_info = false;
+        let mut has_sdta = false;
+        let mut has_pdta = false;
+        
+        for chunk in &list_chunks {
+            if chunk.data.len() >= 4 {
+                let list_type = &chunk.data[0..4];
+                match list_type {
+                    b"INFO" => has_info = true,
+                    b"sdta" => has_sdta = true,
+                    b"pdta" => has_pdta = true,
+                    _ => {}
+                }
+            }
+        }
+        
+        assert!(has_info, "Should have INFO list");
+        assert!(has_sdta, "Should have sdta list");
+        assert!(has_pdta, "Should have pdta list");
     }
 }
 
