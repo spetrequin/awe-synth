@@ -1,4 +1,5 @@
 use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
+use crate::synth::mod_envelope::ModulationEnvelope;
 use crate::synth::oscillator::{Oscillator, midi_note_to_frequency};
 use crate::synth::sample_player::{SamplePlayer, InterpolationMethod};
 use crate::soundfont::types::SoundFontSample;
@@ -24,6 +25,7 @@ pub struct Voice {
     
     // EMU8000 per-voice effects
     pub low_pass_filter: LowPassFilter, // 2-pole resonant filter (100Hz-8kHz)
+    pub modulation_envelope: ModulationEnvelope, // 6-stage envelope for filter/pitch modulation
 }
 
 impl Voice {
@@ -54,6 +56,17 @@ impl Voice {
             is_soundfont_voice: false,
             // Initialize filter with EMU8000 default parameters
             low_pass_filter: LowPassFilter::new(44100.0, 8000.0, 0.7), // Wide open, minimal resonance
+            // Initialize modulation envelope with default parameters
+            modulation_envelope: ModulationEnvelope::new(
+                44100.0,     // sample_rate
+                -7200,       // attack_timecents (~16ms)
+                -12000,      // hold_timecents (1ms)
+                -2400,       // decay_timecents (~250ms)
+                0,           // sustain_level (0%)
+                -7200,       // release_timecents (~16ms)
+                0,           // keynum_to_hold (no key scaling)
+                0,           // keynum_to_decay (no key scaling)
+            ),
         }
     }
     
@@ -70,6 +83,9 @@ impl Voice {
         
         // Trigger volume envelope for note-on event
         self.volume_envelope.trigger();
+        
+        // Trigger modulation envelope for note-on event
+        self.modulation_envelope.trigger(note);
         
         // Log synthesis mode based on available sample data
         if self.soundfont_sample.is_some() {
@@ -108,6 +124,9 @@ impl Voice {
         // Trigger volume envelope
         self.volume_envelope.trigger();
         
+        // Trigger modulation envelope
+        self.modulation_envelope.trigger(note);
+        
         log(&format!("SoundFont voice started: Note {} Vel {} -> Sample '{}' @{:.2}Hz (ratio: {:.3})", 
                    note, velocity, sample.name, target_frequency, self.sample_rate_ratio));
     }
@@ -115,6 +134,10 @@ impl Voice {
     pub fn stop_note(&mut self) {
         // Trigger envelope release phase for note-off event
         self.volume_envelope.release();
+        
+        // Trigger modulation envelope release
+        self.modulation_envelope.release();
+        
         // Mark voice as inactive for voice allocation, but still processing during release
         self.is_active = false;
         // Keep is_processing = true until envelope reaches Off state
@@ -151,6 +174,9 @@ impl Voice {
             self.oscillator.generate_sample(sample_rate)
         };
         
+        // Process modulation envelope (also updates envelope state)
+        let modulation_level = self.modulation_envelope.process();
+        
         // Apply low-pass filter to audio output (EMU8000 per-voice filtering)
         let filtered_output = self.low_pass_filter.process(audio_output);
         
@@ -159,6 +185,16 @@ impl Voice {
         
         // Combine filtered audio with envelope modulation
         filtered_output * envelope_amplitude
+    }
+    
+    /// Get modulation envelope output for filter/pitch control
+    pub fn get_modulation_level(&self) -> f32 {
+        self.modulation_envelope.get_level()
+    }
+    
+    /// Check if voice has active modulation
+    pub fn has_active_modulation(&self) -> bool {
+        self.modulation_envelope.is_active()
     }
     
     /// Generate sample from SoundFont sample data
