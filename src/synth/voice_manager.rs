@@ -3,6 +3,44 @@ use crate::soundfont::types::*;
 use crate::log;
 use std::collections::HashMap;
 
+/// Zone selection strategies for multi-sample instruments
+#[derive(Debug, Clone, PartialEq)]
+pub enum ZoneSelectionStrategy {
+    /// Select all matching zones (default EMU8000 behavior)
+    AllMatching,
+    /// Round-robin through matching zones for variation
+    RoundRobin,
+    /// Select first matching zone only (simple behavior)
+    FirstMatch,
+    /// Random selection from matching zones
+    Random,
+    /// Priority-based selection (prefer certain zones)
+    Priority,
+}
+
+/// Analysis information for zone selection debugging
+#[derive(Debug, Clone)]
+pub struct ZoneSelectionAnalysis {
+    pub note: u8,
+    pub velocity: u8,
+    pub total_matching_zones: usize,
+    pub selected_zones: usize,
+    pub strategy: ZoneSelectionStrategy,
+    pub round_robin_enabled: bool,
+    pub zone_details: Vec<ZoneDetail>,
+}
+
+/// Details about a specific zone for analysis
+#[derive(Debug, Clone)]
+pub struct ZoneDetail {
+    pub sample_name: String,
+    pub preset_name: String,
+    pub instrument_name: String,
+    pub weight: f32,
+    pub original_pitch: u8,
+    pub sample_rate: u32,
+}
+
 pub struct VoiceManager {
     voices: [Voice; 32],              // Legacy oscillator-based voices (fallback)
     sample_voices: [SampleVoice; 32], // Modern sample-based voices 
@@ -15,6 +53,10 @@ pub struct VoiceManager {
     // Voice allocation strategy
     prefer_sample_voices: bool,       // True = use SampleVoice first, False = use Voice first
     enable_multi_zone: bool,          // True = use MultiZoneSampleVoice for layering
+    // Round-robin and advanced zone selection
+    round_robin_counters: HashMap<String, usize>, // Per-instrument round-robin state
+    enable_round_robin: bool,         // True = use round-robin sample selection
+    zone_selection_strategy: ZoneSelectionStrategy, // Algorithm for multi-sample zones
 }
 
 impl VoiceManager {
@@ -29,6 +71,9 @@ impl VoiceManager {
             current_preset: None,
             prefer_sample_voices: true, // Default to modern sample-based synthesis
             enable_multi_zone: true,    // Default to EMU8000 multi-zone layering
+            round_robin_counters: HashMap::new(), // Initialize round-robin state
+            enable_round_robin: false,  // Default to all matching zones (EMU8000 authentic)
+            zone_selection_strategy: ZoneSelectionStrategy::AllMatching, // Default EMU8000 behavior
         }
     }
     
@@ -93,6 +138,46 @@ impl VoiceManager {
     /// Check if multi-zone layering is enabled
     pub fn is_multi_zone_enabled(&self) -> bool {
         self.enable_multi_zone
+    }
+    
+    /// Enable round-robin sample selection for variation
+    pub fn enable_round_robin(&mut self) {
+        self.enable_round_robin = true;
+        self.zone_selection_strategy = ZoneSelectionStrategy::RoundRobin;
+        log("VoiceManager: Round-robin sample selection enabled");
+    }
+    
+    /// Disable round-robin (use all matching zones)
+    pub fn disable_round_robin(&mut self) {
+        self.enable_round_robin = false;
+        self.zone_selection_strategy = ZoneSelectionStrategy::AllMatching;
+        log("VoiceManager: Round-robin disabled, using all matching zones");
+    }
+    
+    /// Check if round-robin is enabled
+    pub fn is_round_robin_enabled(&self) -> bool {
+        self.enable_round_robin
+    }
+    
+    /// Set zone selection strategy
+    pub fn set_zone_selection_strategy(&mut self, strategy: ZoneSelectionStrategy) {
+        // Update round-robin flag for consistency
+        self.enable_round_robin = matches!(strategy, ZoneSelectionStrategy::RoundRobin);
+        
+        log(&format!("VoiceManager: Zone selection strategy set to {:?}", strategy));
+        
+        self.zone_selection_strategy = strategy;
+    }
+    
+    /// Get current zone selection strategy
+    pub fn get_zone_selection_strategy(&self) -> &ZoneSelectionStrategy {
+        &self.zone_selection_strategy
+    }
+    
+    /// Reset round-robin counters (useful for testing)
+    pub fn reset_round_robin_counters(&mut self) {
+        self.round_robin_counters.clear();
+        log("VoiceManager: Round-robin counters reset");
     }
     
     /// Select preset by bank and program number
@@ -210,7 +295,7 @@ impl VoiceManager {
     /// 
     /// Returns Vec of (sample, weight, preset_name, instrument_name) tuples
     /// where weight indicates the layer contribution (0.0-1.0)
-    pub fn select_multi_zone_samples(&self, note: u8, velocity: u8, bank: Option<u16>, program: Option<u8>) 
+    pub fn select_multi_zone_samples(&mut self, note: u8, velocity: u8, bank: Option<u16>, program: Option<u8>) 
         -> Vec<(&SoundFontSample, f32, String, String)> {
         
         let mut matching_samples = Vec::new();
@@ -294,7 +379,100 @@ impl VoiceManager {
             }
         }
         
-        matching_samples
+        // Apply zone selection strategy
+        let strategy = self.zone_selection_strategy.clone();
+        VoiceManager::apply_zone_selection_strategy_static(&mut self.round_robin_counters, matching_samples, note, velocity, strategy)
+    }
+    
+    /// Apply zone selection strategy to matching samples (static version)
+    fn apply_zone_selection_strategy_static<'a>(round_robin_counters: &mut HashMap<String, usize>, 
+                                               mut matching_samples: Vec<(&'a SoundFontSample, f32, String, String)>, 
+                                               note: u8, velocity: u8, strategy: ZoneSelectionStrategy) -> Vec<(&'a SoundFontSample, f32, String, String)> {
+        
+        if matching_samples.is_empty() {
+            return matching_samples;
+        }
+        
+        match &strategy {
+            ZoneSelectionStrategy::AllMatching => {
+                // Default EMU8000 behavior - return all matching zones with crossfading
+                matching_samples
+            },
+            
+            ZoneSelectionStrategy::FirstMatch => {
+                // Simple behavior - return only the first matching zone
+                if !matching_samples.is_empty() {
+                    let mut first_sample = matching_samples[0].clone();
+                    first_sample.1 = 1.0; // Full weight to first sample
+                    vec![first_sample]
+                } else {
+                    matching_samples
+                }
+            },
+            
+            ZoneSelectionStrategy::RoundRobin => {
+                // Round-robin selection for variation
+                VoiceManager::apply_round_robin_selection_static(round_robin_counters, matching_samples, note, velocity)
+            },
+            
+            ZoneSelectionStrategy::Random => {
+                // Random selection from matching zones
+                if matching_samples.len() > 1 {
+                    // Simple pseudo-random selection based on note and velocity
+                    let index = ((note as usize + velocity as usize) * 7) % matching_samples.len();
+                    let mut selected_sample = matching_samples[index].clone();
+                    selected_sample.1 = 1.0; // Full weight to selected sample
+                    vec![selected_sample]
+                } else {
+                    matching_samples
+                }
+            },
+            
+            ZoneSelectionStrategy::Priority => {
+                // Priority-based selection (prefer samples with higher original pitch)
+                matching_samples.sort_by(|a, b| b.0.original_pitch.cmp(&a.0.original_pitch));
+                if !matching_samples.is_empty() {
+                    let mut priority_sample = matching_samples[0].clone();
+                    priority_sample.1 = 1.0; // Full weight to highest priority sample
+                    vec![priority_sample]
+                } else {
+                    matching_samples
+                }
+            },
+        }
+    }
+    
+    /// Apply round-robin selection to matching samples (static version)
+    fn apply_round_robin_selection_static<'a>(round_robin_counters: &mut HashMap<String, usize>,
+                                             matching_samples: Vec<(&'a SoundFontSample, f32, String, String)>, 
+                                             note: u8, _velocity: u8) -> Vec<(&'a SoundFontSample, f32, String, String)> {
+        
+        if matching_samples.len() <= 1 {
+            return matching_samples;
+        }
+        
+        // Create unique key for this note/instrument combination
+        let instrument_key = if !matching_samples.is_empty() {
+            format!("{}_{}", matching_samples[0].3, note) // instrument_name + note
+        } else {
+            return matching_samples;
+        };
+        
+        // Get or initialize round-robin counter for this instrument
+        let counter = round_robin_counters.entry(instrument_key.clone()).or_insert(0);
+        
+        // Select sample based on round-robin counter
+        let selected_index = *counter % matching_samples.len();
+        *counter = (*counter + 1) % matching_samples.len(); // Increment for next time
+        
+        // Return selected sample with full weight
+        let mut selected_sample = matching_samples[selected_index].clone();
+        selected_sample.1 = 1.0; // Full weight to selected sample
+        
+        log(&format!("Round-robin selection: Instrument '{}' Note {} -> Sample '{}' (index {}/{})",
+                   selected_sample.3, note, selected_sample.0.name, selected_index, matching_samples.len()));
+        
+        vec![selected_sample]
     }
     
     /// Calculate layer weight for velocity crossfading
@@ -353,8 +531,51 @@ impl VoiceManager {
     /// Get count of matching zones for analysis
     /// 
     /// Useful for debugging multi-zone sample selection
-    pub fn get_zone_count(&self, note: u8, velocity: u8) -> usize {
+    pub fn get_zone_count(&mut self, note: u8, velocity: u8) -> usize {
         self.select_multi_zone_samples(note, velocity, None, None).len()
+    }
+    
+    /// Get zone selection analysis for debugging
+    /// 
+    /// Returns detailed information about zone selection for a given note/velocity
+    pub fn analyze_zone_selection(&mut self, note: u8, velocity: u8) -> ZoneSelectionAnalysis {
+        // Get basic analysis info
+        let current_strategy = self.zone_selection_strategy.clone();
+        let current_round_robin = self.enable_round_robin;
+        
+        // Get selected zones with current strategy
+        let selected_zones = self.select_multi_zone_samples(note, velocity, None, None);
+        let selected_count = selected_zones.len();
+        
+        // For now, use selected zones as the basis for analysis
+        // This avoids the complex borrowing issues while still providing useful info
+        let zone_details: Vec<ZoneDetail> = selected_zones.into_iter().map(|(sample, weight, preset, instrument)| {
+            ZoneDetail {
+                sample_name: sample.name.clone(),
+                preset_name: preset,
+                instrument_name: instrument,
+                weight,
+                original_pitch: sample.original_pitch,
+                sample_rate: sample.sample_rate,
+            }
+        }).collect();
+        
+        ZoneSelectionAnalysis {
+            note,
+            velocity,
+            total_matching_zones: zone_details.len(), // Simplified for now
+            selected_zones: selected_count,
+            strategy: current_strategy,
+            round_robin_enabled: current_round_robin,
+            zone_details,
+        }
+    }
+    
+    /// Get round-robin counter state for debugging
+    pub fn get_round_robin_state(&self) -> Vec<(String, usize)> {
+        self.round_robin_counters.iter()
+            .map(|(key, counter)| (key.clone(), *counter))
+            .collect()
     }
     
     /// Check if SoundFont is loaded
