@@ -123,6 +123,20 @@ impl VoiceManager {
         self.prefer_sample_voices
     }
     
+    /// Select a SoundFont preset by bank and program number
+    pub fn select_preset(&mut self, bank: u16, program: u8) {
+        if let Some(preset_index) = self.preset_map.get(&(bank, program)) {
+            self.current_preset = Some(*preset_index);
+            if let Some(soundfont) = &self.loaded_soundfont {
+                log(&format!("Selected preset: '{}' (Bank {}, Program {})", 
+                           soundfont.presets[*preset_index].name, bank, program));
+            }
+        } else {
+            log(&format!("Warning: Preset not found for Bank {}, Program {} - keeping current preset", 
+                       bank, program));
+        }
+    }
+    
     /// Enable EMU8000 multi-zone sample layering (preferred for authenticity)
     pub fn enable_multi_zone(&mut self) {
         self.enable_multi_zone = true;
@@ -180,19 +194,6 @@ impl VoiceManager {
         log("VoiceManager: Round-robin counters reset");
     }
     
-    /// Select preset by bank and program number
-    pub fn select_preset(&mut self, bank: u16, program: u8) -> Result<(), String> {
-        if let Some(preset_index) = self.preset_map.get(&(bank, program)) {
-            self.current_preset = Some(*preset_index);
-            let preset_name = &self.loaded_soundfont.as_ref().unwrap().presets[*preset_index].name;
-            log(&format!("Preset selected: '{}' (Bank {}, Program {})", preset_name, bank, program));
-            Ok(())
-        } else {
-            let error = format!("Preset not found: Bank {}, Program {}", bank, program);
-            log(&error);
-            Err(error)
-        }
-    }
     
     /// Get current preset information
     pub fn get_current_preset_info(&self) -> Option<String> {
