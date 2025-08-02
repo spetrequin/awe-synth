@@ -509,4 +509,10 @@ impl VelocityRange {
     pub fn contains(&self, velocity: u8) -> bool {
         velocity >= self.low && velocity <= self.high
     }
+    
+    /// Check if this range overlaps with another range
+    pub fn overlaps(&self, other: &VelocityRange) -> bool {
+        // Ranges overlap if one range contains any part of the other
+        self.low <= other.high && self.high >= other.low
+    }
 }
