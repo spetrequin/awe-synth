@@ -1,9 +1,11 @@
 use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
 use crate::synth::mod_envelope::ModulationEnvelope;
+use crate::synth::lfo::{LFO, LfoWaveform};
 use crate::synth::oscillator::{Oscillator, midi_note_to_frequency};
 use crate::synth::sample_player::{SamplePlayer, InterpolationMethod};
 use crate::soundfont::types::SoundFontSample;
 use crate::effects::filter::LowPassFilter;
+use crate::effects::modulation::{ModulationRouter, ModulationSource, ModulationDestination};
 use crate::log;
 
 #[derive(Debug, Clone)]
@@ -26,6 +28,14 @@ pub struct Voice {
     // EMU8000 per-voice effects
     pub low_pass_filter: LowPassFilter, // 2-pole resonant filter (100Hz-8kHz)
     pub modulation_envelope: ModulationEnvelope, // 6-stage envelope for filter/pitch modulation
+    pub lfo1: LFO, // LFO1 for tremolo (amplitude modulation)
+    pub lfo2: LFO, // LFO2 for vibrato (pitch modulation)
+    pub modulation_router: ModulationRouter, // Modulation routing system
+    
+    // EMU8000 send/return effects
+    pub reverb_send_level: f32, // Per-voice reverb send amount (0.0-1.0)
+    pub chorus_send_level: f32, // Per-voice chorus send amount (0.0-1.0)
+    pub midi_channel: u8, // MIDI channel for effects control (0-15)
 }
 
 impl Voice {
@@ -67,6 +77,23 @@ impl Voice {
                 0,           // keynum_to_hold (no key scaling)
                 0,           // keynum_to_decay (no key scaling)
             ),
+            // Initialize LFO1 for tremolo (amplitude modulation)
+            lfo1: LFO::new(44100.0, 3.5, 0.0, LfoWaveform::Sine), // 3.5Hz, no depth initially
+            // Initialize LFO2 for vibrato (pitch modulation)  
+            lfo2: LFO::new(44100.0, 6.1, 0.0, LfoWaveform::Sine), // 6.1Hz, no depth initially
+            // Initialize modulation router with default EMU8000 routing
+            modulation_router: {
+                let mut router = ModulationRouter::new();
+                // Set up default EMU8000 modulation routes
+                router.add_route(ModulationSource::ModulationEnvelope, ModulationDestination::FilterCutoff, 0.5, 2000.0);
+                router.add_route(ModulationSource::Lfo1, ModulationDestination::Amplitude, 0.0, 0.3); // LFO1 tremolo (disabled initially)
+                router.add_route(ModulationSource::Lfo2, ModulationDestination::Pitch, 0.0, 50.0); // LFO2 vibrato (disabled initially)
+                router
+            },
+            // Initialize send/return effects
+            reverb_send_level: 0.2, // Default 20% reverb send
+            chorus_send_level: 0.1, // Default 10% chorus send
+            midi_channel: 0, // Default to channel 0
         }
     }
     
@@ -78,7 +105,8 @@ impl Voice {
         self.is_processing = true;
         
         // Set oscillator frequency from MIDI note number (fallback mode)
-        self.oscillator.frequency = midi_note_to_frequency(note);
+        let base_frequency = midi_note_to_frequency(note);
+        self.oscillator.frequency = base_frequency;
         self.oscillator.phase = 0.0; // Reset phase for clean note start
         
         // Trigger volume envelope for note-on event
@@ -86,6 +114,10 @@ impl Voice {
         
         // Trigger modulation envelope for note-on event
         self.modulation_envelope.trigger(note);
+        
+        // Trigger LFOs for note-on synchronization
+        self.lfo1.trigger();
+        self.lfo2.trigger();
         
         // Log synthesis mode based on available sample data
         if self.soundfont_sample.is_some() {
@@ -126,6 +158,10 @@ impl Voice {
         
         // Trigger modulation envelope
         self.modulation_envelope.trigger(note);
+        
+        // Trigger LFOs for note-on synchronization
+        self.lfo1.trigger();
+        self.lfo2.trigger();
         
         log(&format!("SoundFont voice started: Note {} Vel {} -> Sample '{}' @{:.2}Hz (ratio: {:.3})", 
                    note, velocity, sample.name, target_frequency, self.sample_rate_ratio));
@@ -174,8 +210,41 @@ impl Voice {
             self.oscillator.generate_sample(sample_rate)
         };
         
-        // Process modulation envelope (also updates envelope state)
+        // Process modulation sources and update modulation router
         let modulation_level = self.modulation_envelope.process();
+        let tremolo_level = self.lfo1.process(); // LFO1 for amplitude modulation
+        let vibrato_level = self.lfo2.process(); // LFO2 for pitch modulation
+        
+        // Update modulation router with current source values
+        self.modulation_router.set_source_value(ModulationSource::ModulationEnvelope, modulation_level);
+        self.modulation_router.set_source_value(ModulationSource::Lfo1, tremolo_level);
+        self.modulation_router.set_source_value(ModulationSource::Lfo2, vibrato_level);
+        
+        // Apply modulated filter cutoff frequency
+        let base_cutoff = self.low_pass_filter.cutoff_hz;
+        let modulated_cutoff = self.modulation_router.get_modulated_value(ModulationDestination::FilterCutoff, base_cutoff);
+        if (modulated_cutoff - base_cutoff).abs() > 10.0 { // Only update if significant change
+            self.low_pass_filter.set_cutoff(modulated_cutoff);
+        }
+        
+        // Apply LFO2 vibrato modulation to pitch (affects sample rate ratio)
+        let base_pitch = 0.0; // Base pitch in cents
+        let modulated_pitch = self.modulation_router.get_modulated_value(ModulationDestination::Pitch, base_pitch);
+        
+        // Convert pitch modulation in cents to frequency ratio
+        if modulated_pitch.abs() > 1.0 { // Only apply if significant modulation
+            let pitch_ratio = (2.0_f32).powf(modulated_pitch / 1200.0); // Cents to frequency ratio
+            
+            // Update sample rate ratio for SoundFont samples
+            if self.is_soundfont_voice {
+                let original_ratio = self.sample_rate_ratio;
+                self.sample_rate_ratio = original_ratio * pitch_ratio as f64;
+            } else {
+                // Update oscillator frequency for fallback synthesis
+                let original_freq = midi_note_to_frequency(self.note);
+                self.oscillator.frequency = original_freq * pitch_ratio;
+            }
+        }
         
         // Apply low-pass filter to audio output (EMU8000 per-voice filtering)
         let filtered_output = self.low_pass_filter.process(audio_output);
@@ -183,8 +252,12 @@ impl Voice {
         // Get envelope amplitude (also processes envelope state)
         let envelope_amplitude = self.get_envelope_amplitude();
         
-        // Combine filtered audio with envelope modulation
-        filtered_output * envelope_amplitude
+        // Apply LFO1 tremolo modulation to amplitude
+        let base_amplitude = envelope_amplitude;
+        let modulated_amplitude = self.modulation_router.get_modulated_value(ModulationDestination::Amplitude, base_amplitude);
+        
+        // Combine filtered audio with modulated amplitude
+        filtered_output * modulated_amplitude
     }
     
     /// Get modulation envelope output for filter/pitch control
@@ -195,6 +268,51 @@ impl Voice {
     /// Check if voice has active modulation
     pub fn has_active_modulation(&self) -> bool {
         self.modulation_envelope.is_active()
+    }
+    
+    /// Get LFO1 output for tremolo effects
+    pub fn get_lfo1_level(&self) -> f32 {
+        self.lfo1.get_level()
+    }
+    
+    /// Get LFO2 output for vibrato effects
+    pub fn get_lfo2_level(&self) -> f32 {
+        self.lfo2.get_level()
+    }
+    
+    /// Check if any LFOs are active
+    pub fn has_active_lfo(&self) -> bool {
+        self.lfo1.is_active() || self.lfo2.is_active()
+    }
+    
+    /// Set reverb send level for this voice
+    pub fn set_reverb_send(&mut self, send_level: f32) {
+        self.reverb_send_level = send_level.clamp(0.0, 1.0);
+    }
+    
+    /// Get current reverb send level
+    pub fn get_reverb_send(&self) -> f32 {
+        self.reverb_send_level
+    }
+    
+    /// Set chorus send level for this voice
+    pub fn set_chorus_send(&mut self, send_level: f32) {
+        self.chorus_send_level = send_level.clamp(0.0, 1.0);
+    }
+    
+    /// Get current chorus send level
+    pub fn get_chorus_send(&self) -> f32 {
+        self.chorus_send_level
+    }
+    
+    /// Set MIDI channel for effects control
+    pub fn set_midi_channel(&mut self, channel: u8) {
+        self.midi_channel = channel.min(15);
+    }
+    
+    /// Get MIDI channel
+    pub fn get_midi_channel(&self) -> u8 {
+        self.midi_channel
     }
     
     /// Generate sample from SoundFont sample data

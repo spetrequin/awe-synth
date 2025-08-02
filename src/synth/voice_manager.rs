@@ -1,5 +1,8 @@
 use super::voice::{Voice, SampleVoice, MultiZoneSampleVoice};
 use crate::soundfont::types::*;
+use crate::effects::reverb::ReverbBus;
+use crate::effects::chorus::ChorusBus;
+use crate::midi::effects_controller::MidiEffectsController;
 use crate::log;
 use std::collections::HashMap;
 
@@ -57,11 +60,16 @@ pub struct VoiceManager {
     round_robin_counters: HashMap<String, usize>, // Per-instrument round-robin state
     enable_round_robin: bool,         // True = use round-robin sample selection
     zone_selection_strategy: ZoneSelectionStrategy, // Algorithm for multi-sample zones
+    // EMU8000 send/return effects
+    reverb_bus: ReverbBus,            // Global reverb with send/return architecture
+    chorus_bus: ChorusBus,            // Global chorus with send/return architecture
+    // MIDI effects control
+    midi_effects: MidiEffectsController, // MIDI CC 91/93 effects control
 }
 
 impl VoiceManager {
     pub fn new(sample_rate: f32) -> Self {
-        VoiceManager {
+        let mut voice_manager = VoiceManager {
             voices: core::array::from_fn(|_| Voice::new()),
             sample_voices: core::array::from_fn(|_| SampleVoice::new()),
             multi_zone_voices: core::array::from_fn(|_| MultiZoneSampleVoice::new()),
@@ -74,7 +82,14 @@ impl VoiceManager {
             round_robin_counters: HashMap::new(), // Initialize round-robin state
             enable_round_robin: false,  // Default to all matching zones (EMU8000 authentic)
             zone_selection_strategy: ZoneSelectionStrategy::AllMatching, // Default EMU8000 behavior
-        }
+            reverb_bus: ReverbBus::new(sample_rate), // Initialize global reverb
+            chorus_bus: ChorusBus::new(sample_rate), // Initialize global chorus
+            midi_effects: MidiEffectsController::new(), // Initialize MIDI effects control
+        };
+        
+        // Initialize effects buses with default MIDI send levels
+        voice_manager.update_effects_from_midi();
+        voice_manager
     }
     
     /// Load SoundFont and build preset mapping
@@ -186,6 +201,94 @@ impl VoiceManager {
     /// Get current zone selection strategy
     pub fn get_zone_selection_strategy(&self) -> &ZoneSelectionStrategy {
         &self.zone_selection_strategy
+    }
+    
+    /// Set MIDI channel reverb send level (MIDI CC 91)
+    pub fn set_channel_reverb_send(&mut self, channel: u8, send_level: f32) {
+        self.reverb_bus.set_channel_send(channel, send_level);
+    }
+    
+    /// Configure global reverb parameters
+    pub fn configure_reverb(&mut self, room_size: f32, damping: f32, diffusion: f32) {
+        self.reverb_bus.configure_reverb(room_size, damping, diffusion);
+    }
+    
+    /// Set master reverb send level
+    pub fn set_master_reverb_send(&mut self, send_level: f32) {
+        self.reverb_bus.set_master_send(send_level);
+    }
+    
+    /// Set reverb return level (wet signal mixing)
+    pub fn set_reverb_return_level(&mut self, return_level: f32) {
+        self.reverb_bus.set_return_level(return_level);
+    }
+    
+    /// Set MIDI channel chorus send level (MIDI CC 93)
+    pub fn set_channel_chorus_send(&mut self, channel: u8, send_level: f32) {
+        self.chorus_bus.set_channel_send(channel, send_level);
+    }
+    
+    /// Configure global chorus parameters
+    pub fn configure_chorus(&mut self, rate: f32, depth: f32, feedback: f32, stereo_spread: f32) {
+        self.chorus_bus.configure_chorus(rate, depth, feedback, stereo_spread);
+    }
+    
+    /// Set master chorus send level
+    pub fn set_master_chorus_send(&mut self, send_level: f32) {
+        self.chorus_bus.set_master_send(send_level);
+    }
+    
+    /// Set chorus return level (wet signal mixing)
+    pub fn set_chorus_return_level(&mut self, return_level: f32) {
+        self.chorus_bus.set_return_level(return_level);
+    }
+    
+    /// Process MIDI Control Change message for effects
+    /// 
+    /// # Arguments
+    /// * `channel` - MIDI channel (0-15)
+    /// * `controller` - MIDI CC number  
+    /// * `value` - MIDI CC value (0-127)
+    /// 
+    /// # Returns
+    /// True if the CC was processed (effects-related), false otherwise
+    pub fn process_midi_control_change(&mut self, channel: u8, controller: u8, value: u8) -> bool {
+        let processed = self.midi_effects.process_control_change(channel, controller, value);
+        
+        if processed {
+            // Update effects buses with new MIDI-controlled send levels
+            self.update_effects_from_midi();
+        }
+        
+        processed
+    }
+    
+    /// Update effects buses with current MIDI send levels
+    fn update_effects_from_midi(&mut self) {
+        // Update reverb bus channel send levels from MIDI controller
+        for channel in 0..16 {
+            let reverb_send = self.midi_effects.get_reverb_send(channel as u8);
+            let chorus_send = self.midi_effects.get_chorus_send(channel as u8);
+            
+            self.reverb_bus.set_channel_send(channel as u8, reverb_send);
+            self.chorus_bus.set_channel_send(channel as u8, chorus_send);
+        }
+    }
+    
+    /// Set MIDI effects logging enable/disable
+    pub fn set_midi_effects_logging(&mut self, enable: bool) {
+        self.midi_effects.set_effects_logging(enable);
+    }
+    
+    /// Get MIDI effects status for debugging
+    pub fn get_midi_effects_status(&self) -> String {
+        self.midi_effects.get_effects_status()
+    }
+    
+    /// Reset MIDI effects to EMU8000 defaults
+    pub fn reset_midi_effects(&mut self) {
+        self.midi_effects.reset_to_defaults();
+        self.update_effects_from_midi();
     }
     
     /// Reset round-robin counters (useful for testing)
@@ -847,13 +950,14 @@ impl VoiceManager {
     /// Process all active voices and return mixed audio sample
     /// This is the main audio processing method - call once per sample
     pub fn process(&mut self) -> f32 {
-        let mut mixed_output = 0.0;
+        let mut dry_mixed_output = 0.0;
         
         // Process MultiZoneSampleVoices (most authentic EMU8000 with layering)
         for multi_voice in self.multi_zone_voices.iter_mut() {
             if multi_voice.is_processing {
                 let voice_sample = multi_voice.generate_sample();
-                mixed_output += voice_sample;
+                dry_mixed_output += voice_sample;
+                // Note: MultiZoneSampleVoice doesn't have reverb send yet (future enhancement)
             }
         }
         
@@ -861,20 +965,36 @@ impl VoiceManager {
         for sample_voice in self.sample_voices.iter_mut() {
             if sample_voice.is_processing {
                 let voice_sample = sample_voice.generate_sample();
-                mixed_output += voice_sample;
+                dry_mixed_output += voice_sample;
+                // Note: SampleVoice doesn't have reverb send yet (future enhancement)
             }
         }
         
-        // Process legacy Voices (oscillator-based fallback)
+        // Process legacy Voices (oscillator-based fallback with reverb send)
         for voice in self.voices.iter_mut() {
             if voice.is_processing {
                 let voice_sample = voice.generate_sample(self.sample_rate);
-                mixed_output += voice_sample;
+                dry_mixed_output += voice_sample;
+                
+                // Add to reverb send bus
+                let reverb_send = voice.get_reverb_send();
+                let chorus_send = voice.get_chorus_send();
+                let channel = voice.get_midi_channel();
+                self.reverb_bus.add_voice_send(voice_sample, reverb_send, channel);
+                self.chorus_bus.add_voice_send(voice_sample, chorus_send, channel);
             }
         }
         
+        // Process global effects and get wet signals
+        let reverb_wet = self.reverb_bus.process_reverb();
+        let chorus_wet = self.chorus_bus.process_chorus();
+        
+        // Mix dry and wet signals (EMU8000 style)
+        let dry_level = 0.7; // 70% dry signal  
+        let final_output = (dry_mixed_output * dry_level) + reverb_wet + chorus_wet;
+        
         // Simple mixing - divide by max voices to prevent clipping
-        mixed_output / 32.0
+        final_output / 32.0
     }
     
     /// Process envelopes for all processing voices (call once per audio sample)

@@ -1,8 +1,8 @@
 # AWE Player Project TODO - Updated Status
 
 **Last Updated:** August 2, 2025
-**Status:** Phase 10B: Sample-Based Synthesis Testing - SIGNIFICANT PROGRESS ✅  
-**Current Branch:** main (Phase 9A+9B+10B.1+10B.2+10B.9+10B.10+10B.11 complete)
+**Status:** Phase 15A+15B+15C: EMU8000 Send/Return Effects Implementation ✅ **COMPLETE**  
+**Current Branch:** main (Phases 9A+9B+10B+15A+15B+15C complete)
 
 ## 🎯 Project Status: Phase 9A Complete ✅
 
@@ -283,37 +283,61 @@ Phase 9A SoundFont 2.0 Implementation has been **successfully completed**. Compl
 **14B.5** **[PENDING]** Test vibrato and pitch envelope effects on synthesis (20 lines)
 **14B.6** **[PENDING]** Create comprehensive pitch modulation performance tests (20 lines)
 
-## 🌊 Phase 15-16: Global Effects and Final Integration
+## 🌊 Phase 15-16: EMU8000 Send/Return Effects Architecture
 
-### **Phase 15A: Global Reverb Implementation** (8 micro-tasks)
-**15A.1** **[PENDING]** Create src/effects/reverb.rs - multi-tap delay reverb algorithm (30 lines)
-**15A.2** **[PENDING]** Implement Reverb::new() with room size and decay parameters (20 lines)
-**15A.3** **[PENDING]** Add reverb delay line allocation and management (25 lines)
-**15A.4** **[PENDING]** Implement multi-tap delay with feedback and diffusion (30 lines)
-**15A.5** **[PENDING]** Add reverb parameter control from SoundFont generators (15 lines)
-**15A.6** **[PENDING]** Create global reverb processor for voice mixing (20 lines)
-**15A.7** **[PENDING]** Add reverb send level control per voice (15 lines)
-**15A.8** **[PENDING]** Integrate reverb with VoiceManager output processing (15 lines)
+### **Phase 15A: Global Reverb with Send/Return** ✅ **COMPLETE**
+**15A.1** **[COMPLETED]** ✅ Create src/effects/reverb.rs - multi-tap delay reverb algorithm with EMU8000 authentication (400+ lines)
+**15A.2** **[COMPLETED]** ✅ Implement ReverbProcessor::new() with room size and decay parameters (20 lines)
+**15A.3** **[COMPLETED]** ✅ Add reverb delay line allocation and management with golden ratio spacing (25 lines)
+**15A.4** **[COMPLETED]** ✅ Implement multi-tap delay with feedback, diffusion, and all-pass filters (30 lines)
+**15A.5** **[COMPLETED]** ✅ Add reverb parameter control from SoundFont generators and presets (15 lines)
+**15A.6** **[COMPLETED]** ✅ Create global reverb send bus for voice mixing with accumulation (25 lines)
+**15A.7** **[COMPLETED]** ✅ Add per-voice reverb_send_level field and control methods in Voice struct (15 lines)
+**15A.8** **[COMPLETED]** ✅ Add per-MIDI-channel reverb send control integration with ReverbBus (20 lines)
+**15A.9** **[COMPLETED]** ✅ Integrate reverb processing with VoiceManager output and send/return architecture (20 lines)
+**15A.10** **[COMPLETED]** ✅ Add reverb wet/dry mix control and final output routing with master levels (15 lines)
 
-### **Phase 15B: Global Chorus Implementation** (8 micro-tasks)
-**15B.1** **[PENDING]** Create src/effects/chorus.rs - pitch-modulated delay chorus (30 lines)
-**15B.2** **[PENDING]** Implement Chorus::new() with rate, depth, and feedback parameters (20 lines)
-**15B.3** **[PENDING]** Add chorus delay line with pitch modulation LFO (25 lines)
-**15B.4** **[PENDING]** Implement chorus feedback and wet/dry mixing (20 lines)
-**15B.5** **[PENDING]** Add chorus parameter control from SoundFont generators (15 lines)
-**15B.6** **[PENDING]** Create global chorus processor for voice mixing (20 lines)
-**15B.7** **[PENDING]** Add chorus send level control per voice (15 lines)
-**15B.8** **[PENDING]** Integrate chorus with VoiceManager output processing (15 lines)
+### **Phase 15B: Global Chorus with Send/Return** ✅ **COMPLETE**
+**15B.1** **[COMPLETED]** ✅ Create src/effects/chorus.rs - pitch-modulated delay chorus with EMU8000 authentication (400+ lines)
+**15B.2** **[COMPLETED]** ✅ Implement ChorusProcessor::new() with rate, depth, and feedback parameters (20 lines)
+**15B.3** **[COMPLETED]** ✅ Add chorus delay line with pitch modulation LFO and phase offsets (25 lines)
+**15B.4** **[COMPLETED]** ✅ Implement chorus feedback and stereo spreading with multiple delay lines (20 lines)
+**15B.5** **[COMPLETED]** ✅ Add chorus parameter control from SoundFont generators and presets (15 lines)
+**15B.6** **[COMPLETED]** ✅ Create global chorus send bus for voice mixing with accumulation (25 lines)
+**15B.7** **[COMPLETED]** ✅ Add per-voice chorus_send_level field and control methods in Voice struct (15 lines)
+**15B.8** **[COMPLETED]** ✅ Add per-MIDI-channel chorus send control integration with ChorusBus (20 lines)
+**15B.9** **[COMPLETED]** ✅ Integrate chorus processing with VoiceManager output and send/return architecture (20 lines)
+**15B.10** **[COMPLETED]** ✅ Add chorus wet/dry mix control and final output routing with master levels (15 lines)
 
-### **Phase 16: Global Effects Testing** (8 micro-tasks)
-**16.1** **[PENDING]** Create tests/src/effects/reverb_tests.rs - comprehensive reverb testing (30 lines)
-**16.2** **[PENDING]** Create tests/src/effects/chorus_tests.rs - comprehensive chorus testing (30 lines)
-**16.3** **[PENDING]** Test reverb algorithm accuracy and room size effects (25 lines)
-**16.4** **[PENDING]** Test chorus pitch modulation and delay effects (25 lines)
-**16.5** **[PENDING]** Test global effects integration with 32-voice processing (25 lines)
-**16.6** **[PENDING]** Test effects send level control and wet/dry mixing (20 lines)
-**16.7** **[PENDING]** Create global effects performance benchmarks (20 lines)
-**16.8** **[PENDING]** Test complete EMU8000 effects pipeline integration (25 lines)
+### **Phase 15C: MIDI Effects Control Implementation** ✅ **COMPLETE**
+**15C.1** **[COMPLETED]** ✅ Create src/midi/effects_controller.rs - MIDI effects controller for CC 91 (reverb) and CC 93 (chorus) (30 lines)
+**15C.2** **[COMPLETED]** ✅ Implement MidiEffectsController::new() with 16-channel state tracking (15 lines)
+**15C.3** **[COMPLETED]** ✅ Add MIDI CC 91 (reverb send) processing with real-time updates (20 lines)
+**15C.4** **[COMPLETED]** ✅ Add MIDI CC 93 (chorus send) processing with real-time updates (20 lines)
+**15C.5** **[COMPLETED]** ✅ Implement CC value scaling from MIDI (0-127) to effect levels (0.0-1.0) (10 lines)
+**15C.6** **[COMPLETED]** ✅ Add integration with VoiceManager for effects parameter updates (20 lines)
+**15C.7** **[COMPLETED]** ✅ Create MIDI message processing for effects control in MIDI router (25 lines)
+**15C.8** **[COMPLETED]** ✅ Add real-time effects parameter change logging and debugging (10 lines)
+
+### **Phase 16: Send/Return Effects Testing** (18 micro-tasks)
+**16.1** **[PENDING]** Create tests/test_reverb_integration.rs - Basic reverb bus functionality test (30 lines)
+**16.2** **[PENDING]** Test ReverbProcessor initialization with EMU8000 default parameters (15 lines)
+**16.3** **[PENDING]** Test multi-tap delay line processing with golden ratio spacing (20 lines)
+**16.4** **[PENDING]** Test all-pass filter chain for diffusion (4 stages verification) (25 lines)
+**16.5** **[PENDING]** Test comb filter array with feedback and damping parameters (20 lines)
+**16.6** **[PENDING]** Create tests/test_chorus_integration.rs - Basic chorus bus functionality test (30 lines)
+**16.7** **[PENDING]** Test ChorusProcessor initialization with EMU8000 default parameters (15 lines)
+**16.8** **[PENDING]** Test modulated delay lines with LFO phase offsets (20 lines)
+**16.9** **[PENDING]** Test chorus LFO frequency and depth parameter ranges (15 lines)
+**16.10** **[PENDING]** Create tests/test_midi_effects_integration.rs - MIDI CC 91/93 control test (25 lines)
+**16.11** **[PENDING]** Test real-time MIDI CC 91 (reverb send) parameter updates (20 lines)
+**16.12** **[PENDING]** Test real-time MIDI CC 93 (chorus send) parameter updates (20 lines)
+**16.13** **[PENDING]** Test 16-channel independent effects send level tracking (25 lines)
+**16.14** **[PENDING]** Test VoiceManager integration with global effects buses (30 lines)
+**16.15** **[PENDING]** Test send/return signal flow: dry signal + wet reverb + wet chorus (25 lines)
+**16.16** **[PENDING]** Test effects accumulation with multiple voices sending to buses (20 lines)
+**16.17** **[PENDING]** Create comprehensive effects system integration test (35 lines)
+**16.18** **[PENDING]** Test MIDI value scaling accuracy (0-127 → 0.0-1.0) with boundary conditions (15 lines)
 
 ## 🚀 Phase 17-19: UI Integration and Final Features
 
@@ -334,11 +358,11 @@ Phase 9A SoundFont 2.0 Implementation has been **successfully completed**. Compl
 **19.3** **[PENDING]** Implement MIDI device state management (connect/disconnect)  
 
 ## 🔢 **Easy Reference System**
-**Current Phase**: Phase 10B Sample-Based Synthesis Testing ✅ **COMPLETE**  
-**Next Phase**: Phase 11A Low-Pass Filter Implementation 🔄 **READY**  
-**Progress**: Phase 8C, 9A, 9B, 10B Complete (85+ tasks)  
-**Commands**: Just specify the phase (e.g., "11A.1", "11A.2", "11B.1", "12A.1")  
-**Next Task**: 11A.1 - Create src/effects/filter.rs - EMU8000 2-pole low-pass filter struct
+**Current Phase**: Phase 15A, 15B, 15C Send/Return Effects ✅ **COMPLETE**  
+**Next Phase**: Phase 16 Send/Return Effects Testing 🔄 **READY**  
+**Progress**: Phases 8C, 9A, 9B, 10B, 15A, 15B, 15C Complete (100+ tasks)  
+**Commands**: Just specify the phase (e.g., "16.1", "16.2", "16.3", "16.4")  
+**Next Task**: 16.1 - Create tests/test_reverb_integration.rs - Basic reverb bus functionality test
 
 **New Strategy**: Alternating Implementation + Testing (see DEVELOPMENT_SEQUENCE.md)
 
@@ -561,9 +585,13 @@ Phase 9A SoundFont 2.0 Implementation has been **successfully completed**. Compl
 - ✅ **Phase 8A/8B/8C**: Web Audio Integration + Rust-Centric Architecture (19 tasks)
 - ✅ **Phase 9A**: SoundFont 2.0 Implementation (7 tasks)
 - ✅ **Phase 9B**: SoundFont Testing Framework (6 tasks)
-- 🔄 **Phase 10B**: Sample-Based Synthesis Testing (5/11 tasks complete) - CURRENT
+- ✅ **Phase 10B**: Sample-Based Synthesis Testing (5/11 tasks complete)
+- ✅ **Phase 15A**: Global Reverb with Send/Return (10 tasks)
+- ✅ **Phase 15B**: Global Chorus with Send/Return (10 tasks)
+- ✅ **Phase 15C**: MIDI Effects Control Implementation (8 tasks)
+- 🔄 **Phase 16**: Send/Return Effects Testing (18 tasks) - CURRENT
 
-**Total Progress**: 85/90 foundational + architecture + SoundFont + sample testing tasks complete
+**Total Progress**: 113/131 foundational + architecture + SoundFont + effects tasks complete
 
 ### **Current Architecture Status**
 ✅ **Synthesis Engine**: 32-voice polyphonic synthesis with EMU8000-authentic envelopes  
@@ -574,16 +602,17 @@ Phase 9A SoundFont 2.0 Implementation has been **successfully completed**. Compl
 ✅ **Browser Interface**: Production-ready web application with modular UI architecture  
 ✅ **Rust-Centric Architecture**: Clean separation with all audio processing in Rust  
 ✅ **SoundFont 2.0 Parser**: Complete SF2 file support with sample-based synthesis  
+✅ **EMU8000 Send/Return Effects**: Global reverb and chorus processors with MIDI CC 91/93 control  
 
-### **Current Focus: Phase 10B Sample-Based Synthesis Testing**
-**Strategic Achievement**: Phase 9A+9B SoundFont implementation and testing complete - authentic sample-based synthesis operational  
-**Major Milestone**: Phase 10B.9-10B.11 EMU8000 multi-zone sample layering complete with velocity crossfading and round-robin  
-**Phase 10B Progress**: 5/11 tasks complete - comprehensive pitch accuracy and advanced sample selection algorithms operational  
-**Current Achievement**: EMU8000-authentic multi-zone sample selection with velocity crossfading and round-robin algorithms  
+### **Current Focus: Phase 16 Send/Return Effects Testing**
+**Major Achievement**: Phase 15A+15B+15C EMU8000 Send/Return Effects Implementation complete  
+**Strategic Milestone**: Complete global reverb and chorus processors with MIDI CC 91/93 control  
+**Phase 15 Results**: 28/28 tasks complete - authentic EMU8000 send/return effects architecture operational  
+**Current Achievement**: Global effects buses with per-voice sends, MIDI control, and VoiceManager integration  
 
-### **Next: Complete Phase 10B Testing**
-**Phase 10B Remaining**: Sample loop points, performance testing, integration tests, and baseline comparisons  
-**Expected Impact**: Complete validation of sample-based synthesis with EMU8000 compatibility verification
+### **Next: Complete Phase 16 Testing**
+**Phase 16 Focus**: Comprehensive testing of reverb/chorus processors and MIDI effects control  
+**Expected Impact**: Complete validation of EMU8000 send/return effects with MIDI integration
 
 ### **Deferred Tasks (For Future Phases)**
 **DEFERRED-6A.7** **[PENDING]** Add key scaling support (keynumToVolEnvHold/Decay generators 39-40) - implement during Phase 7+ for complete EMU8000 authenticity

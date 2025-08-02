@@ -790,14 +790,21 @@ Sample → Pitch Mod → Filter → Amplifier → Effects → Pan → Output
 ```
 
 ### 6. **EffectsChain** (`src/effects/chain.rs`)
-**Purpose**: Authentic EMU8000 effects processing
+**Purpose**: Authentic EMU8000 effects processing with send/return architecture
 
-**Key Features:**
-- **LFO System**: Dual LFOs (modulation + vibrato)
-- **Filter**: Low-pass 100Hz-8kHz with resonance
-- **Reverb**: Multi-tap delay with room scaling
-- **Chorus**: Pitch-modulated delay
-- **Per-Voice**: Each voice has complete effects chain
+**EMU8000 Effects Architecture:**
+- **Per-Voice Effects**: Low-pass filter, modulation envelope, dual LFOs
+- **Per-Voice Send Levels**: Individual reverb/chorus send amounts (MIDI controllable)
+- **Global Effects Bus**: Shared reverb and chorus processors
+- **MIDI Channel Effects**: Per-channel effect send control (16-part multitimbral)
+
+**Key Components:**
+- **Low-Pass Filter**: 2-pole resonant filter (100Hz-8kHz, Q 0.7-40)
+- **Modulation Envelope**: 6-stage AHDSR for filter/pitch modulation
+- **Dual LFO System**: LFO1 (tremolo) + LFO2 (vibrato)
+- **Global Reverb**: Multi-tap delay with room scaling
+- **Global Chorus**: Pitch-modulated delay with feedback
+- **Send/Return Routing**: Voice → Send Level → Global Effects → Mix
 
 ### 7. **SoundFont Engine** (`src/soundfont/`)
 **Purpose**: Complete SoundFont 2.0 implementation
