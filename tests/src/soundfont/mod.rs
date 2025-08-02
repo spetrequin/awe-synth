@@ -8,8 +8,8 @@ pub mod parser_tests;
 pub mod sample_tests;
 pub mod preset_tests;
 pub mod integration_tests; // Task 9B.5
+pub mod performance_tests; // Task 9B.6
 // pub mod generator_tests;   // Future enhancement
-// pub mod performance_tests; // Task 9B.6
 
 // Re-export commonly used test utilities
 pub use crate::utils::*;
