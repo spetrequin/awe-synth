@@ -4,13 +4,12 @@
 /// including parser validation, sample extraction, preset hierarchy, and integration tests.
 
 // Test modules for different aspects of SoundFont functionality
-// These will be implemented in subsequent tasks
-// pub mod parser_tests;
-// pub mod sample_tests;
-// pub mod preset_tests;
-// pub mod generator_tests;
-// pub mod integration_tests;
-// pub mod performance_tests;
+pub mod parser_tests;
+// pub mod sample_tests;      // Task 9B.3
+// pub mod preset_tests;      // Task 9B.4
+// pub mod generator_tests;   // Future enhancement
+// pub mod integration_tests; // Task 9B.5
+// pub mod performance_tests; // Task 9B.6
 
 // Re-export commonly used test utilities
 pub use crate::utils::*;
@@ -55,9 +54,24 @@ pub mod utils {
         data.extend_from_slice(b"sfbk");
         
         // INFO list chunk
+        let info_start = data.len();
         data.extend_from_slice(b"LIST");
-        data.extend_from_slice(&[0x04, 0x00, 0x00, 0x00]); // Size
+        data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // Size (to be filled)
         data.extend_from_slice(b"INFO");
+        
+        // Required ifil chunk (version)
+        data.extend_from_slice(b"ifil");
+        data.extend_from_slice(&[0x04, 0x00, 0x00, 0x00]); // 4 bytes
+        data.extend_from_slice(&[0x02, 0x00, 0x01, 0x00]); // Version 2.1
+        
+        // Required INAM chunk (name)
+        data.extend_from_slice(b"INAM");
+        data.extend_from_slice(&[0x08, 0x00, 0x00, 0x00]); // 8 bytes
+        data.extend_from_slice(b"MinSF2\0\0");
+        
+        // Update INFO list size
+        let info_size = (data.len() - info_start - 8) as u32;
+        data[info_start + 4..info_start + 8].copy_from_slice(&info_size.to_le_bytes());
         
         // Update RIFF size
         let size = (data.len() - 8) as u32;
