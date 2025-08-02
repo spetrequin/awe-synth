@@ -1,5 +1,6 @@
 use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
 use crate::synth::oscillator::{Oscillator, midi_note_to_frequency};
+use crate::synth::sample_player::{SamplePlayer, InterpolationMethod};
 use crate::soundfont::types::SoundFontSample;
 use crate::log;
 
@@ -57,15 +58,21 @@ impl Voice {
         self.is_active = true;
         self.is_processing = true;
         
-        // Set oscillator frequency from MIDI note number
+        // Set oscillator frequency from MIDI note number (fallback mode)
         self.oscillator.frequency = midi_note_to_frequency(note);
         self.oscillator.phase = 0.0; // Reset phase for clean note start
         
         // Trigger volume envelope for note-on event
         self.volume_envelope.trigger();
         
-        log(&format!("Voice started: Note {} Vel {} Freq {:.2}Hz (Sine wave)", 
-                   note, velocity, self.oscillator.frequency));
+        // Log synthesis mode based on available sample data
+        if self.soundfont_sample.is_some() {
+            log(&format!("Voice started: Note {} Vel {} -> Sample-based synthesis", 
+                       note, velocity));
+        } else {
+            log(&format!("Voice started: Note {} Vel {} -> Sine wave fallback @{:.2}Hz", 
+                       note, velocity, self.oscillator.frequency));
+        }
     }
     
     /// Start note with SoundFont sample
@@ -121,25 +128,27 @@ impl Voice {
         amplitude
     }
     
-    /// Generate one audio sample combining oscillator/sample and envelope
+    /// Generate one audio sample prioritizing sample data over sine wave
     /// Returns final audio sample (-1.0 to 1.0)
     pub fn generate_sample(&mut self, sample_rate: f32) -> f32 {
         if !self.is_processing {
             return 0.0;
         }
         
-        // Generate audio sample based on voice type
-        let audio_output = if self.is_soundfont_voice {
+        // PRIORITY 1: Try sample-based synthesis if SoundFont sample is available
+        let audio_output = if self.soundfont_sample.is_some() {
+            // Use authentic sample-based synthesis
             self.generate_soundfont_sample()
         } else {
-            // Generate oscillator sample (sine wave)
+            // FALLBACK: Use sine wave oscillator only if no sample available
+            log(&format!("Voice {}: No SoundFont sample, falling back to sine wave", self.note));
             self.oscillator.generate_sample(sample_rate)
         };
         
         // Get envelope amplitude (also processes envelope state)
         let envelope_amplitude = self.get_envelope_amplitude();
         
-        // Combine audio with envelope
+        // Combine audio with envelope modulation
         audio_output * envelope_amplitude
     }
     
@@ -194,5 +203,148 @@ impl Voice {
         self.sample_position += self.sample_rate_ratio;
         
         interpolated_sample
+    }
+}
+
+/// Sample-based voice for authentic EMU8000 synthesis
+/// 
+/// Dedicated voice structure that eliminates oscillator complexity and focuses
+/// exclusively on sample-based synthesis using the SamplePlayer engine.
+#[derive(Debug, Clone)]
+pub struct SampleVoice {
+    /// MIDI note number (0-127)
+    pub note: u8,
+    /// MIDI velocity (0-127)
+    pub velocity: u8,
+    /// Voice activity state (true = allocated for note, false = available)
+    pub is_active: bool,
+    /// Processing state (true = generating audio, false = silent)
+    pub is_processing: bool,
+    /// EMU8000 6-stage DAHDSR volume envelope
+    pub volume_envelope: DAHDSREnvelope,
+    /// High-performance sample playback engine
+    pub sample_player: SamplePlayer,
+    /// Currently loaded SoundFont sample
+    pub soundfont_sample: Option<SoundFontSample>,
+}
+
+impl SampleVoice {
+    /// Create new sample-based voice with EMU8000 envelope defaults
+    pub fn new() -> Self {
+        // EMU8000 default envelope parameters for sample-based synthesis
+        let volume_envelope = DAHDSREnvelope::new(
+            44100.0,     // sample_rate
+            -12000,      // delay_timecents (1ms)
+            -12000,      // attack_timecents (1ms)  
+            -12000,      // hold_timecents (1ms)
+            -12000,      // decay_timecents (1ms)
+            0,           // sustain_centibels (full level)
+            -12000,      // release_timecents (1ms)
+        );
+        
+        Self {
+            note: 0,
+            velocity: 0,
+            is_active: false,
+            is_processing: false,
+            volume_envelope,
+            sample_player: SamplePlayer::new(),
+            soundfont_sample: None,
+        }
+    }
+    
+    /// Start sample-based note with SoundFont sample
+    /// 
+    /// # Arguments
+    /// * `note` - MIDI note number (0-127)
+    /// * `velocity` - MIDI velocity (0-127)
+    /// * `sample` - SoundFont sample for authentic synthesis
+    /// * `sample_rate` - Audio system sample rate (typically 44100.0)
+    pub fn start_note(&mut self, note: u8, velocity: u8, sample: &SoundFontSample, sample_rate: f32) {
+        self.note = note;
+        self.velocity = velocity;
+        self.is_active = true;
+        self.is_processing = true;
+        
+        // Store SoundFont sample
+        self.soundfont_sample = Some(sample.clone());
+        
+        // Start sample playback with pitch shifting
+        self.sample_player.start_sample(sample, note, sample_rate);
+        
+        // Configure interpolation based on sample quality needs
+        // Use cubic interpolation for high-quality pitch shifting
+        self.sample_player.set_interpolation(InterpolationMethod::Cubic);
+        
+        // Trigger EMU8000 envelope
+        self.volume_envelope.trigger();
+        
+        log(&format!("SampleVoice started: Note {} Vel {} -> Sample '{}'", 
+                   note, velocity, sample.name));
+    }
+    
+    /// Stop note (triggers envelope release phase)
+    pub fn stop_note(&mut self) {
+        // Trigger envelope release phase for note-off event
+        self.volume_envelope.release();
+        // Mark voice as inactive for voice allocation
+        self.is_active = false;
+        // Keep processing until envelope reaches Off state
+    }
+    
+    /// Generate one audio sample with envelope modulation
+    /// 
+    /// # Returns
+    /// Final audio sample (-1.0 to 1.0) combining sample playback and envelope
+    pub fn generate_sample(&mut self) -> f32 {
+        if !self.is_processing {
+            return 0.0;
+        }
+        
+        // Get sample audio output
+        let audio_output = match &self.soundfont_sample {
+            Some(sample) => self.sample_player.generate_sample(sample),
+            None => {
+                log("SampleVoice has no SoundFont sample");
+                0.0
+            }
+        };
+        
+        // Process envelope and update voice state
+        let envelope_amplitude = self.volume_envelope.process();
+        
+        // Voice stops processing when envelope reaches Off state or sample finishes
+        if self.volume_envelope.state == EnvelopeState::Off || !self.sample_player.is_playing() {
+            self.is_processing = false;
+        }
+        
+        // Combine sample audio with envelope modulation
+        audio_output * envelope_amplitude
+    }
+    
+    /// Check if voice is available for new note allocation
+    pub fn is_available(&self) -> bool {
+        !self.is_active
+    }
+    
+    /// Check if voice is generating audio
+    pub fn is_generating_audio(&self) -> bool {
+        self.is_processing
+    }
+    
+    /// Get current envelope amplitude (for analysis/debugging)
+    pub fn get_envelope_amplitude(&mut self) -> f32 {
+        self.volume_envelope.process()
+    }
+    
+    /// Set sample interpolation method for quality vs performance trade-off
+    pub fn set_interpolation(&mut self, method: InterpolationMethod) {
+        self.sample_player.set_interpolation(method);
+    }
+}
+
+impl Default for SampleVoice {
+    fn default() -> Self {
+        Self::new()
     }
 }

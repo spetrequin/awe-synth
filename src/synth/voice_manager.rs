@@ -1,25 +1,30 @@
-use super::voice::Voice;
+use super::voice::{Voice, SampleVoice};
 use crate::soundfont::types::*;
 use crate::log;
 use std::collections::HashMap;
 
 pub struct VoiceManager {
-    voices: [Voice; 32],
+    voices: [Voice; 32],              // Legacy oscillator-based voices (fallback)
+    sample_voices: [SampleVoice; 32], // Modern sample-based voices (preferred)
     sample_rate: f32,
     // SoundFont integration
     loaded_soundfont: Option<SoundFont>,
     preset_map: HashMap<(u16, u8), usize>, // (bank, program) -> preset_index
     current_preset: Option<usize>, // Currently selected preset index
+    // Voice allocation strategy
+    prefer_sample_voices: bool,       // True = use SampleVoice first, False = use Voice first
 }
 
 impl VoiceManager {
     pub fn new(sample_rate: f32) -> Self {
         VoiceManager {
             voices: core::array::from_fn(|_| Voice::new()),
+            sample_voices: core::array::from_fn(|_| SampleVoice::new()),
             sample_rate,
             loaded_soundfont: None,
             preset_map: HashMap::new(),
             current_preset: None,
+            prefer_sample_voices: true, // Default to modern sample-based synthesis
         }
     }
     
@@ -52,6 +57,23 @@ impl VoiceManager {
         Ok(())
     }
     
+    /// Enable sample-based voice allocation (preferred for EMU8000 authenticity)
+    pub fn enable_sample_voices(&mut self) {
+        self.prefer_sample_voices = true;
+        log("VoiceManager: Sample-based voice allocation enabled");
+    }
+    
+    /// Enable legacy oscillator-based voice allocation (fallback mode)
+    pub fn enable_legacy_voices(&mut self) {
+        self.prefer_sample_voices = false;
+        log("VoiceManager: Legacy oscillator voice allocation enabled");
+    }
+    
+    /// Check if sample-based voices are preferred
+    pub fn is_using_sample_voices(&self) -> bool {
+        self.prefer_sample_voices
+    }
+    
     /// Select preset by bank and program number
     pub fn select_preset(&mut self, bank: u16, program: u8) -> Result<(), String> {
         if let Some(preset_index) = self.preset_map.get(&(bank, program)) {
@@ -77,27 +99,157 @@ impl VoiceManager {
         }
     }
     
+    /// Select SoundFont sample based on MIDI note and velocity
+    /// 
+    /// This is the core sample selection algorithm that navigates the complete
+    /// SoundFont hierarchy: Preset → Instrument → Sample based on key/velocity ranges.
+    /// 
+    /// # Arguments
+    /// * `note` - MIDI note number (0-127)
+    /// * `velocity` - MIDI velocity (0-127)
+    /// * `bank` - Optional MIDI bank (uses current preset if None)  
+    /// * `program` - Optional MIDI program (uses current preset if None)
+    /// 
+    /// # Returns
+    /// Some((sample, preset_name, instrument_name)) if found, None if no match
+    pub fn select_sample(&self, note: u8, velocity: u8, bank: Option<u16>, program: Option<u8>) 
+        -> Option<(&SoundFontSample, String, String)> {
+        
+        let soundfont = self.loaded_soundfont.as_ref()?;
+        
+        // Determine which preset to use
+        let preset_index = if let (Some(b), Some(p)) = (bank, program) {
+            // Use specified bank/program
+            self.preset_map.get(&(b, p)).copied()?
+        } else {
+            // Use current preset
+            self.current_preset?
+        };
+        
+        let preset = &soundfont.presets[preset_index];
+        
+        // Find matching preset zone for this note/velocity
+        let preset_zone = preset.preset_zones.iter().find(|zone| {
+            let key_match = zone.key_range.as_ref()
+                .map(|range| range.contains(note))
+                .unwrap_or(true);
+            let vel_match = zone.velocity_range.as_ref()
+                .map(|range| range.contains(velocity))
+                .unwrap_or(true);
+            key_match && vel_match
+        })?;
+        
+        // Get instrument from preset zone
+        let instrument_id = preset_zone.instrument_id?;
+        let instrument = soundfont.instruments.get(instrument_id as usize)?;
+        
+        // Find matching instrument zone for this note/velocity
+        let instrument_zone = instrument.instrument_zones.iter().find(|zone| {
+            let key_match = zone.key_range.as_ref()
+                .map(|range| range.contains(note))
+                .unwrap_or(true);
+            let vel_match = zone.velocity_range.as_ref()
+                .map(|range| range.contains(velocity))
+                .unwrap_or(true);
+            key_match && vel_match
+        })?;
+        
+        // Get sample from instrument zone
+        let sample_id = instrument_zone.sample_id?;
+        let sample = soundfont.samples.get(sample_id as usize)?;
+        
+        Some((sample, preset.name.clone(), instrument.name.clone()))
+    }
+    
+    /// Get all available samples for a given MIDI note across all velocity layers
+    /// 
+    /// Useful for analysis and debugging of SoundFont sample coverage
+    pub fn get_samples_for_note(&self, note: u8) -> Vec<(u8, &SoundFontSample, String, String)> {
+        let mut samples = Vec::new();
+        
+        if let Some(soundfont) = &self.loaded_soundfont {
+            // Check all velocity layers (0-127) for this note  
+            for velocity in 0..128 {
+                if let Some((sample, preset_name, inst_name)) = self.select_sample(note, velocity, None, None) {
+                    samples.push((velocity, sample, preset_name, inst_name));
+                }
+            }
+        }
+        
+        samples
+    }
+    
     /// Check if SoundFont is loaded
     pub fn is_soundfont_loaded(&self) -> bool {
         self.loaded_soundfont.is_some()
     }
     
     pub fn note_on(&mut self, note: u8, velocity: u8) -> Option<usize> {
-        // Try SoundFont-based note triggering first
-        if let Some(voice_id) = self.note_on_soundfont(note, velocity) {
-            return Some(voice_id);
+        // Use the preferred voice allocation strategy
+        if self.prefer_sample_voices {
+            // Try SampleVoice-based note triggering first (modern approach)
+            if let Some(voice_id) = self.note_on_sample_voice(note, velocity) {
+                return Some(voice_id);
+            }
+            
+            // Fallback to legacy Voice system if SampleVoice fails
+            if let Some(voice_id) = self.note_on_soundfont(note, velocity) {
+                return Some(voice_id);
+            }
+            
+            // Final fallback to sine wave synthesis
+            self.note_on_legacy_fallback(note, velocity)
+        } else {
+            // Legacy mode: use original Voice system first
+            if let Some(voice_id) = self.note_on_soundfont(note, velocity) {
+                return Some(voice_id);
+            }
+            
+            // Fallback to sine wave synthesis
+            self.note_on_legacy_fallback(note, velocity)
         }
+    }
+    
+    /// Modern SampleVoice-based note triggering (preferred approach)
+    fn note_on_sample_voice(&mut self, note: u8, velocity: u8) -> Option<usize> {
+        // Use the sample selection utility to find the appropriate sample
+        let sample_info = self.select_sample(note, velocity, None, None)?;
+        let (sample, preset_name, instrument_name) = sample_info;
         
-        // Fallback to simple sine wave synthesis
-        for (i, voice) in self.voices.iter_mut().enumerate() {
-            if !voice.is_active {
-                voice.start_note(note, velocity);
-                log(&format!("Fallback synthesis: Note {} on voice {} (no SoundFont)", note, i));
+        // Clone sample data to avoid borrow checker issues
+        let sample_clone = sample.clone();
+        let preset_name_clone = preset_name.clone();
+        let instrument_name_clone = instrument_name.clone();
+        let sample_rate = self.sample_rate;
+        
+        // Find available SampleVoice and configure it
+        for (i, sample_voice) in self.sample_voices.iter_mut().enumerate() {
+            if sample_voice.is_available() {
+                // Configure SampleVoice with selected SoundFont sample
+                sample_voice.start_note(note, velocity, &sample_clone, sample_rate);
+                
+                log(&format!("SampleVoice triggered: Note {} Vel {} -> SampleVoice {} using sample '{}' from instrument '{}' in preset '{}'",
+                           note, velocity, i, sample_clone.name, instrument_name_clone, preset_name_clone));
+                
                 return Some(i);
             }
         }
         
-        log(&format!("No available voices for note {}", note));
+        log(&format!("No available SampleVoices for note {} velocity {}", note, velocity));
+        None
+    }
+    
+    /// Legacy fallback to sine wave synthesis
+    fn note_on_legacy_fallback(&mut self, note: u8, velocity: u8) -> Option<usize> {
+        for (i, voice) in self.voices.iter_mut().enumerate() {
+            if !voice.is_active {
+                voice.start_note(note, velocity);
+                log(&format!("Legacy fallback: Note {} on Voice {} (sine wave)", note, i));
+                return Some(i);
+            }
+        }
+        
+        log(&format!("No available voices for note {} (all voice types exhausted)", note));
         None
     }
     
@@ -205,6 +357,16 @@ impl VoiceManager {
     
     pub fn note_off(&mut self, note: u8) {
         let mut released_count = 0;
+        
+        // Release matching SampleVoices first (preferred voice type)
+        for sample_voice in self.sample_voices.iter_mut() {
+            if sample_voice.is_active && sample_voice.note == note {
+                sample_voice.stop_note();
+                released_count += 1;
+            }
+        }
+        
+        // Release matching legacy Voices (fallback voice type)
         for voice in self.voices.iter_mut() {
             if voice.is_active && voice.note == note {
                 voice.stop_note();
@@ -213,7 +375,7 @@ impl VoiceManager {
         }
         
         if released_count > 0 {
-            log(&format!("Note {} released on {} voices", note, released_count));
+            log(&format!("Note {} released on {} voice(s)", note, released_count));
         }
     }
     
@@ -222,6 +384,15 @@ impl VoiceManager {
     pub fn process(&mut self) -> f32 {
         let mut mixed_output = 0.0;
         
+        // Process SampleVoices (modern sample-based synthesis)
+        for sample_voice in self.sample_voices.iter_mut() {
+            if sample_voice.is_processing {
+                let voice_sample = sample_voice.generate_sample();
+                mixed_output += voice_sample;
+            }
+        }
+        
+        // Process legacy Voices (oscillator-based fallback)
         for voice in self.voices.iter_mut() {
             if voice.is_processing {
                 let voice_sample = voice.generate_sample(self.sample_rate);
@@ -238,6 +409,19 @@ impl VoiceManager {
     pub fn process_envelopes(&mut self) -> u32 {
         let mut processing_count = 0;
         
+        // Process SampleVoice envelopes
+        for sample_voice in self.sample_voices.iter_mut() {
+            if sample_voice.is_processing {
+                let _amplitude = sample_voice.get_envelope_amplitude();
+                
+                // SampleVoice automatically updates is_processing in get_envelope_amplitude()
+                if sample_voice.is_processing {
+                    processing_count += 1;
+                }
+            }
+        }
+        
+        // Process legacy Voice envelopes
         for voice in self.voices.iter_mut() {
             if voice.is_processing {
                 let _amplitude = voice.get_envelope_amplitude();

@@ -9,6 +9,7 @@ pub mod sample_tests;
 pub mod preset_tests;
 pub mod integration_tests; // Task 9B.5
 pub mod performance_tests; // Task 9B.6
+pub mod sample_playback_tests; // Task 10A.11 - Sample-based synthesis testing
 // pub mod generator_tests;   // Future enhancement
 
 // Re-export commonly used test utilities
