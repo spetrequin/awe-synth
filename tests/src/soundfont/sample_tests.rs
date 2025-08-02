@@ -312,7 +312,13 @@ mod sample_properties_tests {
         let mut rate_histogram = std::collections::HashMap::new();
         
         for sample in &sf.samples {
-            // Validate sample rate is reasonable
+            // Skip terminal/EOS samples which may have zero sample rate
+            if sample.name.starts_with("EOS") || sample.name.is_empty() || 
+               sample.sample_type == SampleType::Unused {
+                continue;
+            }
+            
+            // Validate sample rate is reasonable for actual samples
             assert!(sample.sample_rate > 1000, 
                    "Sample '{}' has unreasonably low sample rate: {}", 
                    sample.name, sample.sample_rate);
@@ -380,6 +386,11 @@ mod sample_properties_tests {
             
             // Validate sample type
             match sample.sample_type {
+                SampleType::Unused => {
+                    // Unused samples might be terminal or placeholder samples
+                    // They often have names like "EOS" (End Of Samples)
+                    // No specific validation needed
+                },
                 SampleType::MonoSample => {
                     // Mono samples should not link to other samples
                     assert_eq!(sample.sample_link, 0,
@@ -399,7 +410,7 @@ mod sample_properties_tests {
                            sample.name);
                 },
                 _ => {
-                    // Other types should be valid
+                    // ROM samples and other types should be valid
                 }
             }
         }

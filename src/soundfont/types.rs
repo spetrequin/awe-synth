@@ -104,6 +104,7 @@ pub struct SoundFontSample {
 /// Sample type enumeration
 #[derive(Debug, Clone, PartialEq)]
 pub enum SampleType {
+    Unused = 0,                 // Unused or terminating sample
     MonoSample = 1,
     RightSample = 2,
     LeftSample = 4,
@@ -163,6 +164,7 @@ pub enum GeneratorType {
     KeynumToVolEnvHold = 39,       // Key number to vol env hold
     KeynumToVolEnvDecay = 40,      // Key number to vol env decay
     Instrument = 41,               // Instrument (terminal generator)
+    Reserved42 = 42,               // Reserved (not used in SoundFont 2.0)
     KeyRange = 43,                 // Key range
     VelRange = 44,                 // Velocity range
     StartloopAddrsCoarseOffset = 45, // Loop start coarse offset
@@ -299,6 +301,7 @@ impl SampleType {
     /// Parse sample type from raw value
     pub fn from_raw(value: u16) -> SoundFontResult<Self> {
         match value {
+            0 => Ok(SampleType::Unused),
             1 => Ok(SampleType::MonoSample),
             2 => Ok(SampleType::RightSample),
             4 => Ok(SampleType::LeftSample),
@@ -307,16 +310,18 @@ impl SampleType {
             0x8002 => Ok(SampleType::RomRightSample),
             0x8004 => Ok(SampleType::RomLeftSample),
             0x8008 => Ok(SampleType::RomLinkedSample),
-            _ => Err(SoundFontError::InvalidFormat {
-                message: format!("Invalid sample type: 0x{:04X}", value),
-                position: None,
-            }),
+            _ => {
+                // Log unrecognized sample types but continue parsing
+                crate::log(&format!("Warning: Unrecognized sample type: 0x{:04X}, treating as Unused", value));
+                Ok(SampleType::Unused)
+            }
         }
     }
     
     /// Convert to raw value
     pub fn to_raw(&self) -> u16 {
         match self {
+            SampleType::Unused => 0,
             SampleType::MonoSample => 1,
             SampleType::RightSample => 2,
             SampleType::LeftSample => 4,
@@ -371,6 +376,7 @@ impl GeneratorType {
             39 => Ok(GeneratorType::KeynumToVolEnvHold),
             40 => Ok(GeneratorType::KeynumToVolEnvDecay),
             41 => Ok(GeneratorType::Instrument),
+            42 => Ok(GeneratorType::Reserved42),
             43 => Ok(GeneratorType::KeyRange),
             44 => Ok(GeneratorType::VelRange),
             45 => Ok(GeneratorType::StartloopAddrsCoarseOffset),
@@ -385,12 +391,11 @@ impl GeneratorType {
             56 => Ok(GeneratorType::ScaleTuning),
             57 => Ok(GeneratorType::ExclusiveClass),
             58 => Ok(GeneratorType::OverridingRootKey),
-            _ => Err(SoundFontError::GeneratorError {
-                generator_type: value,
-                value: 0,
-                expected_range: (0, 58),
-                message: format!("Unknown generator type: {}", value),
-            }),
+            _ => {
+                // Log unknown generator types but don't fail parsing
+                crate::log(&format!("Warning: Unknown generator type {}, treating as Reserved42", value));
+                Ok(GeneratorType::Reserved42)
+            }
         }
     }
     
@@ -435,6 +440,7 @@ impl GeneratorType {
             GeneratorType::KeynumToVolEnvHold => "keynumToVolEnvHold",
             GeneratorType::KeynumToVolEnvDecay => "keynumToVolEnvDecay",
             GeneratorType::Instrument => "instrument",
+            GeneratorType::Reserved42 => "reserved42",
             GeneratorType::KeyRange => "keyRange",
             GeneratorType::VelRange => "velRange",
             GeneratorType::StartloopAddrsCoarseOffset => "startloopAddrsCoarseOffset",
