@@ -348,3 +348,204 @@ impl Default for SampleVoice {
         Self::new()
     }
 }
+
+/// Multi-Zone Sample Voice for EMU8000 Layering
+/// 
+/// Enhanced voice that supports multiple simultaneous samples with crossfading
+/// for authentic EMU8000 velocity layering and key splitting capabilities.
+#[derive(Debug, Clone)]
+pub struct MultiZoneSampleVoice {
+    /// MIDI note number (0-127)
+    pub note: u8,
+    /// MIDI velocity (0-127)
+    pub velocity: u8,
+    /// Voice activity state (true = allocated for note, false = available)
+    pub is_active: bool,
+    /// Processing state (true = generating audio, false = silent)
+    pub is_processing: bool,
+    /// EMU8000 6-stage DAHDSR volume envelope
+    pub volume_envelope: DAHDSREnvelope,
+    /// Multiple sample layers with weights for crossfading
+    pub sample_layers: Vec<SampleLayer>,
+}
+
+/// Single sample layer within a multi-zone voice
+#[derive(Debug, Clone)]
+pub struct SampleLayer {
+    /// Sample playback engine for this layer
+    pub sample_player: SamplePlayer,
+    /// SoundFont sample data
+    pub soundfont_sample: SoundFontSample,
+    /// Layer weight for crossfading (0.0-1.0)
+    pub weight: f32,
+    /// Layer metadata for debugging
+    pub preset_name: String,
+    pub instrument_name: String,
+}
+
+impl MultiZoneSampleVoice {
+    /// Create new multi-zone sample voice
+    pub fn new() -> Self {
+        // EMU8000 default envelope parameters for multi-zone synthesis
+        let volume_envelope = DAHDSREnvelope::new(
+            44100.0,     // sample_rate
+            -12000,      // delay_timecents (1ms)
+            -12000,      // attack_timecents (1ms)  
+            -12000,      // hold_timecents (1ms)
+            -12000,      // decay_timecents (1ms)
+            0,           // sustain_centibels (full level)
+            -12000,      // release_timecents (1ms)
+        );
+        
+        Self {
+            note: 0,
+            velocity: 0,
+            is_active: false,
+            is_processing: false,
+            volume_envelope,
+            sample_layers: Vec::new(),
+        }
+    }
+    
+    /// Start multi-zone note with layered samples
+    /// 
+    /// # Arguments
+    /// * `note` - MIDI note number (0-127)
+    /// * `velocity` - MIDI velocity (0-127)
+    /// * `samples` - Vec of (sample, weight, preset_name, instrument_name) tuples
+    /// * `sample_rate` - Audio system sample rate (typically 44100.0)
+    pub fn start_multi_zone_note(&mut self, note: u8, velocity: u8, 
+                                 samples: Vec<(SoundFontSample, f32, String, String)>, 
+                                 sample_rate: f32) {
+        self.note = note;
+        self.velocity = velocity;
+        self.is_active = true;
+        self.is_processing = true;
+        
+        // Clear existing layers
+        self.sample_layers.clear();
+        
+        // Create sample layers from the provided samples
+        for (sample, weight, preset_name, instrument_name) in samples {
+            let mut sample_player = SamplePlayer::new();
+            sample_player.start_sample(&sample, note, sample_rate);
+            
+            // Use cubic interpolation for high-quality multi-zone synthesis
+            sample_player.set_interpolation(InterpolationMethod::Cubic);
+            
+            let layer = SampleLayer {
+                sample_player,
+                soundfont_sample: sample,
+                weight,
+                preset_name,
+                instrument_name,
+            };
+            
+            self.sample_layers.push(layer);
+        }
+        
+        // Trigger EMU8000 envelope
+        self.volume_envelope.trigger();
+        
+        log(&format!("MultiZoneSampleVoice started: Note {} Vel {} -> {} layers", 
+                   note, velocity, self.sample_layers.len()));
+        
+        // Log layer details
+        for (i, layer) in self.sample_layers.iter().enumerate() {
+            log(&format!("  Layer {}: Sample '{}' weight {:.3} from '{}'", 
+                       i, layer.soundfont_sample.name, layer.weight, layer.instrument_name));
+        }
+    }
+    
+    /// Stop note (triggers envelope release phase)
+    pub fn stop_note(&mut self) {
+        // Trigger envelope release phase for note-off event
+        self.volume_envelope.release();
+        // Mark voice as inactive for voice allocation
+        self.is_active = false;
+        // Keep processing until envelope reaches Off state
+    }
+    
+    /// Generate one audio sample with multi-zone mixing and envelope modulation
+    /// 
+    /// # Returns
+    /// Final audio sample (-1.0 to 1.0) combining all sample layers with crossfading
+    pub fn generate_sample(&mut self) -> f32 {
+        if !self.is_processing {
+            return 0.0;
+        }
+        
+        // Mix all sample layers with their weights
+        let mut mixed_audio = 0.0;
+        let mut active_layers = 0;
+        
+        for layer in self.sample_layers.iter_mut() {
+            let layer_audio = layer.sample_player.generate_sample(&layer.soundfont_sample);
+            
+            // Apply layer weight for crossfading
+            mixed_audio += layer_audio * layer.weight;
+            
+            if layer.sample_player.is_playing() {
+                active_layers += 1;
+            }
+        }
+        
+        // Process envelope and update voice state
+        let envelope_amplitude = self.volume_envelope.process();
+        
+        // Voice stops processing when envelope reaches Off state or all samples finish
+        if self.volume_envelope.state == EnvelopeState::Off || active_layers == 0 {
+            self.is_processing = false;
+        }
+        
+        // Combine mixed audio with envelope modulation
+        mixed_audio * envelope_amplitude
+    }
+    
+    /// Check if voice is available for new note allocation
+    pub fn is_available(&self) -> bool {
+        !self.is_active
+    }
+    
+    /// Check if voice is generating audio
+    pub fn is_generating_audio(&self) -> bool {
+        self.is_processing
+    }
+    
+    /// Get number of active sample layers
+    pub fn get_layer_count(&self) -> usize {
+        self.sample_layers.len()
+    }
+    
+    /// Get total weight of all layers (should be close to 1.0)
+    pub fn get_total_weight(&self) -> f32 {
+        self.sample_layers.iter().map(|layer| layer.weight).sum()
+    }
+    
+    /// Get current envelope amplitude (for analysis/debugging)
+    pub fn get_envelope_amplitude(&mut self) -> f32 {
+        self.volume_envelope.process()
+    }
+    
+    /// Set interpolation method for all sample layers
+    pub fn set_interpolation(&mut self, method: InterpolationMethod) {
+        for layer in self.sample_layers.iter_mut() {
+            layer.sample_player.set_interpolation(method);
+        }
+    }
+    
+    /// Get details about sample layers for debugging
+    pub fn get_layer_info(&self) -> Vec<(String, f32, bool)> {
+        self.sample_layers.iter().map(|layer| {
+            (layer.soundfont_sample.name.clone(), 
+             layer.weight, 
+             layer.sample_player.is_playing())
+        }).collect()
+    }
+}
+
+impl Default for MultiZoneSampleVoice {
+    fn default() -> Self {
+        Self::new()
+    }
+}

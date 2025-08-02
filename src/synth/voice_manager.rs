@@ -1,11 +1,12 @@
-use super::voice::{Voice, SampleVoice};
+use super::voice::{Voice, SampleVoice, MultiZoneSampleVoice};
 use crate::soundfont::types::*;
 use crate::log;
 use std::collections::HashMap;
 
 pub struct VoiceManager {
     voices: [Voice; 32],              // Legacy oscillator-based voices (fallback)
-    sample_voices: [SampleVoice; 32], // Modern sample-based voices (preferred)
+    sample_voices: [SampleVoice; 32], // Modern sample-based voices 
+    multi_zone_voices: [MultiZoneSampleVoice; 32], // EMU8000 multi-zone voices (preferred)
     sample_rate: f32,
     // SoundFont integration
     loaded_soundfont: Option<SoundFont>,
@@ -13,6 +14,7 @@ pub struct VoiceManager {
     current_preset: Option<usize>, // Currently selected preset index
     // Voice allocation strategy
     prefer_sample_voices: bool,       // True = use SampleVoice first, False = use Voice first
+    enable_multi_zone: bool,          // True = use MultiZoneSampleVoice for layering
 }
 
 impl VoiceManager {
@@ -20,11 +22,13 @@ impl VoiceManager {
         VoiceManager {
             voices: core::array::from_fn(|_| Voice::new()),
             sample_voices: core::array::from_fn(|_| SampleVoice::new()),
+            multi_zone_voices: core::array::from_fn(|_| MultiZoneSampleVoice::new()),
             sample_rate,
             loaded_soundfont: None,
             preset_map: HashMap::new(),
             current_preset: None,
             prefer_sample_voices: true, // Default to modern sample-based synthesis
+            enable_multi_zone: true,    // Default to EMU8000 multi-zone layering
         }
     }
     
@@ -72,6 +76,23 @@ impl VoiceManager {
     /// Check if sample-based voices are preferred
     pub fn is_using_sample_voices(&self) -> bool {
         self.prefer_sample_voices
+    }
+    
+    /// Enable EMU8000 multi-zone sample layering (preferred for authenticity)
+    pub fn enable_multi_zone(&mut self) {
+        self.enable_multi_zone = true;
+        log("VoiceManager: Multi-zone sample layering enabled");
+    }
+    
+    /// Disable multi-zone layering (single sample per voice)
+    pub fn disable_multi_zone(&mut self) {
+        self.enable_multi_zone = false;
+        log("VoiceManager: Multi-zone layering disabled");
+    }
+    
+    /// Check if multi-zone layering is enabled
+    pub fn is_multi_zone_enabled(&self) -> bool {
+        self.enable_multi_zone
     }
     
     /// Select preset by bank and program number
@@ -167,7 +188,7 @@ impl VoiceManager {
     pub fn get_samples_for_note(&self, note: u8) -> Vec<(u8, &SoundFontSample, String, String)> {
         let mut samples = Vec::new();
         
-        if let Some(soundfont) = &self.loaded_soundfont {
+        if let Some(_soundfont) = &self.loaded_soundfont {
             // Check all velocity layers (0-127) for this note  
             for velocity in 0..128 {
                 if let Some((sample, preset_name, inst_name)) = self.select_sample(note, velocity, None, None) {
@@ -179,15 +200,180 @@ impl VoiceManager {
         samples
     }
     
+    /// EMU8000 Multi-Zone Sample Selection
+    /// 
+    /// Select ALL matching samples for a note/velocity combination to support:
+    /// - Velocity layering with crossfading
+    /// - Key splitting with multiple samples  
+    /// - Round-robin sampling for variation
+    /// - Overlapping zones as per SoundFont 2.0 spec
+    /// 
+    /// Returns Vec of (sample, weight, preset_name, instrument_name) tuples
+    /// where weight indicates the layer contribution (0.0-1.0)
+    pub fn select_multi_zone_samples(&self, note: u8, velocity: u8, bank: Option<u16>, program: Option<u8>) 
+        -> Vec<(&SoundFontSample, f32, String, String)> {
+        
+        let mut matching_samples = Vec::new();
+        
+        let soundfont = match &self.loaded_soundfont {
+            Some(sf) => sf,
+            None => return matching_samples,
+        };
+        
+        // Determine which preset to use
+        let preset_index = if let (Some(b), Some(p)) = (bank, program) {
+            // Use specified bank/program
+            match self.preset_map.get(&(b, p)) {
+                Some(&idx) => idx,
+                None => return matching_samples,
+            }
+        } else {
+            // Use current preset
+            match self.current_preset {
+                Some(idx) => idx,
+                None => return matching_samples,
+            }
+        };
+        
+        let preset = &soundfont.presets[preset_index];
+        
+        // Find ALL matching preset zones (not just the first one)
+        let matching_preset_zones: Vec<_> = preset.preset_zones.iter().filter(|zone| {
+            let key_match = zone.key_range.as_ref()
+                .map(|range| range.contains(note))
+                .unwrap_or(true);
+            let vel_match = zone.velocity_range.as_ref()
+                .map(|range| range.contains(velocity))
+                .unwrap_or(true);
+            key_match && vel_match
+        }).collect();
+        
+        // Process each matching preset zone
+        for preset_zone in matching_preset_zones {
+            if let Some(instrument_id) = preset_zone.instrument_id {
+                if let Some(instrument) = soundfont.instruments.get(instrument_id as usize) {
+                    
+                    // Find ALL matching instrument zones for this preset zone
+                    let matching_instrument_zones: Vec<_> = instrument.instrument_zones.iter().filter(|zone| {
+                        let key_match = zone.key_range.as_ref()
+                            .map(|range| range.contains(note))
+                            .unwrap_or(true);
+                        let vel_match = zone.velocity_range.as_ref()
+                            .map(|range| range.contains(velocity))
+                            .unwrap_or(true);
+                        key_match && vel_match
+                    }).collect();
+                    
+                    // Process each matching instrument zone
+                    for instrument_zone in matching_instrument_zones {
+                        if let Some(sample_id) = instrument_zone.sample_id {
+                            if let Some(sample) = soundfont.samples.get(sample_id as usize) {
+                                
+                                // Calculate layer weight based on velocity position within range
+                                let weight = self.calculate_layer_weight(velocity, 
+                                    &preset_zone.velocity_range, &instrument_zone.velocity_range);
+                                
+                                matching_samples.push((
+                                    sample, 
+                                    weight,
+                                    preset.name.clone(), 
+                                    instrument.name.clone()
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Normalize weights so they sum to 1.0 (or close to it)
+        let total_weight: f32 = matching_samples.iter().map(|(_, weight, _, _)| weight).sum();
+        if total_weight > 0.0 {
+            for (_, weight, _, _) in matching_samples.iter_mut() {
+                *weight /= total_weight;
+            }
+        }
+        
+        matching_samples
+    }
+    
+    /// Calculate layer weight for velocity crossfading
+    /// 
+    /// Returns weight (0.0-1.0) based on velocity position within overlapping ranges
+    fn calculate_layer_weight(&self, velocity: u8, 
+                             preset_vel_range: &Option<crate::soundfont::types::VelocityRange>,
+                             instrument_vel_range: &Option<crate::soundfont::types::VelocityRange>) -> f32 {
+        
+        // Start with full weight
+        let mut weight = 1.0;
+        
+        // Apply preset velocity range weighting
+        if let Some(preset_range) = preset_vel_range {
+            weight *= self.calculate_range_weight(velocity, preset_range.low, preset_range.high);
+        }
+        
+        // Apply instrument velocity range weighting
+        if let Some(instrument_range) = instrument_vel_range {
+            weight *= self.calculate_range_weight(velocity, instrument_range.low, instrument_range.high);
+        }
+        
+        weight
+    }
+    
+    /// Calculate weight based on position within a velocity range
+    /// 
+    /// Uses EMU8000-style crossfading:
+    /// - Full weight in the center of the range
+    /// - Linear falloff at the edges for crossfading
+    fn calculate_range_weight(&self, velocity: u8, range_low: u8, range_high: u8) -> f32 {
+        if velocity < range_low || velocity > range_high {
+            return 0.0; // Outside range
+        }
+        
+        let range_size = range_high - range_low;
+        if range_size <= 4 {
+            return 1.0; // Small range, no crossfading
+        }
+        
+        let crossfade_size = (range_size / 4).max(1); // 25% of range for crossfading
+        let velocity_pos = velocity - range_low;
+        
+        if velocity_pos < crossfade_size {
+            // Fade in at start of range
+            velocity_pos as f32 / crossfade_size as f32
+        } else if velocity_pos > range_size - crossfade_size {
+            // Fade out at end of range
+            (range_size - velocity_pos) as f32 / crossfade_size as f32
+        } else {
+            // Full weight in middle of range
+            1.0
+        }
+    }
+    
+    /// Get count of matching zones for analysis
+    /// 
+    /// Useful for debugging multi-zone sample selection
+    pub fn get_zone_count(&self, note: u8, velocity: u8) -> usize {
+        self.select_multi_zone_samples(note, velocity, None, None).len()
+    }
+    
     /// Check if SoundFont is loaded
     pub fn is_soundfont_loaded(&self) -> bool {
         self.loaded_soundfont.is_some()
     }
     
     pub fn note_on(&mut self, note: u8, velocity: u8) -> Option<usize> {
+        // Use EMU8000 multi-zone layering if enabled
+        if self.enable_multi_zone {
+            // Try multi-zone sample layering first (most authentic EMU8000)
+            if let Some(voice_id) = self.note_on_multi_zone(note, velocity) {
+                return Some(voice_id);
+            }
+        }
+        
         // Use the preferred voice allocation strategy
         if self.prefer_sample_voices {
-            // Try SampleVoice-based note triggering first (modern approach)
+            // Try SampleVoice-based note triggering (modern approach)
             if let Some(voice_id) = self.note_on_sample_voice(note, velocity) {
                 return Some(voice_id);
             }
@@ -210,7 +396,56 @@ impl VoiceManager {
         }
     }
     
-    /// Modern SampleVoice-based note triggering (preferred approach)
+    /// EMU8000 Multi-Zone note triggering (most authentic approach)
+    fn note_on_multi_zone(&mut self, note: u8, velocity: u8) -> Option<usize> {
+        // First, find an available MultiZoneSampleVoice
+        let available_voice_index = {
+            let mut found_index = None;
+            for (i, multi_voice) in self.multi_zone_voices.iter().enumerate() {
+                if multi_voice.is_available() {
+                    found_index = Some(i);
+                    break;
+                }
+            }
+            found_index
+        };
+        
+        let voice_index = match available_voice_index {
+            Some(index) => index,
+            None => {
+                log(&format!("No available MultiZoneSampleVoices for note {} velocity {}", note, velocity));
+                return None;
+            }
+        };
+        
+        // Now get the multi-zone samples (separate borrow)
+        let multi_zone_sample_refs = self.select_multi_zone_samples(note, velocity, None, None);
+        
+        if multi_zone_sample_refs.is_empty() {
+            log(&format!("No multi-zone samples found for note {} velocity {}", note, velocity));
+            return None;
+        }
+        
+        // Convert references to owned values for MultiZoneSampleVoice
+        let multi_zone_samples: Vec<(SoundFontSample, f32, String, String)> = 
+            multi_zone_sample_refs.into_iter()
+                .map(|(sample_ref, weight, preset_name, instrument_name)| {
+                    (sample_ref.clone(), weight, preset_name, instrument_name)
+                })
+                .collect();
+        
+        let sample_rate = self.sample_rate;
+        
+        // Finally, start the multi-zone note
+        self.multi_zone_voices[voice_index].start_multi_zone_note(note, velocity, multi_zone_samples, sample_rate);
+        
+        log(&format!("Multi-zone note triggered: Note {} Vel {} -> MultiZoneVoice {} with {} layers",
+                   note, velocity, voice_index, self.multi_zone_voices[voice_index].get_layer_count()));
+        
+        Some(voice_index)
+    }
+    
+    /// Modern SampleVoice-based note triggering (single sample approach)
     fn note_on_sample_voice(&mut self, note: u8, velocity: u8) -> Option<usize> {
         // Use the sample selection utility to find the appropriate sample
         let sample_info = self.select_sample(note, velocity, None, None)?;
@@ -358,7 +593,15 @@ impl VoiceManager {
     pub fn note_off(&mut self, note: u8) {
         let mut released_count = 0;
         
-        // Release matching SampleVoices first (preferred voice type)
+        // Release matching MultiZoneSampleVoices first (most authentic EMU8000)
+        for multi_voice in self.multi_zone_voices.iter_mut() {
+            if multi_voice.is_active && multi_voice.note == note {
+                multi_voice.stop_note();
+                released_count += 1;
+            }
+        }
+        
+        // Release matching SampleVoices (modern approach)
         for sample_voice in self.sample_voices.iter_mut() {
             if sample_voice.is_active && sample_voice.note == note {
                 sample_voice.stop_note();
@@ -384,6 +627,14 @@ impl VoiceManager {
     pub fn process(&mut self) -> f32 {
         let mut mixed_output = 0.0;
         
+        // Process MultiZoneSampleVoices (most authentic EMU8000 with layering)
+        for multi_voice in self.multi_zone_voices.iter_mut() {
+            if multi_voice.is_processing {
+                let voice_sample = multi_voice.generate_sample();
+                mixed_output += voice_sample;
+            }
+        }
+        
         // Process SampleVoices (modern sample-based synthesis)
         for sample_voice in self.sample_voices.iter_mut() {
             if sample_voice.is_processing {
@@ -408,6 +659,18 @@ impl VoiceManager {
     /// Returns the number of voices that are still generating audio  
     pub fn process_envelopes(&mut self) -> u32 {
         let mut processing_count = 0;
+        
+        // Process MultiZoneSampleVoice envelopes
+        for multi_voice in self.multi_zone_voices.iter_mut() {
+            if multi_voice.is_processing {
+                let _amplitude = multi_voice.get_envelope_amplitude();
+                
+                // MultiZoneSampleVoice automatically updates is_processing in get_envelope_amplitude()
+                if multi_voice.is_processing {
+                    processing_count += 1;
+                }
+            }
+        }
         
         // Process SampleVoice envelopes
         for sample_voice in self.sample_voices.iter_mut() {
