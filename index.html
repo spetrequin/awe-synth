@@ -166,6 +166,48 @@
             color: #87ceeb;
             text-decoration: none;
         }
+        .nav-header {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+        .nav-brand {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #87ceeb;
+            text-decoration: none;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .nav-links a {
+            color: #e0e0e0;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+        .nav-links a:hover {
+            background: rgba(135,206,235,0.2);
+            color: #87ceeb;
+        }
+        .nav-links a.active {
+            background: rgba(135,206,235,0.3);
+            color: #87ceeb;
+            font-weight: 500;
+        }
         .loading {
             display: none;
             text-align: center;
@@ -187,6 +229,19 @@
     </style>
 </head>
 <body>
+    <nav class="nav-header">
+        <div class="nav-content">
+            <a href="index.html" class="nav-brand">🎵 AWE Player</a>
+            <div class="nav-links">
+                <a href="index.html" class="active">🏠 Main Interface</a>
+                <a href="architecture_test.html">🧪 Testing Suite</a>
+                <a href="debug_version_info.html">🔍 Debug Tools</a>
+                <a href="web/index.html">🖥️ Full Web App</a>
+                <a href="web/test-comprehensive-integration.html">⚙️ Integration Tests</a>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <header class="header">
             <h1>🎵 AWE Player</h1>

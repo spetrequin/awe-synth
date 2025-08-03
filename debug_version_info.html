@@ -2,9 +2,85 @@
 <html>
 <head>
     <title>Debug Version Info</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
+        .nav-header {
+            background: rgba(16,33,62,0.8);
+            padding: 10px 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+        .nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+        .nav-brand {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #00ff88;
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+        }
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .nav-links a {
+            color: #e0e0e0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+        .nav-links a:hover {
+            background: rgba(0,255,136,0.2);
+            color: #00ff88;
+        }
+        .nav-links a.active {
+            background: rgba(0,255,136,0.3);
+            color: #00ff88;
+            font-weight: 500;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #00ff88;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <h1>Debug Version Info Test</h1>
+    <nav class="nav-header">
+        <div class="nav-content">
+            <a href="index.html" class="nav-brand">🎵 AWE Player</a>
+            <div class="nav-links">
+                <a href="index.html">🏠 Main Interface</a>
+                <a href="architecture_test.html">🧪 Testing Suite</a>
+                <a href="debug_version_info.html" class="active">🔍 Debug Tools</a>
+                <a href="web/index.html">🖥️ Full Web App</a>
+                <a href="web/test-comprehensive-integration.html">⚙️ Integration Tests</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>🔍 Debug Version Info Test</h1>
     <div id="output"></div>
     
     <script type="module">
@@ -51,5 +127,6 @@
         
         testVersionInfo();
     </script>
+    </div>
 </body>
 </html>

@@ -215,9 +215,66 @@
         .level-intermediate { background: #ffc107; color: #212529; }
         .level-advanced { background: #dc3545; color: white; }
         .level-stress { background: #6f42c1; color: white; }
+        .nav-header {
+            background: rgba(16,33,62,0.8);
+            padding: 10px 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+        .nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+        .nav-brand {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #00ff88;
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+        }
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .nav-links a {
+            color: #e0e0e0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+        .nav-links a:hover {
+            background: rgba(0,255,136,0.2);
+            color: #00ff88;
+        }
+        .nav-links a.active {
+            background: rgba(0,255,136,0.3);
+            color: #00ff88;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
+    <nav class="nav-header">
+        <div class="nav-content">
+            <a href="index.html" class="nav-brand">🎵 AWE Player</a>
+            <div class="nav-links">
+                <a href="index.html">🏠 Main Interface</a>
+                <a href="architecture_test.html" class="active">🧪 Testing Suite</a>
+                <a href="debug_version_info.html">🔍 Debug Tools</a>
+                <a href="web/index.html">🖥️ Full Web App</a>
+                <a href="web/test-comprehensive-integration.html">⚙️ Integration Tests</a>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <header class="header">
             <h1>🧪 AWE Player Testing Suite</h1>
