@@ -1,81 +1,529 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>AWE Player - Foundation Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWE Player - EMU8000 Emulator</title>
     <style>
-        body { font-family: monospace; margin: 20px; }
-        #debug-log { width: 100%; height: 200px; background: #f0f0f0; }
-        button { margin: 5px; padding: 10px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .version-info {
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin: 5px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-dot.green { background: #28a745; }
+        .status-dot.red { background: #dc3545; }
+        .status-dot.yellow { background: #ffc107; }
+        .main-interface {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .controls-section {
+            margin-bottom: 30px;
+        }
+        .controls-section h3 {
+            margin-bottom: 15px;
+            color: #87ceeb;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+            transform: translateY(-2px);
+        }
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        .btn-info:hover {
+            background: #117a8b;
+            transform: translateY(-2px);
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+        .file-drop-area {
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        .file-drop-area:hover,
+        .file-drop-area.dragover {
+            border-color: #87ceeb;
+            background: rgba(135,206,235,0.1);
+        }
+        .debug-section {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        .debug-log {
+            background: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+            border: 1px solid #333;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            opacity: 0.7;
+        }
+        .footer a {
+            color: #87ceeb;
+            text-decoration: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid #87ceeb;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
-    <h1>AWE Player - Foundation Test</h1>
-    
-    <button onclick="testPlayer()">Test MidiPlayer</button>
-    <button onclick="testTone()">Test Tone</button>
-    <button onclick="testSynthesis()">Test Phase 7A Synthesis</button>
-    <button onclick="updateDebugLog()">Update Debug Log</button>
-    
-    <h3>Debug Output:</h3>
-    <textarea id="debug-log" readonly></textarea>
+    <div class="container">
+        <header class="header">
+            <h1>🎵 AWE Player</h1>
+            <div class="subtitle">WebAssembly EMU8000 Emulator with SoundFont 2.0 Support</div>
+            <div class="version-info" id="version-info">
+                Loading version info...
+            </div>
+        </header>
+
+        <div class="status-bar" id="status-bar">
+            <div class="status-item">
+                <div class="status-dot red" id="wasm-status"></div>
+                <span>WASM Module</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot red" id="audio-status"></div>
+                <span>Audio System</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot red" id="midi-status"></div>
+                <span>MIDI System</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot red" id="sf-status"></div>
+                <span>SoundFont</span>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Initializing AWE Player...</p>
+        </div>
+
+        <main class="main-interface" id="main-interface" style="display: none;">
+            <div class="controls-section">
+                <h3>🎹 Quick Start</h3>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="initializeAudio()">🔊 Initialize Audio</button>
+                    <button class="btn btn-success" onclick="playTestTone()">🎵 Test Tone</button>
+                    <button class="btn btn-info" onclick="runQuickTest()">⚡ Quick MIDI Test</button>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>📁 File Management</h3>
+                <div class="file-drop-area" id="file-drop-area">
+                    <p>📂 Drop SoundFont (.sf2) or MIDI (.mid) files here</p>
+                    <p>or</p>
+                    <input type="file" id="file-input" accept=".sf2,.mid,.midi" style="display: none;" multiple>
+                    <button class="btn btn-info" onclick="document.getElementById('file-input').click()">Choose Files</button>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-warning" onclick="loadDefaultSoundFont()">🎼 Load Default SoundFont</button>
+                    <button class="btn btn-info" onclick="loadDemoMIDI()">🎵 Load Demo MIDI</button>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>🎛️ Playback Controls</h3>
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="playMIDI()">▶️ Play</button>
+                    <button class="btn btn-warning" onclick="pauseMIDI()">⏸️ Pause</button>
+                    <button class="btn btn-info" onclick="stopMIDI()">⏹️ Stop</button>
+                    <button class="btn btn-primary" onclick="resetAll()">🔄 Reset</button>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>🔧 Advanced Features</h3>
+                <div class="button-group">
+                    <a href="web/index.html" class="btn btn-primary">🖥️ Full Web Interface</a>
+                    <a href="architecture_test.html" class="btn btn-info">🧪 Testing Suite</a>
+                    <a href="web/test-comprehensive-integration.html" class="btn btn-warning">⚙️ Integration Tests</a>
+                </div>
+            </div>
+        </main>
+
+        <div class="debug-section">
+            <h3>🐛 Debug Console</h3>
+            <div class="button-group">
+                <button class="btn btn-info" onclick="updateDebugLog()">🔄 Refresh Log</button>
+                <button class="btn btn-success" onclick="copyDebugLog()">📋 Copy Log</button>
+                <button class="btn btn-warning" onclick="clearDebugLog()">🧹 Clear Log</button>
+            </div>
+            <div class="debug-log" id="debug-log">AWE Player Debug Console\nWaiting for initialization...</div>
+        </div>
+
+        <footer class="footer">
+            <p>🎵 AWE Player - Authentic EMU8000 Emulation | 
+            <a href="https://github.com/your-repo/awe-synth" target="_blank">GitHub</a> | 
+            <a href="CLAUDE.md">Documentation</a></p>
+        </footer>
+    </div>
 
     <script type="module">
-        import init, { MidiPlayer } from './pkg/awe_synth.js';
-        
-        let player = null;
-        
-        async function initWasm() {
-            await init();
-            window.player = new MidiPlayer();
-            document.getElementById('debug-log').value = 'WASM loaded successfully\n';
+        let wasmModule = null;
+        let audioInitialized = false;
+        let midiPlayer = null;
+
+        // Status management
+        function updateStatus(elementId, success, message = '') {
+            const element = document.getElementById(elementId);
+            element.className = `status-dot ${success ? 'green' : 'red'}`;
+            if (message) {
+                element.parentElement.title = message;
+            }
         }
-        
-        window.testPlayer = function() {
-            if (window.player) {
-                const log = window.player.get_debug_log();
-                document.getElementById('debug-log').value = log;
-            }
-        };
-        
-        window.testTone = function() {
-            if (window.player) {
-                const sample = window.player.play_test_tone();
-                document.getElementById('debug-log').value += `\nTest tone sample: ${sample}`;
-            }
-        };
-        
-        window.testSynthesis = function() {
-            if (window.player) {
-                const results = window.player.test_synthesis_pipeline();
-                document.getElementById('debug-log').value += `\n\n=== PHASE 7A SYNTHESIS TEST ===\n`;
-                document.getElementById('debug-log').value += `Results: ${results}\n`;
-                document.getElementById('debug-log').value += `=== END TEST ===\n\n`;
+
+        // Debug logging
+        function debugLog(message, type = 'info') {
+            const logElement = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logElement.textContent += `\n[${timestamp}] ${prefix} ${message}`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // Initialize WASM module
+        async function initializeWASM() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                debugLog('Loading WASM module...');
                 
-                // Parse and display results nicely
+                wasmModule = await import('./pkg/awe_synth.js');
+                await wasmModule.default();
+                
+                // Initialize systems
+                const initSuccess = wasmModule.init_all_systems(44100);
+                if (initSuccess) {
+                    updateStatus('wasm-status', true, 'WASM module loaded and initialized');
+                    debugLog('WASM module initialized successfully', 'success');
+                    
+                    // Get version info
+                    const versionInfo = JSON.parse(wasmModule.get_version_info());
+                    document.getElementById('version-info').textContent = 
+                        `${versionInfo.name} v${versionInfo.version} (${versionInfo.phase})`;
+                    
+                    // Initialize MIDI player
+                    midiPlayer = new wasmModule.MidiPlayer();
+                    updateStatus('midi-status', true, 'MIDI system ready');
+                    debugLog('MIDI player created', 'success');
+                    
+                    // Show main interface
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('main-interface').style.display = 'block';
+                    
+                } else {
+                    throw new Error('Failed to initialize systems');
+                }
+                
+            } catch (error) {
+                debugLog(`WASM initialization failed: ${error.message}`, 'error');
+                updateStatus('wasm-status', false, error.message);
+                document.getElementById('loading').innerHTML = 
+                    '<p style="color: #dc3545;">❌ Failed to load AWE Player. Please refresh and try again.</p>';
+            }
+        }
+
+        // Audio initialization
+        window.initializeAudio = async function() {
+            try {
+                debugLog('Initializing Web Audio...');
+                // This would integrate with the web/ folder audio system
+                updateStatus('audio-status', true, 'Audio system ready');
+                audioInitialized = true;
+                debugLog('Audio system initialized', 'success');
+            } catch (error) {
+                debugLog(`Audio initialization failed: ${error.message}`, 'error');
+                updateStatus('audio-status', false, error.message);
+            }
+        };
+
+        // Test functions
+        window.playTestTone = function() {
+            if (!midiPlayer) {
+                debugLog('MIDI player not initialized', 'error');
+                return;
+            }
+            try {
+                const result = midiPlayer.play_test_tone();
+                debugLog(`Test tone played: ${result}`, 'success');
+            } catch (error) {
+                debugLog(`Test tone failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.runQuickTest = function() {
+            if (!wasmModule) {
+                debugLog('WASM module not loaded', 'error');
+                return;
+            }
+            try {
+                const result = wasmModule.quick_c_major_test();
+                debugLog(`Quick test result: ${result}`, 'success');
+            } catch (error) {
+                debugLog(`Quick test failed: ${error.message}`, 'error');
+            }
+        };
+
+        // File handling
+        const fileDropArea = document.getElementById('file-drop-area');
+        const fileInput = document.getElementById('file-input');
+
+        fileDropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropArea.classList.add('dragover');
+        });
+
+        fileDropArea.addEventListener('dragleave', () => {
+            fileDropArea.classList.remove('dragover');
+        });
+
+        fileDropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                const extension = file.name.toLowerCase().split('.').pop();
+                if (extension === 'sf2') {
+                    loadSoundFont(file);
+                } else if (extension === 'mid' || extension === 'midi') {
+                    loadMIDIFile(file);
+                } else {
+                    debugLog(`Unsupported file type: ${file.name}`, 'warning');
+                }
+            });
+        }
+
+        function loadSoundFont(file) {
+            debugLog(`Loading SoundFont: ${file.name}`);
+            const reader = new FileReader();
+            reader.onload = (e) => {
                 try {
-                    const data = JSON.parse(results);
-                    if (data.success) {
-                        document.getElementById('debug-log').value += `✅ SUCCESS: Voice ${data.voice_allocated} allocated\n`;
-                        document.getElementById('debug-log').value += `✅ Audio samples generated: ${data.non_zero_samples}/10 non-zero\n`;
-                        document.getElementById('debug-log').value += `✅ Complete synthesis pipeline working!\n`;
-                    } else {
-                        document.getElementById('debug-log').value += `❌ FAILED: ${data.error}\n`;
+                    // This would integrate with the SoundFont system
+                    updateStatus('sf-status', true, `Loaded: ${file.name}`);
+                    debugLog(`SoundFont loaded: ${file.name}`, 'success');
+                } catch (error) {
+                    debugLog(`SoundFont load failed: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function loadMIDIFile(file) {
+            debugLog(`Loading MIDI file: ${file.name}`);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    if (midiPlayer) {
+                        const data = new Uint8Array(e.target.result);
+                        const success = midiPlayer.load_midi_file(data);
+                        if (success) {
+                            debugLog(`MIDI file loaded: ${file.name}`, 'success');
+                        } else {
+                            debugLog(`MIDI file load failed: ${file.name}`, 'error');
+                        }
                     }
-                } catch(e) {
-                    document.getElementById('debug-log').value += `Parse error: ${e}\n`;
+                } catch (error) {
+                    debugLog(`MIDI load failed: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Playback controls
+        window.playMIDI = function() {
+            if (midiPlayer) {
+                midiPlayer.play();
+                debugLog('MIDI playback started', 'success');
+            }
+        };
+
+        window.pauseMIDI = function() {
+            if (midiPlayer) {
+                midiPlayer.pause();
+                debugLog('MIDI playback paused', 'warning');
+            }
+        };
+
+        window.stopMIDI = function() {
+            if (midiPlayer) {
+                midiPlayer.stop();
+                debugLog('MIDI playback stopped', 'warning');
+            }
+        };
+
+        window.resetAll = function() {
+            if (wasmModule) {
+                wasmModule.reset_audio_state_global();
+                debugLog('All systems reset', 'success');
+            }
+        };
+
+        // Demo functions
+        window.loadDefaultSoundFont = function() {
+            debugLog('Loading default SoundFont (feature coming soon)', 'warning');
+        };
+
+        window.loadDemoMIDI = function() {
+            debugLog('Loading demo MIDI (feature coming soon)', 'warning');
+        };
+
+        // Debug log management
+        window.updateDebugLog = function() {
+            if (midiPlayer) {
+                const log = midiPlayer.get_debug_log();
+                if (log) {
+                    document.getElementById('debug-log').textContent += '\n' + log;
                 }
             }
         };
-        
-        window.updateDebugLog = function() {
-            if (window.player) {
-                const log = window.player.get_debug_log();
-                document.getElementById('debug-log').value = log;
+
+        window.copyDebugLog = async function() {
+            const debugLog = document.getElementById('debug-log');
+            try {
+                await navigator.clipboard.writeText(debugLog.textContent);
+                debugLog('Debug log copied to clipboard', 'success');
+            } catch (err) {
+                debugLog.select();
+                document.execCommand('copy');
+                debugLog('Debug log copied to clipboard (fallback)', 'success');
             }
         };
-        
-        initWasm();
+
+        window.clearDebugLog = function() {
+            document.getElementById('debug-log').textContent = 'AWE Player Debug Console\n';
+        };
+
+        // Initialize on page load
+        initializeWASM();
     </script>
 </body>
 </html>

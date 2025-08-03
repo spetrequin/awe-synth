@@ -136,7 +136,7 @@ impl ChorusProcessor {
         ];
         
         // Create modulated delay lines
-        for (i, (delay_ms, phase_offset)) in delay_configs.iter().enumerate() {
+        for (_i, (delay_ms, phase_offset)) in delay_configs.iter().enumerate() {
             let delay_samples = (delay_ms * self.sample_rate / 1000.0) as usize;
             let modulation_depth_samples = self.depth * 2.0 * self.sample_rate / 1000.0; // Up to 2ms modulation
             let feedback = self.feedback * 0.8; // Reduce feedback per line to avoid buildup
@@ -163,7 +163,7 @@ impl ChorusProcessor {
     /// Processed chorus output sample
     pub fn process(&mut self, input: f32) -> f32 {
         // Apply input gain to prevent clipping
-        let mut signal = input * self.input_gain;
+        let signal = input * self.input_gain;
         
         // Update LFO for modulation
         let lfo_output = self.lfo.process();

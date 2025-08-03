@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Version Info</title>
+</head>
+<body>
+    <h1>Debug Version Info Test</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        async function testVersionInfo() {
+            try {
+                const wasmModule = await import('./pkg/awe_synth.js');
+                await wasmModule.default();
+                
+                console.log('WASM module loaded');
+                
+                // Test the function directly
+                const versionRaw = wasmModule.get_version_info();
+                console.log('Raw version info:', versionRaw);
+                console.log('Type:', typeof versionRaw);
+                console.log('Length:', versionRaw.length);
+                
+                document.getElementById('output').innerHTML = `
+                    <p><strong>Raw output:</strong> ${versionRaw}</p>
+                    <p><strong>Type:</strong> ${typeof versionRaw}</p>
+                    <p><strong>Length:</strong> ${versionRaw.length}</p>
+                `;
+                
+                // Try to parse it
+                try {
+                    const parsed = JSON.parse(versionRaw);
+                    document.getElementById('output').innerHTML += `
+                        <p style="color: green;"><strong>✅ Parsed successfully:</strong> ${JSON.stringify(parsed, null, 2)}</p>
+                    `;
+                } catch (parseError) {
+                    document.getElementById('output').innerHTML += `
+                        <p style="color: red;"><strong>❌ Parse error:</strong> ${parseError.message}</p>
+                        <p><strong>Character codes:</strong> ${Array.from(versionRaw).map(c => c.charCodeAt(0)).join(', ')}</p>
+                        <p><strong>Hex representation:</strong> ${Array.from(versionRaw).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ')}</p>
+                        <p><strong>First 10 chars:</strong> "${versionRaw.substring(0, 10)}"</p>
+                        <p><strong>Last 10 chars:</strong> "${versionRaw.substring(versionRaw.length - 10)}"</p>
+                    `;
+                }
+                
+            } catch (error) {
+                document.getElementById('output').innerHTML = `<p>Error: ${error.message}</p>`;
+                console.error('Error:', error);
+            }
+        }
+        
+        testVersionInfo();
+    </script>
+</body>
+</html>

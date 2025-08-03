@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 use std::collections::VecDeque;
+use std::sync::{Mutex, OnceLock};
 
 pub mod error;
 pub mod midi;
@@ -13,20 +14,16 @@ use midi::sequencer::{MidiSequencer, PlaybackState};
 use midi::constants::*;
 use synth::voice_manager::VoiceManager;
 
-static mut DEBUG_LOG: Option<VecDeque<String>> = None;
-static mut MIDI_EVENT_QUEUE: Option<VecDeque<MidiEvent>> = None;
+static DEBUG_LOG: OnceLock<Mutex<VecDeque<String>>> = OnceLock::new();
+static MIDI_EVENT_QUEUE: OnceLock<Mutex<VecDeque<MidiEvent>>> = OnceLock::new();
 
 pub fn log(message: &str) {
-    unsafe {
-        if DEBUG_LOG.is_none() {
-            DEBUG_LOG = Some(VecDeque::with_capacity(200));
+    let log = DEBUG_LOG.get_or_init(|| Mutex::new(VecDeque::with_capacity(200)));
+    if let Ok(mut log) = log.lock() {
+        if log.len() >= 200 {
+            log.pop_front();
         }
-        if let Some(ref mut log) = DEBUG_LOG {
-            if log.len() >= 200 {
-                log.pop_front();
-            }
-            log.push_back(message.to_string());
-        }
+        log.push_back(message.to_string());
     }
 }
 
@@ -61,12 +58,9 @@ impl MidiPlayer {
     #[wasm_bindgen(constructor)]
     pub fn new() -> MidiPlayer {
         log("MidiPlayer::new() - AWE Player initialized");
-        unsafe {
-            if MIDI_EVENT_QUEUE.is_none() {
-                MIDI_EVENT_QUEUE = Some(VecDeque::with_capacity(1000));
-                log("MIDI event queue initialized (capacity: 1000)");
-            }
-        }
+        // Initialize MIDI event queue
+        MIDI_EVENT_QUEUE.get_or_init(|| Mutex::new(VecDeque::with_capacity(1000)));
+        log("MIDI event queue initialized (capacity: 1000)");
         MidiPlayer {
             sequencer: MidiSequencer::new(44100.0), // 44.1kHz sample rate
             voice_manager: VoiceManager::new(44100.0),
@@ -76,37 +70,35 @@ impl MidiPlayer {
     
     #[wasm_bindgen]
     pub fn queue_midi_event(&mut self, event: MidiEvent) {
-        unsafe {
-            if let Some(ref mut queue) = MIDI_EVENT_QUEUE {
-                if queue.len() >= 1000 {
-                    queue.pop_front();
-                    log("MIDI queue full - dropped oldest event");
-                }
-                queue.push_back(event);
-                log(&format!("MIDI event queued: ch={} type={} data={},{} @{}", 
-                    event.channel, event.message_type, event.data1, event.data2, event.timestamp));
+        let queue = MIDI_EVENT_QUEUE.get().expect("MIDI queue should be initialized");
+        if let Ok(mut queue) = queue.lock() {
+            if queue.len() >= 1000 {
+                queue.pop_front();
+                log("MIDI queue full - dropped oldest event");
             }
+            queue.push_back(event);
+            log(&format!("MIDI event queued: ch={} type={} data={},{} @{}", 
+                event.channel, event.message_type, event.data1, event.data2, event.timestamp));
         }
     }
     
     #[wasm_bindgen]
     pub fn process_midi_events(&mut self, current_sample_time: u64) -> u32 {
         let mut processed_count = 0;
-        unsafe {
-            if let Some(ref mut queue) = MIDI_EVENT_QUEUE {
-                while let Some(event) = queue.front() {
-                    if event.timestamp <= current_sample_time {
-                        let event = queue.pop_front().unwrap();
-                        
-                        // Process MIDI event through VoiceManager
-                        self.handle_midi_event(&event);
-                        
-                        log(&format!("Processing MIDI event: ch={} type=0x{:02X} data={},{} @{}", 
-                            event.channel, event.message_type, event.data1, event.data2, event.timestamp));
-                        processed_count += 1;
-                    } else {
-                        break;
-                    }
+        let queue = MIDI_EVENT_QUEUE.get().expect("MIDI queue should be initialized");
+        if let Ok(mut queue) = queue.lock() {
+            while let Some(event) = queue.front() {
+                if event.timestamp <= current_sample_time {
+                    let event = queue.pop_front().unwrap();
+                    
+                    // Process MIDI event through VoiceManager
+                    self.handle_midi_event(&event);
+                    
+                    log(&format!("Processing MIDI event: ch={} type=0x{:02X} data={},{} @{}", 
+                        event.channel, event.message_type, event.data1, event.data2, event.timestamp));
+                    processed_count += 1;
+                } else {
+                    break;
                 }
             }
         }
@@ -115,12 +107,14 @@ impl MidiPlayer {
     
     #[wasm_bindgen]
     pub fn get_debug_log(&self) -> String {
-        unsafe {
-            if let Some(ref log) = DEBUG_LOG {
+        if let Some(log) = DEBUG_LOG.get() {
+            if let Ok(log) = log.lock() {
                 log.iter().cloned().collect::<Vec<String>>().join("\n")
             } else {
                 String::new()
             }
+        } else {
+            String::new()
         }
     }
     

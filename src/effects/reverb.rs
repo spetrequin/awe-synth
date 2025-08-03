@@ -352,7 +352,7 @@ impl AllPassFilter {
 
 impl CombFilter {
     /// Create new comb filter with damping
-    pub fn new(delay_samples: usize, feedback: f32, damping: f32) -> Self {
+    pub fn new(delay_samples: usize, _feedback: f32, damping: f32) -> Self {
         CombFilter {
             delay_line: DelayLine::new(delay_samples, 0.0), // Handle feedback internally
             damping_filter: damping.clamp(0.0, 1.0),

@@ -143,7 +143,7 @@ impl LFO {
     pub fn from_soundfont_generators(
         sample_rate: f32,
         freq_cents: i32,        // Frequency in cents
-        delay_timecents: i32,   // Delay before LFO starts (not implemented yet)
+        _delay_timecents: i32,   // Delay before LFO starts (not implemented yet)
         depth: f32,             // Modulation depth (0.0-1.0)
         waveform: LfoWaveform,  // Waveform type
     ) -> Self {

@@ -8,7 +8,7 @@
  * - Key scaling support for envelope timing
  */
 
-use crate::synth::envelope::{EnvelopeState, timecents_to_seconds, centibels_to_linear};
+use crate::synth::envelope::{EnvelopeState, timecents_to_seconds};
 use crate::log;
 
 /// 6-stage modulation envelope for filter/pitch modulation

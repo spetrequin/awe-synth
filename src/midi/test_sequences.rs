@@ -392,8 +392,8 @@ pub fn execute_test_sequence(sequence_json: &str) -> u32 {
             
             // Queue all events from the sequence
             for event in &sequence.events {
-                unsafe {
-                    if let Some(ref mut queue) = crate::MIDI_EVENT_QUEUE {
+                if let Some(queue) = crate::MIDI_EVENT_QUEUE.get() {
+                    if let Ok(mut queue) = queue.lock() {
                         if queue.len() >= 1000 {
                             queue.pop_front();
                         }
