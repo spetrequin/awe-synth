@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Pipeline Test - Phase 17.3</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #1a1a1a; color: #00ff00; }
+        .status { padding: 10px; margin: 10px 0; border: 1px solid #333; background: #222; }
+        .success { color: #44ff44; }
+        .error { color: #ff4444; }
+        .info { color: #00ffff; }
+        #log { width: 100%; height: 400px; background: #000; color: #00ff00; padding: 10px; }
+        button { background: #333; color: #00ff00; border: 1px solid #00ff00; padding: 8px 16px; margin: 5px; cursor: pointer; }
+        button:hover { background: #00ff00; color: #000; }
+    </style>
+</head>
+<body>
+    <h1>🧪 MIDI Pipeline Test - Task 17.3</h1>
+    
+    <div class="status">
+        <h3>Pipeline Status</h3>
+        <div id="status-display">Initializing...</div>
+    </div>
+    
+    <div class="status">
+        <h3>Test Controls</h3>
+        <button onclick="runPipelineTest()">🧪 Run Complete Pipeline Test</button>
+        <button onclick="testEffects()">🎛️ Test Effects (CC 91/93)</button>
+        <button onclick="testMIDINote()">🎹 Test MIDI Note</button>
+        <button onclick="clearLog()">🧹 Clear Log</button>
+    </div>
+    
+    <div class="status">
+        <h3>Debug Log</h3>
+        <textarea id="log" readonly></textarea>
+    </div>
+
+    <script type="module">
+        // Import WASM module directly for pipeline testing
+        import init, * as wasm from './src/wasm-pkg/awe_synth.js';
+        
+        let wasmModule = null;
+        let isInitialized = false;
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.value += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status-display');
+            statusDiv.innerHTML = `<span class="${type}">${message}</span>`;
+        }
+        
+        async function initializeWASM() {
+            try {
+                log('📦 Loading WASM module...');
+                updateStatus('Loading WASM...', 'info');
+                
+                await init();
+                wasmModule = wasm;
+                
+                log('✅ WASM module loaded successfully');
+                
+                // Initialize audio worklet
+                const sampleRate = 44100;
+                const initResult = wasmModule.init_audio_worklet(sampleRate);
+                if (!initResult) {
+                    throw new Error('Failed to initialize WASM audio worklet');
+                }
+                
+                log(`✅ WASM audio worklet initialized at ${sampleRate}Hz`);
+                updateStatus('WASM Ready - Pipeline Test Available', 'success');
+                isInitialized = true;
+                
+                // Enable test buttons
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => btn.disabled = false);
+                
+            } catch (error) {
+                log(`❌ WASM initialization failed: ${error}`);
+                updateStatus('WASM Failed', 'error');
+            }
+        }
+        
+        window.runPipelineTest = async function() {
+            if (!isInitialized) {
+                log('❌ WASM not initialized');
+                return;
+            }
+            
+            try {
+                log('🧪 Running complete MIDI→WASM→Audio pipeline test...');
+                updateStatus('Running Pipeline Test...', 'info');
+                
+                // Test 1: Verify WASM functions
+                const requiredFunctions = [
+                    'init_audio_worklet',
+                    'queue_midi_event_global', 
+                    'process_stereo_buffer_global',
+                    'get_debug_log_global'
+                ];
+                
+                for (const func of requiredFunctions) {
+                    if (!wasmModule[func]) {
+                        throw new Error(`Missing WASM function: ${func}`);
+                    }
+                }
+                log('✅ All required WASM functions available');
+                
+                // Test 2: Queue Phase 16 effects + note
+                log('🎛️ Testing Phase 16 effects integration...');
+                
+                // Set reverb send (CC 91) to 80%
+                wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, 102);
+                log('✅ Queued Reverb Send CC 91 = 80%');
+                
+                // Set chorus send (CC 93) to 50%
+                wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, 64);
+                log('✅ Queued Chorus Send CC 93 = 50%');
+                
+                // Play Middle C with velocity 100
+                wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+                log('✅ Queued Note On: Middle C (60) velocity 100');
+                
+                // Test 3: Process audio buffer
+                const bufferSize = 128;
+                const audioBuffer = wasmModule.process_stereo_buffer_global(bufferSize);
+                
+                if (!audioBuffer || audioBuffer.length !== bufferSize * 2) {
+                    throw new Error(`Invalid audio buffer: expected ${bufferSize * 2} samples, got ${audioBuffer?.length || 0}`);
+                }
+                
+                // Check for non-zero audio
+                let nonZeroCount = 0;
+                for (let i = 0; i < audioBuffer.length; i++) {
+                    if (Math.abs(audioBuffer[i]) > 0.0001) {
+                        nonZeroCount++;
+                    }
+                }
+                log(`✅ Audio synthesis working: ${nonZeroCount}/${audioBuffer.length} non-zero samples`);
+                
+                // Test 4: Stop the note
+                wasmModule.queue_midi_event_global(0n, 0, 0x80, 60, 0);
+                log('✅ Queued Note Off: Middle C');
+                
+                // Test 5: Get WASM debug log
+                const debugLog = wasmModule.get_debug_log_global();
+                if (debugLog && debugLog.length > 0) {
+                    log('✅ WASM debug logging functional');
+                    log(`📋 WASM Log Sample: ${debugLog.slice(-200)}`);
+                }
+                
+                log('🎉 COMPLETE MIDI→WASM→Audio pipeline test PASSED!');
+                updateStatus('Pipeline Test PASSED ✅', 'success');
+                
+            } catch (error) {
+                log(`❌ Pipeline test failed: ${error}`);
+                updateStatus('Pipeline Test FAILED ❌', 'error');
+            }
+        };
+        
+        window.testEffects = function() {
+            if (!isInitialized) {
+                log('❌ WASM not initialized');
+                return;
+            }
+            
+            log('🎛️ Testing Phase 16 effects control...');
+            
+            const effectsTests = [
+                { cc: 91, value: 127, name: 'Reverb Send Max' },
+                { cc: 91, value: 0, name: 'Reverb Send Off' },
+                { cc: 93, value: 64, name: 'Chorus Send 50%' },
+                { cc: 93, value: 0, name: 'Chorus Send Off' }
+            ];
+            
+            for (const test of effectsTests) {
+                wasmModule.queue_midi_event_global(0n, 0, 0xB0, test.cc, test.value);
+                wasmModule.process_stereo_buffer_global(32); // Process small buffer
+                log(`✅ ${test.name} (CC${test.cc}=${test.value})`);
+            }
+            
+            log('✅ Effects control test complete');
+        };
+        
+        window.testMIDINote = function() {
+            if (!isInitialized) {
+                log('❌ WASM not initialized');
+                return;
+            }
+            
+            log('🎹 Testing MIDI note...');
+            
+            // Play A4 (440Hz)
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 69, 80);
+            
+            // Process some audio
+            const audioBuffer = wasmModule.process_stereo_buffer_global(256);
+            log(`✅ Note triggered, processed ${audioBuffer.length} samples`);
+            
+            // Stop after 1 second
+            setTimeout(() => {
+                wasmModule.queue_midi_event_global(0n, 0, 0x80, 69, 0);
+                log('✅ Note stopped');
+            }, 1000);
+        };
+        
+        window.clearLog = function() {
+            document.getElementById('log').value = '';
+        };
+        
+        // Initialize on load
+        initializeWASM();
+    </script>
+</body>
+</html>

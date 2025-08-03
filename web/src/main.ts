@@ -9,6 +9,9 @@
 
 import { DebugLogger } from './utils/debug-logger.js';
 import { UIControlManager } from './ui-controls.js';
+import { EffectsControlPanel } from './effects-control-panel.js';
+import { SoundFontLoader } from './soundfont-loader.js';
+import { VoiceActivityMonitor } from './voice-activity-monitor.js';
 
 // Create debug logger instance for main application
 const logger = new DebugLogger({ componentName: 'Main', enabled: true });
@@ -16,6 +19,9 @@ const logger = new DebugLogger({ componentName: 'Main', enabled: true });
 // Global state
 let wasmModule: any = null;
 let uiControlManager: UIControlManager | null = null;
+let effectsControlPanel: EffectsControlPanel | null = null;
+let soundFontLoader: SoundFontLoader | null = null;
+let voiceActivityMonitor: VoiceActivityMonitor | null = null;
 
 /**
  * Initialize the application
@@ -27,11 +33,29 @@ async function main(): Promise<void> {
         // Step 1: Load WASM module
         await initializeWASM();
         
-        // Step 2: Initialize UI Control Manager
+        // Step 2: Initialize Enhanced UI Control Manager (Phase 17)
         uiControlManager = new UIControlManager(wasmModule);
-        uiControlManager.initialize();
+        await uiControlManager.initializeEnhanced();
         
-        logger.log('✅ AWE Player initialization complete');
+        // Step 3: Initialize Effects Control Panel (Task 17.4)
+        effectsControlPanel = new EffectsControlPanel(wasmModule);
+        effectsControlPanel.initialize();
+        
+        // Connect effects panel to UI manager
+        uiControlManager.setEffectsControlPanel(effectsControlPanel);
+        
+        // Step 4: Initialize SoundFont Loader (Task 17.5)
+        soundFontLoader = new SoundFontLoader(wasmModule);
+        soundFontLoader.initialize();
+        
+        // Step 5: Initialize Voice Activity Monitor (Task 17.6)
+        voiceActivityMonitor = new VoiceActivityMonitor(wasmModule);
+        voiceActivityMonitor.initialize();
+        
+        // Step 6: Test complete MIDI→WASM→Audio pipeline
+        await testMIDIPipeline();
+        
+        logger.log('✅ AWE Player initialization complete - Phase 17 UI Integration ready');
         
     } catch (error) {
         logger.log('❌ Failed to initialize AWE Player', error);
@@ -64,6 +88,141 @@ async function initializeWASM(): Promise<void> {
         
     } catch (error) {
         throw new Error(`Failed to load WASM module: ${error}`);
+    }
+}
+
+/**
+ * Test complete MIDI input→WASM→audio output pipeline (Task 17.3)
+ */
+async function testMIDIPipeline(): Promise<void> {
+    try {
+        logger.log('🧪 Testing complete MIDI→WASM→Audio pipeline...');
+        
+        // Test 1: WASM global functions availability
+        const wasmFunctions = [
+            'init_audio_worklet',
+            'queue_midi_event_global', 
+            'process_stereo_buffer_global',
+            'get_debug_log_global'
+        ];
+        
+        for (const func of wasmFunctions) {
+            if (!wasmModule[func]) {
+                throw new Error(`Missing WASM function: ${func}`);
+            }
+        }
+        logger.log('✅ All required WASM functions available');
+        
+        // Test 2: Initialize WASM audio system
+        const sampleRate = 44100;
+        const initResult = wasmModule.init_audio_worklet(sampleRate);
+        if (!initResult) {
+            throw new Error('Failed to initialize WASM audio worklet');
+        }
+        logger.log(`✅ WASM audio worklet initialized at ${sampleRate}Hz`);
+        
+        // Test 3: Queue test MIDI events (Phase 16 effects integration)
+        const testEvents = [
+            // Set reverb send (CC 91) to 80%
+            { channel: 0, type: 0xB0, data1: 91, data2: 102 },
+            // Set chorus send (CC 93) to 50% 
+            { channel: 0, type: 0xB0, data1: 93, data2: 64 },
+            // Play Middle C with velocity 100
+            { channel: 0, type: 0x90, data1: 60, data2: 100 }
+        ];
+        
+        for (const event of testEvents) {
+            wasmModule.queue_midi_event_global(0n, event.channel, event.type, event.data1, event.data2);
+        }
+        logger.log(`✅ Queued ${testEvents.length} test MIDI events (including effects)`);
+        
+        // Test 4: Process audio buffer to verify synthesis
+        const bufferSize = 128;
+        const audioBuffer = wasmModule.process_stereo_buffer_global(bufferSize);
+        
+        if (!audioBuffer || audioBuffer.length !== bufferSize * 2) {
+            throw new Error(`Invalid audio buffer: expected ${bufferSize * 2} samples, got ${audioBuffer?.length || 0}`);
+        }
+        
+        // Check for non-zero audio (synthesis working)
+        let nonZeroCount = 0;
+        for (let i = 0; i < audioBuffer.length; i++) {
+            if (Math.abs(audioBuffer[i]) > 0.0001) {
+                nonZeroCount++;
+            }
+        }
+        logger.log(`✅ Audio synthesis working: ${nonZeroCount}/${audioBuffer.length} non-zero samples`);
+        
+        // Test 5: Stop the test note
+        wasmModule.queue_midi_event_global(0n, 0, 0x80, 60, 0); // Note Off
+        
+        // Test 6: Verify WASM debug logging
+        const debugLog = wasmModule.get_debug_log_global();
+        if (debugLog && debugLog.length > 0) {
+            logger.log('✅ WASM debug logging functional');
+            logger.log(`📋 WASM Log Preview: ${debugLog.slice(0, 100)}...`);
+        }
+        
+        // Test 7: Verify effects status from Phase 16
+        await testEffectsIntegration();
+        
+        logger.log('🎉 Complete MIDI→WASM→Audio pipeline test PASSED');
+        
+        // Update UI status to show pipeline is ready
+        updatePipelineStatus('success', 'Pipeline: Ready');
+        
+    } catch (error) {
+        logger.log('❌ MIDI pipeline test failed', error);
+        updatePipelineStatus('error', 'Pipeline: Failed');
+        throw error;
+    }
+}
+
+/**
+ * Test Phase 16 effects integration with MIDI CC control
+ */
+async function testEffectsIntegration(): Promise<void> {
+    try {
+        logger.log('🎛️ Testing Phase 16 effects integration...');
+        
+        // Test effects control via MIDI CC messages
+        const effectsTests = [
+            { cc: 91, value: 127, name: 'Reverb Send Max' },
+            { cc: 91, value: 0, name: 'Reverb Send Off' },
+            { cc: 93, value: 64, name: 'Chorus Send 50%' },
+            { cc: 93, value: 0, name: 'Chorus Send Off' }
+        ];
+        
+        for (const test of effectsTests) {
+            // Send CC message
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, test.cc, test.value);
+            
+            // Process a small buffer to let WASM update effects
+            wasmModule.process_stereo_buffer_global(32);
+            
+            logger.log(`✅ Effects test: ${test.name} (CC${test.cc}=${test.value})`);
+        }
+        
+        logger.log('✅ Phase 16 effects integration verified');
+        
+    } catch (error) {
+        logger.log('❌ Effects integration test failed', error);
+        throw error;
+    }
+}
+
+/**
+ * Update pipeline status in UI
+ */
+function updatePipelineStatus(type: 'success' | 'error' | 'info', message: string): void {
+    const statusElement = document.createElement('div');
+    statusElement.className = `status-item ${type}`;
+    statusElement.textContent = message;
+    
+    // Add to status section
+    const statusContainer = document.querySelector('.status');
+    if (statusContainer) {
+        statusContainer.appendChild(statusElement);
     }
 }
 

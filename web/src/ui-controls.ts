@@ -1,25 +1,45 @@
 /**
- * AWE Player - UI Controls Module (Simplified DOM Interface)
+ * AWE Player - Enhanced UI Controls Module (Phase 17)
  * Part of AWE Player EMU8000 Emulator
  * 
- * Pure DOM interaction layer - audio logic moved to Rust
- * Handles UI events and delegates audio operations to WASM/Rust
+ * Enhanced DOM interface with MIDI input, effects control, and real-time feedback
+ * Integrates with complete EMU8000 send/return effects system
  */
 
 import { DebugLogger } from './utils/debug-logger.js';
 import { AudioWorkletManager, isAudioWorkletSupported } from './audio-worklet-manager.js';
+import { EffectsControlPanel } from './effects-control-panel.js';
 
 /**
- * UI Control Manager - Pure DOM interface for audio controls
- * Audio logic delegated to Rust WASM modules
+ * Enhanced UI Control Manager - Complete EMU8000 interface
+ * Includes MIDI device management, effects control, and real-time feedback
  */
 export class UIControlManager {
     private logger: DebugLogger;
     private wasmModule: any = null;
     private audioContext: AudioContext | null = null;
     private audioWorkletManager: AudioWorkletManager | null = null;
+    private effectsControlPanel: EffectsControlPanel | null = null;
 
-    // DOM Elements
+    // MIDI Integration
+    private midiAccess: WebMidi.MIDIAccess | null = null;
+    private connectedMidiDevices: Map<string, WebMidi.MIDIInput> = new Map();
+    private midiStatus: HTMLElement | null = null;
+
+    // Effects Control
+    private reverbSendSlider: HTMLInputElement | null = null;
+    private chorusSendSlider: HTMLInputElement | null = null;
+    private reverbReturnSlider: HTMLInputElement | null = null;
+    private chorusReturnSlider: HTMLInputElement | null = null;
+    private masterReverbSlider: HTMLInputElement | null = null;
+    private masterChorusSlider: HTMLInputElement | null = null;
+
+    // Voice Activity Display
+    private voiceActivityContainer: HTMLElement | null = null;
+    private voiceMeters: HTMLElement[] = [];
+    private voiceUpdateInterval: number | null = null;
+
+    // DOM Elements (existing)
     private wasmStatus: HTMLElement;
     private audioStatus: HTMLElement;
     private workletStatus: HTMLElement;
@@ -31,10 +51,10 @@ export class UIControlManager {
     private pianoKeys: NodeListOf<HTMLButtonElement>;
 
     constructor(wasmModule: any) {
-        this.logger = new DebugLogger({ componentName: 'UIControls', enabled: true });
+        this.logger = new DebugLogger({ componentName: 'Enhanced-UIControls', enabled: true });
         this.wasmModule = wasmModule;
 
-        // Get DOM elements
+        // Get core DOM elements
         this.wasmStatus = document.getElementById('wasm-status') as HTMLElement;
         this.audioStatus = document.getElementById('audio-status') as HTMLElement;
         this.workletStatus = document.getElementById('worklet-status') as HTMLElement;
@@ -47,7 +67,35 @@ export class UIControlManager {
         this.debugLogTextarea = document.getElementById('debug-log') as HTMLTextAreaElement;
         this.pianoKeys = document.querySelectorAll('.piano-key') as NodeListOf<HTMLButtonElement>;
 
+        // Get enhanced UI elements (optional - may not exist in all HTML versions)
+        this.initializeEnhancedElements();
+
         this.setupEventHandlers();
+    }
+
+    /**
+     * Initialize enhanced UI elements (MIDI, effects, voice activity)
+     */
+    private initializeEnhancedElements(): void {
+        // MIDI status
+        this.midiStatus = document.getElementById('midi-status');
+
+        // Effects controls
+        this.reverbSendSlider = document.getElementById('reverb-send') as HTMLInputElement;
+        this.chorusSendSlider = document.getElementById('chorus-send') as HTMLInputElement;
+        this.reverbReturnSlider = document.getElementById('reverb-return') as HTMLInputElement;
+        this.chorusReturnSlider = document.getElementById('chorus-return') as HTMLInputElement;
+        this.masterReverbSlider = document.getElementById('master-reverb') as HTMLInputElement;
+        this.masterChorusSlider = document.getElementById('master-chorus') as HTMLInputElement;
+
+        // Voice activity display
+        this.voiceActivityContainer = document.getElementById('voice-activity');
+
+        // Initialize effects controls if available
+        this.initializeEffectsControls();
+        
+        // Initialize voice activity display if available
+        this.initializeVoiceActivityDisplay();
     }
 
     /**
@@ -127,6 +175,9 @@ export class UIControlManager {
                     // Test with a simple tone
                     this.logger.log('🧪 Testing audio pipeline...');
                     setTimeout(() => this.testAudioPipeline(), 500);
+                    
+                    // Initialize enhanced features after audio is ready
+                    setTimeout(() => this.initializeMIDI(), 1000);
                 }
             });
             
@@ -224,6 +275,11 @@ export class UIControlManager {
             
             this.logger.log(`🎹 Note ON: ${note} (${this.getNoteNameFromRust(note)})`);
             
+            // Dispatch custom event for voice monitor
+            window.dispatchEvent(new CustomEvent('midi-event', {
+                detail: { type: 'note-on', note: note, velocity: 100, channel: 0 }
+            }));
+            
         } catch (error) {
             this.logger.log(`❌ Failed to trigger note ${note}`, error);
         }
@@ -245,6 +301,11 @@ export class UIControlManager {
             keyElement.classList.remove('pressed');
             
             this.logger.log(`🎹 Note OFF: ${note} (${this.getNoteNameFromRust(note)})`);
+            
+            // Dispatch custom event for voice monitor
+            window.dispatchEvent(new CustomEvent('midi-event', {
+                detail: { type: 'note-off', note: note, velocity: 0, channel: 0 }
+            }));
             
         } catch (error) {
             this.logger.log(`❌ Failed to release note ${note}`, error);
@@ -345,6 +406,14 @@ export class UIControlManager {
     }
 
     /**
+     * Set the effects control panel reference
+     */
+    public setEffectsControlPanel(panel: EffectsControlPanel): void {
+        this.effectsControlPanel = panel;
+        this.logger.log('✅ Effects control panel connected');
+    }
+
+    /**
      * Initialize the UI control manager after WASM module is loaded
      */
     public initialize(): void {
@@ -367,5 +436,357 @@ export class UIControlManager {
      */
     public getAudioWorkletManager(): AudioWorkletManager | null {
         return this.audioWorkletManager;
+    }
+
+    // ==================== ENHANCED FEATURES (Phase 17) ====================
+
+    /**
+     * Initialize MIDI device detection and management
+     */
+    private async initializeMIDI(): Promise<void> {
+        try {
+            this.logger.log('🎹 Initializing MIDI device access...');
+            
+            if (navigator.requestMIDIAccess) {
+                this.midiAccess = await navigator.requestMIDIAccess();
+                
+                // Set up MIDI device event handlers
+                this.midiAccess.onstatechange = (e) => this.handleMIDIStateChange(e);
+                
+                // Scan for existing devices
+                this.scanMIDIDevices();
+                
+                this.logger.log('✅ MIDI access initialized');
+                this.updateMIDIStatus(`MIDI: ${this.connectedMidiDevices.size} devices`);
+                
+            } else {
+                this.logger.log('❌ WebMIDI not supported in this browser');
+                this.updateMIDIStatus('MIDI: Not supported');
+            }
+        } catch (error) {
+            this.logger.log('❌ Failed to initialize MIDI access', error);
+            this.updateMIDIStatus('MIDI: Error');
+        }
+    }
+
+    /**
+     * Scan for connected MIDI devices
+     */
+    private scanMIDIDevices(): void {
+        if (!this.midiAccess) return;
+
+        // Clear existing devices
+        this.connectedMidiDevices.clear();
+
+        // Scan inputs
+        for (const input of this.midiAccess.inputs.values()) {
+            if (input.state === 'connected') {
+                this.connectMIDIDevice(input);
+            }
+        }
+
+        this.updateMIDIStatus(`MIDI: ${this.connectedMidiDevices.size} devices`);
+    }
+
+    /**
+     * Connect a MIDI input device
+     */
+    private connectMIDIDevice(input: WebMidi.MIDIInput): void {
+        this.connectedMidiDevices.set(input.id, input);
+        
+        // Set up MIDI message handler
+        input.onmidimessage = (event) => this.handleMIDIMessage(event);
+        
+        this.logger.log(`🎹 Connected MIDI device: ${input.name}`);
+    }
+
+    /**
+     * Handle MIDI device state changes
+     */
+    private handleMIDIStateChange(event: WebMidi.MIDIConnectionEvent): void {
+        const port = event.port;
+        
+        if (port.type === 'input') {
+            if (port.state === 'connected') {
+                this.connectMIDIDevice(port as WebMidi.MIDIInput);
+            } else if (port.state === 'disconnected') {
+                this.connectedMidiDevices.delete(port.id);
+                this.logger.log(`🎹 Disconnected MIDI device: ${port.name}`);
+            }
+            
+            this.updateMIDIStatus(`MIDI: ${this.connectedMidiDevices.size} devices`);
+        }
+    }
+
+    /**
+     * Handle incoming MIDI messages
+     */
+    private handleMIDIMessage(event: WebMidi.MIDIMessageEvent): void {
+        const [status, data1, data2] = event.data;
+        if (status === undefined) return;
+        
+        const channel = status & 0x0F;
+        const messageType = status & 0xF0;
+
+        // Send MIDI message to WASM
+        if (this.wasmModule.queue_midi_event_global) {
+            try {
+                this.wasmModule.queue_midi_event_global(0, channel, messageType, data1 || 0, data2 || 0);
+                
+                // Log note on/off for debugging
+                if (messageType === 0x90 && (data2 || 0) > 0) { // Note On
+                    this.logger.log(`🎹 MIDI Note ON: ${data1} vel=${data2} ch=${channel}`);
+                    window.dispatchEvent(new CustomEvent('midi-event', {
+                        detail: { type: 'note-on', note: data1 || 0, velocity: data2 || 0, channel: channel }
+                    }));
+                } else if (messageType === 0x80 || (messageType === 0x90 && (data2 || 0) === 0)) { // Note Off
+                    this.logger.log(`🎹 MIDI Note OFF: ${data1} ch=${channel}`);
+                    window.dispatchEvent(new CustomEvent('midi-event', {
+                        detail: { type: 'note-off', note: data1 || 0, velocity: 0, channel: channel }
+                    }));
+                }
+                
+            } catch (error) {
+                this.logger.log('❌ Failed to process MIDI message', error);
+            }
+        }
+    }
+
+    /**
+     * Initialize effects control sliders
+     */
+    private initializeEffectsControls(): void {
+        if (!this.wasmModule) return;
+
+        // Set up reverb send control
+        if (this.reverbSendSlider) {
+            this.reverbSendSlider.addEventListener('input', (e) => {
+                const value = parseFloat((e.target as HTMLInputElement).value);
+                this.handleReverbSendChange(value);
+            });
+        }
+
+        // Set up chorus send control
+        if (this.chorusSendSlider) {
+            this.chorusSendSlider.addEventListener('input', (e) => {
+                const value = parseFloat((e.target as HTMLInputElement).value);
+                this.handleChorusSendChange(value);
+            });
+        }
+
+        // Set up reverb return control
+        if (this.reverbReturnSlider) {
+            this.reverbReturnSlider.addEventListener('input', (e) => {
+                const value = parseFloat((e.target as HTMLInputElement).value);
+                this.handleReverbReturnChange(value);
+            });
+        }
+
+        // Set up chorus return control
+        if (this.chorusReturnSlider) {
+            this.chorusReturnSlider.addEventListener('input', (e) => {
+                const value = parseFloat((e.target as HTMLInputElement).value);
+                this.handleChorusReturnChange(value);
+            });
+        }
+
+        // Set up master reverb control
+        if (this.masterReverbSlider) {
+            this.masterReverbSlider.addEventListener('input', (e) => {
+                const value = parseFloat((e.target as HTMLInputElement).value);
+                this.handleMasterReverbChange(value);
+            });
+        }
+
+        // Set up master chorus control
+        if (this.masterChorusSlider) {
+            this.masterChorusSlider.addEventListener('input', (e) => {
+                const value = parseFloat((e.target as HTMLInputElement).value);
+                this.handleMasterChorusChange(value);
+            });
+        }
+
+        this.logger.log('🎛️ Effects controls initialized');
+    }
+
+    /**
+     * Handle reverb send level changes (MIDI CC 91)
+     */
+    private handleReverbSendChange(value: number): void {
+        // Convert 0.0-1.0 to MIDI CC value 0-127
+        const midiValue = Math.round(value * 127);
+        
+        // Use effects control panel if available
+        if (this.effectsControlPanel) {
+            this.effectsControlPanel.updateReverbSend(midiValue);
+        } else if (this.wasmModule.queue_midi_event_global) {
+            // Fallback to direct WASM call
+            this.wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, midiValue);
+            this.logger.log(`🎛️ Reverb Send: ${(value * 100).toFixed(1)}% (CC=${midiValue})`);
+        }
+    }
+
+    /**
+     * Handle chorus send level changes (MIDI CC 93)
+     */
+    private handleChorusSendChange(value: number): void {
+        // Convert 0.0-1.0 to MIDI CC value 0-127
+        const midiValue = Math.round(value * 127);
+        
+        // Use effects control panel if available
+        if (this.effectsControlPanel) {
+            this.effectsControlPanel.updateChorusSend(midiValue);
+        } else if (this.wasmModule.queue_midi_event_global) {
+            // Fallback to direct WASM call
+            this.wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, midiValue);
+            this.logger.log(`🎛️ Chorus Send: ${(value * 100).toFixed(1)}% (CC=${midiValue})`);
+        }
+    }
+
+    /**
+     * Handle reverb return level changes
+     */
+    private handleReverbReturnChange(value: number): void {
+        if (this.effectsControlPanel) {
+            // Get current master level from slider
+            const masterSlider = document.getElementById('master-reverb') as HTMLInputElement;
+            const masterLevel = masterSlider ? parseFloat(masterSlider.value) : 1.0;
+            
+            this.effectsControlPanel.updateReturnLevels('reverb', value, masterLevel);
+        }
+        this.logger.log(`🎛️ Reverb Return: ${(value * 100).toFixed(1)}%`);
+    }
+
+    /**
+     * Handle chorus return level changes
+     */
+    private handleChorusReturnChange(value: number): void {
+        if (this.effectsControlPanel) {
+            // Get current master level from slider
+            const masterSlider = document.getElementById('master-chorus') as HTMLInputElement;
+            const masterLevel = masterSlider ? parseFloat(masterSlider.value) : 1.0;
+            
+            this.effectsControlPanel.updateReturnLevels('chorus', value, masterLevel);
+        }
+        this.logger.log(`🎛️ Chorus Return: ${(value * 100).toFixed(1)}%`);
+    }
+
+    /**
+     * Handle master reverb level changes
+     */
+    private handleMasterReverbChange(value: number): void {
+        if (this.effectsControlPanel) {
+            // Get current return level from slider
+            const returnSlider = document.getElementById('reverb-return') as HTMLInputElement;
+            const returnLevel = returnSlider ? parseFloat(returnSlider.value) : 0.3;
+            
+            this.effectsControlPanel.updateReturnLevels('reverb', returnLevel, value);
+        }
+        this.logger.log(`🎛️ Master Reverb: ${(value * 100).toFixed(1)}%`);
+    }
+
+    /**
+     * Handle master chorus level changes
+     */
+    private handleMasterChorusChange(value: number): void {
+        if (this.effectsControlPanel) {
+            // Get current return level from slider
+            const returnSlider = document.getElementById('chorus-return') as HTMLInputElement;
+            const returnLevel = returnSlider ? parseFloat(returnSlider.value) : 0.2;
+            
+            this.effectsControlPanel.updateReturnLevels('chorus', returnLevel, value);
+        }
+        this.logger.log(`🎛️ Master Chorus: ${(value * 100).toFixed(1)}%`);
+    }
+
+    /**
+     * Initialize voice activity display
+     */
+    private initializeVoiceActivityDisplay(): void {
+        if (!this.voiceActivityContainer) return;
+
+        // Create 32 voice meters for EMU8000 polyphony
+        this.voiceMeters = [];
+        for (let i = 0; i < 32; i++) {
+            const voiceMeter = document.createElement('div');
+            voiceMeter.className = 'voice-meter';
+            voiceMeter.innerHTML = `<span class="voice-number">${i + 1}</span><div class="voice-bar"></div>`;
+            this.voiceActivityContainer.appendChild(voiceMeter);
+            this.voiceMeters.push(voiceMeter);
+        }
+
+        // Start voice activity updates
+        this.startVoiceActivityUpdates();
+        
+        this.logger.log('📊 Voice activity display initialized (32 voices)');
+    }
+
+    /**
+     * Start periodic voice activity updates
+     */
+    private startVoiceActivityUpdates(): void {
+        if (this.voiceUpdateInterval) {
+            clearInterval(this.voiceUpdateInterval);
+        }
+
+        this.voiceUpdateInterval = setInterval(() => {
+            this.updateVoiceActivity();
+        }, 50); // Update at 20 FPS
+    }
+
+    /**
+     * Update voice activity display
+     */
+    private updateVoiceActivity(): void {
+        // Note: This would need a WASM export to get voice activity data
+        // For now, we'll just show that the system is active
+        if (this.voiceMeters.length > 0 && this.audioWorkletManager?.isReady()) {
+            // Placeholder: Show some activity simulation
+            // In a real implementation, we'd get actual voice states from WASM
+        }
+    }
+
+    /**
+     * Update MIDI status display
+     */
+    private updateMIDIStatus(status: string): void {
+        if (this.midiStatus) {
+            this.midiStatus.textContent = status;
+        }
+    }
+
+    /**
+     * Enhanced initialization including MIDI and effects
+     */
+    public async initializeEnhanced(): Promise<void> {
+        this.logger.log('✅ Enhanced UI Controls initializing...');
+        
+        // Initialize base functionality
+        this.initialize();
+        
+        // Initialize MIDI
+        await this.initializeMIDI();
+        
+        this.logger.log('🚀 Enhanced UI Controls fully initialized');
+    }
+
+    /**
+     * Cleanup enhanced features
+     */
+    public cleanup(): void {
+        // Stop voice activity updates
+        if (this.voiceUpdateInterval) {
+            clearInterval(this.voiceUpdateInterval);
+            this.voiceUpdateInterval = null;
+        }
+
+        // Disconnect MIDI devices
+        for (const device of this.connectedMidiDevices.values()) {
+            device.onmidimessage = null;
+        }
+        this.connectedMidiDevices.clear();
+
+        // Call existing cleanup
+        this.handleStopAudio();
     }
 }
