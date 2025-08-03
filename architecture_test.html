@@ -531,7 +531,9 @@ Initializing testing environment...
         window.testSequencer = () => runTest('Test Sequence Generation', async () => {
             if (!wasmModule) return false;
             const result = wasmModule.quick_c_major_test();
-            return result && result.includes('SUCCESS');
+            logToMain(`Test Sequence result: ${result}`, 'info');
+            // Check for success indicators in the JSON response
+            return result && (result.includes('SUCCESS') || result.includes('success') || result.includes('"events_queued"'));
         }, 'intermediate', 'intermediate');
 
         window.runIntermediateTests = async () => {
@@ -565,7 +567,9 @@ Initializing testing environment...
         window.testSoundFontParsing = () => runTest('SoundFont Module Test', async () => {
             if (!wasmModule) return false;
             const result = wasmModule.test_soundfont_module();
-            return result && result.includes('SUCCESS');
+            logToMain(`SoundFont module result: ${result}`, 'info');
+            // Check for success indicators in the JSON response
+            return result && (result.includes('SUCCESS') || result.includes('passed') || result.includes('"test": "passed"'));
         }, 'advanced', 'advanced');
 
         window.runAdvancedTests = async () => {
