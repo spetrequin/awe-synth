@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWE Player - Performance Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+        
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+        }
+        
+        .controls {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        button {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #4CAF50, #2196F3);
+        }
+        
+        .metric-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+        
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .metric-details {
+            font-size: 0.9em;
+            color: #999;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .chart-container {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 300px;
+            position: relative;
+        }
+        
+        .chart-title {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        canvas {
+            width: 100% !important;
+            height: 250px !important;
+        }
+        
+        .recommendations {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .recommendation-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .severity-high {
+            background: rgba(244, 67, 54, 0.1);
+            border-left: 4px solid #f44336;
+        }
+        
+        .severity-medium {
+            background: rgba(255, 152, 0, 0.1);
+            border-left: 4px solid #ff9800;
+        }
+        
+        .severity-low {
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            display: inline-block;
+        }
+        
+        .status-profiling {
+            background: #2196F3;
+            animation: pulse 1s infinite;
+        }
+        
+        .status-idle {
+            background: #666;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .benchmark-results {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.9em;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .options-panel {
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .option-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        input[type="number"], input[type="checkbox"] {
+            background: #333;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        
+        label {
+            min-width: 150px;
+        }
+        
+        .fps-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+        }
+        
+        .fps-good { color: #4CAF50; border-color: #4CAF50; }
+        .fps-warning { color: #ff9800; border-color: #ff9800; }
+        .fps-bad { color: #f44336; border-color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <h1>🎯 AWE Player Performance Dashboard</h1>
+        
+        <div class="fps-indicator" id="fps-indicator">
+            <span id="fps-value">-- FPS</span>
+        </div>
+        
+        <div class="controls">
+            <button id="start-profiling">Start Profiling</button>
+            <button id="stop-profiling" disabled>Stop Profiling</button>
+            <button id="run-benchmark">Run Benchmark</button>
+            <button id="reset-data">Reset Data</button>
+            <button id="export-data">Export Data</button>
+            <span class="status status-idle" id="status">Idle</span>
+        </div>
+        
+        <div class="options-panel">
+            <h3>Profiling Options</h3>
+            <div class="option-group">
+                <label>Duration (ms):</label>
+                <input type="number" id="profile-duration" value="30000" min="1000" max="300000">
+            </div>
+            <div class="option-group">
+                <label>Sample Size:</label>
+                <input type="number" id="sample-size" value="1000" min="100" max="10000">
+            </div>
+            <div class="option-group">
+                <label>Detailed Logging:</label>
+                <input type="checkbox" id="detailed-logging">
+            </div>
+            <div class="option-group">
+                <label>Save Raw Data:</label>
+                <input type="checkbox" id="save-raw-data">
+            </div>
+        </div>
+        
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-title">Frame Time</div>
+                <div class="metric-value" id="frame-time-value">--</div>
+                <div class="metric-details">
+                    <span>Mean: <span id="frame-time-mean">--</span></span>
+                    <span>P95: <span id="frame-time-p95">--</span></span>
+                    <span>P99: <span id="frame-time-p99">--</span></span>
+                    <span>Max: <span id="frame-time-max">--</span></span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-title">Audio Latency</div>
+                <div class="metric-value" id="audio-latency-value">--</div>
+                <div class="metric-details">
+                    <span>Output: <span id="audio-output-latency">--</span></span>
+                    <span>Base: <span id="audio-base-latency">--</span></span>
+                    <span>P95: <span id="audio-latency-p95">--</span></span>
+                    <span>Max: <span id="audio-latency-max">--</span></span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-title">Memory Usage</div>
+                <div class="metric-value" id="memory-usage-value">--</div>
+                <div class="metric-details">
+                    <span>Initial: <span id="memory-initial">--</span></span>
+                    <span>Peak: <span id="memory-peak">--</span></span>
+                    <span>Growth: <span id="memory-growth">--</span></span>
+                    <span>Rate: <span id="memory-rate">--</span></span>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-title">Voice Processing</div>
+                <div class="metric-value" id="voice-processing-value">--</div>
+                <div class="metric-details">
+                    <span>Count: <span id="voice-count">--</span></span>
+                    <span>P95: <span id="voice-p95">--</span></span>
+                    <span>P99: <span id="voice-p99">--</span></span>
+                    <span>Max: <span id="voice-max">--</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Frame Time History</div>
+            <canvas id="frame-time-chart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Memory Usage History</div>
+            <canvas id="memory-chart"></canvas>
+        </div>
+        
+        <div class="recommendations">
+            <h3>🔍 Performance Recommendations</h3>
+            <div id="recommendations-list">
+                <p style="color: #666;">No profiling data available. Start profiling to see recommendations.</p>
+            </div>
+        </div>
+        
+        <div class="benchmark-results" id="benchmark-results" style="display: none;">
+            <h3>📊 Benchmark Results</h3>
+            <pre id="benchmark-output"></pre>
+        </div>
+    </div>
+    
+    <script type="module">
+        import init, { AwePlayer } from './wasm-pkg/awe_synth.js';
+        
+        // Import performance profiler
+        const script = document.createElement('script');
+        script.src = './performance-profiler.js';
+        document.head.appendChild(script);
+        
+        let profiler = null;
+        let awePlayer = null;
+        let audioContext = null;
+        let animationId = null;
+        
+        // Chart contexts
+        let frameTimeCtx = null;
+        let memoryCtx = null;
+        let frameTimeData = [];
+        let memoryData = [];
+        const maxDataPoints = 200;
+        
+        // FPS tracking
+        let lastFrameTime = performance.now();
+        let fpsValues = [];
+        
+        async function initializeProfiler() {
+            try {
+                // Initialize WASM
+                await init();
+                
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 44100,
+                    latencyHint: 'interactive'
+                });
+                
+                // Initialize AWE Player
+                awePlayer = new AwePlayer();
+                
+                // Wait for profiler script to load
+                await new Promise(resolve => {
+                    script.onload = resolve;
+                });
+                
+                // Create profiler instance
+                profiler = new AWEPlayerPerformanceProfiler();
+                await profiler.initialize(awePlayer, audioContext);
+                
+                // Initialize charts
+                initializeCharts();
+                
+                // Start FPS monitoring
+                startFPSMonitoring();
+                
+                console.log('✅ Performance profiler initialized');
+                
+            } catch (error) {
+                console.error('Failed to initialize profiler:', error);
+                alert('Failed to initialize performance profiler. Check console for details.');
+            }
+        }
+        
+        function initializeCharts() {
+            // Frame time chart
+            const frameTimeCanvas = document.getElementById('frame-time-chart');
+            frameTimeCtx = frameTimeCanvas.getContext('2d');
+            
+            // Memory chart
+            const memoryCanvas = document.getElementById('memory-chart');
+            memoryCtx = memoryCanvas.getContext('2d');
+            
+            // Set canvas sizes
+            resizeCanvases();
+            window.addEventListener('resize', resizeCanvases);
+        }
+        
+        function resizeCanvases() {
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            });
+        }
+        
+        function startFPSMonitoring() {
+            function updateFPS() {
+                const currentTime = performance.now();
+                const deltaTime = currentTime - lastFrameTime;
+                lastFrameTime = currentTime;
+                
+                const fps = 1000 / deltaTime;
+                fpsValues.push(fps);
+                
+                // Keep last 60 frames
+                if (fpsValues.length > 60) {
+                    fpsValues.shift();
+                }
+                
+                // Calculate average FPS
+                const avgFPS = fpsValues.reduce((a, b) => a + b, 0) / fpsValues.length;
+                
+                // Update display
+                const fpsElement = document.getElementById('fps-value');
+                const fpsIndicator = document.getElementById('fps-indicator');
+                
+                fpsElement.textContent = `${avgFPS.toFixed(1)} FPS`;
+                
+                // Update color based on FPS
+                fpsIndicator.className = 'fps-indicator';
+                if (avgFPS >= 55) {
+                    fpsIndicator.classList.add('fps-good');
+                } else if (avgFPS >= 30) {
+                    fpsIndicator.classList.add('fps-warning');
+                } else {
+                    fpsIndicator.classList.add('fps-bad');
+                }
+                
+                animationId = requestAnimationFrame(updateFPS);
+            }
+            
+            animationId = requestAnimationFrame(updateFPS);
+        }
+        
+        function drawChart(ctx, data, color, yMax) {
+            const width = ctx.canvas.width;
+            const height = ctx.canvas.height;
+            
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            // Horizontal lines
+            for (let i = 0; i <= 5; i++) {
+                const y = (height / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            
+            // Draw data
+            if (data.length > 1) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const xStep = width / (maxDataPoints - 1);
+                
+                for (let i = 0; i < data.length; i++) {
+                    const x = i * xStep;
+                    const y = height - (data[i] / yMax) * height;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                
+                // Fill area under curve
+                ctx.fillStyle = color + '33'; // Add transparency
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+        
+        function updateCharts() {
+            if (profiler && profiler.isProfileing) {
+                // Update frame time chart
+                if (profiler.metrics.frameTime.length > 0) {
+                    const latestFrameTimes = profiler.metrics.frameTime.slice(-maxDataPoints);
+                    drawChart(frameTimeCtx, latestFrameTimes, '#4CAF50', 50);
+                }
+                
+                // Update memory chart
+                if (profiler.metrics.memoryUsage.length > 0) {
+                    const latestMemory = profiler.metrics.memoryUsage.slice(-maxDataPoints);
+                    const memoryValues = latestMemory.map(m => m.usedJSHeapSize / 1024 / 1024);
+                    drawChart(memoryCtx, memoryValues, '#2196F3', 200);
+                }
+            }
+            
+            requestAnimationFrame(updateCharts);
+        }
+        
+        function updateMetrics(report) {
+            // Frame time metrics
+            document.getElementById('frame-time-value').textContent = report.frameTime.mean + 'ms';
+            document.getElementById('frame-time-mean').textContent = report.frameTime.mean + 'ms';
+            document.getElementById('frame-time-p95').textContent = report.frameTime.p95 + 'ms';
+            document.getElementById('frame-time-p99').textContent = report.frameTime.p99 + 'ms';
+            document.getElementById('frame-time-max').textContent = report.frameTime.max + 'ms';
+            
+            // Audio latency metrics
+            if (report.audioLatency.count > 0) {
+                document.getElementById('audio-latency-value').textContent = report.audioLatency.mean + 'ms';
+                document.getElementById('audio-latency-p95').textContent = report.audioLatency.p95 + 'ms';
+                document.getElementById('audio-latency-max').textContent = report.audioLatency.max + 'ms';
+            }
+            
+            // Memory metrics
+            if (report.memoryUsage.initial) {
+                document.getElementById('memory-usage-value').textContent = report.memoryUsage.final;
+                document.getElementById('memory-initial').textContent = report.memoryUsage.initial;
+                document.getElementById('memory-peak').textContent = report.memoryUsage.peakUsage;
+                document.getElementById('memory-growth').textContent = report.memoryUsage.growth;
+                document.getElementById('memory-rate').textContent = report.memoryUsage.growthRate;
+            }
+            
+            // Voice processing metrics
+            if (report.voiceProcessing.count > 0) {
+                document.getElementById('voice-processing-value').textContent = report.voiceProcessing.mean + 'ms';
+                document.getElementById('voice-count').textContent = report.voiceProcessing.count;
+                document.getElementById('voice-p95').textContent = report.voiceProcessing.p95 + 'ms';
+                document.getElementById('voice-p99').textContent = report.voiceProcessing.p99 + 'ms';
+                document.getElementById('voice-max').textContent = report.voiceProcessing.max + 'ms';
+            }
+            
+            // Update recommendations
+            updateRecommendations(report.recommendations);
+        }
+        
+        function updateRecommendations(recommendations) {
+            const container = document.getElementById('recommendations-list');
+            
+            if (recommendations.length === 0) {
+                container.innerHTML = '<p style="color: #4CAF50;">✅ No performance issues detected!</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            recommendations.forEach(rec => {
+                const item = document.createElement('div');
+                item.className = `recommendation-item severity-${rec.severity}`;
+                
+                item.innerHTML = `
+                    <span style="font-weight: bold;">[${rec.category.toUpperCase()}]</span>
+                    <div>
+                        <strong>${rec.issue}</strong><br>
+                        <span style="font-size: 0.9em;">${rec.suggestion}</span>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+        
+        // Event handlers
+        document.getElementById('start-profiling').addEventListener('click', () => {
+            if (!profiler) return;
+            
+            const options = {
+                profileDuration: parseInt(document.getElementById('profile-duration').value),
+                sampleSize: parseInt(document.getElementById('sample-size').value),
+                detailedLogging: document.getElementById('detailed-logging').checked,
+                saveRawData: document.getElementById('save-raw-data').checked
+            };
+            
+            profiler.startProfiling(options);
+            
+            document.getElementById('start-profiling').disabled = true;
+            document.getElementById('stop-profiling').disabled = false;
+            document.getElementById('status').textContent = 'Profiling...';
+            document.getElementById('status').className = 'status status-profiling';
+            
+            // Start chart updates
+            updateCharts();
+        });
+        
+        document.getElementById('stop-profiling').addEventListener('click', () => {
+            if (!profiler) return;
+            
+            const report = profiler.stopProfiling();
+            
+            if (report) {
+                updateMetrics(report);
+            }
+            
+            document.getElementById('start-profiling').disabled = false;
+            document.getElementById('stop-profiling').disabled = true;
+            document.getElementById('status').textContent = 'Idle';
+            document.getElementById('status').className = 'status status-idle';
+        });
+        
+        document.getElementById('run-benchmark').addEventListener('click', async () => {
+            if (!profiler) return;
+            
+            document.getElementById('run-benchmark').disabled = true;
+            document.getElementById('status').textContent = 'Running benchmark...';
+            document.getElementById('status').className = 'status status-profiling';
+            
+            const results = await profiler.runBenchmark();
+            
+            document.getElementById('benchmark-output').textContent = results;
+            document.getElementById('benchmark-results').style.display = 'block';
+            
+            document.getElementById('run-benchmark').disabled = false;
+            document.getElementById('status').textContent = 'Idle';
+            document.getElementById('status').className = 'status status-idle';
+        });
+        
+        document.getElementById('reset-data').addEventListener('click', () => {
+            if (!profiler) return;
+            
+            profiler.reset();
+            frameTimeData = [];
+            memoryData = [];
+            
+            // Clear displays
+            document.querySelectorAll('.metric-value').forEach(el => el.textContent = '--');
+            document.querySelectorAll('.metric-details span span').forEach(el => el.textContent = '--');
+            document.getElementById('recommendations-list').innerHTML = '<p style="color: #666;">No profiling data available. Start profiling to see recommendations.</p>';
+            
+            // Clear charts
+            if (frameTimeCtx) {
+                frameTimeCtx.clearRect(0, 0, frameTimeCtx.canvas.width, frameTimeCtx.canvas.height);
+            }
+            if (memoryCtx) {
+                memoryCtx.clearRect(0, 0, memoryCtx.canvas.width, memoryCtx.canvas.height);
+            }
+        });
+        
+        document.getElementById('export-data').addEventListener('click', () => {
+            if (!profiler) return;
+            
+            const report = profiler.generateReport(performance.now() - profiler.startTime);
+            profiler.saveRawData(report);
+        });
+        
+        // Initialize on load
+        window.addEventListener('load', initializeProfiler);
+    </script>
+</body>
+</html>

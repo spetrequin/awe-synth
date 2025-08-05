@@ -1,0 +1,108 @@
+{
+  "name": "awe-player-browser-compatibility-tests",
+  "version": "1.0.0",
+  "description": "Cross-browser compatibility testing suite for AWE Player EMU8000 emulator",
+  "scripts": {
+    "test": "node cross-browser-test-runner.js",
+    "test:chrome": "node cross-browser-test-runner.js --browsers chrome",
+    "test:firefox": "node cross-browser-test-runner.js --browsers firefox",
+    "test:edge": "node cross-browser-test-runner.js --browsers edge",
+    "test:all": "node cross-browser-test-runner.js --browsers chrome,firefox,edge",
+    "test:ci": "node cross-browser-test-runner.js --browsers chrome,firefox --output ./ci-results",
+    "test:debug": "node cross-browser-test-runner.js --no-headless --verbose --screenshots",
+    "serve": "npx serve . -p 3000",
+    "serve:test": "npx serve . -p 3000 & open http://localhost:3000/browser-compatibility-test.html"
+  },
+  "keywords": [
+    "browser-testing",
+    "compatibility",
+    "webassembly",
+    "audio",
+    "midi",
+    "emu8000",
+    "soundfont",
+    "cross-browser",
+    "automation"
+  ],
+  "author": "AWE Player Team",
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer": "^21.0.0",
+    "commander": "^11.0.0",
+    "chalk": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spetrequin/awe-synth.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spetrequin/awe-synth/issues"
+  },
+  "homepage": "https://github.com/spetrequin/awe-synth#readme",
+  "browserslist": [
+    "Chrome >= 80",
+    "Firefox >= 76",
+    "Safari >= 14",
+    "Edge >= 79"
+  ],
+  "testEnvironments": {
+    "tier1": [
+      "Chrome 80+",
+      "Firefox 76+", 
+      "Safari 14+",
+      "Edge 79+"
+    ],
+    "tier2": [
+      "Chrome 70-79",
+      "Firefox 70-75",
+      "Safari 13.x"
+    ],
+    "tier3": [
+      "Mobile Safari iOS 14+",
+      "Chrome Mobile 80+"
+    ]
+  },
+  "compatibilityMatrix": {
+    "webassembly": {
+      "required": true,
+      "chrome": "57+",
+      "firefox": "52+",
+      "safari": "11+",
+      "edge": "16+"
+    },
+    "audioContext": {
+      "required": true,
+      "chrome": "34+",
+      "firefox": "25+",
+      "safari": "6+",
+      "edge": "12+"
+    },
+    "audioWorklet": {
+      "required": false,
+      "fallback": "ScriptProcessor",
+      "chrome": "66+",
+      "firefox": "76+",
+      "safari": "14.1+",
+      "edge": "79+"
+    },
+    "webMIDI": {
+      "required": false,
+      "fallback": "Virtual keyboard",
+      "chrome": "43+",
+      "firefox": "none",
+      "safari": "none",
+      "edge": "79+"
+    },
+    "sharedArrayBuffer": {
+      "required": false,
+      "benefit": "Performance improvement",
+      "chrome": "68+",
+      "firefox": "79+",
+      "safari": "15.2+",
+      "edge": "79+"
+    }
+  }
+}

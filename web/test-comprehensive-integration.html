@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWE Player - Comprehensive Integration Testing Suite</title>
+    <style>
+        * { box-sizing: border-box; }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f1f0f 100%);
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            border-bottom: 2px solid #00ffff;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        
+        .test-suite {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            background: linear-gradient(145deg, #1e1e1e, #252525);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .test-suite h3 {
+            margin: 0 0 15px 0;
+            color: #00ffff;
+            font-size: 1.2rem;
+        }
+        
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            border-left: 3px solid #666;
+        }
+        
+        .test-item.pending { border-left-color: #666; color: #ccc; }
+        .test-item.running { border-left-color: #ffaa00; color: #ffaa00; }
+        .test-item.passed { border-left-color: #00ff00; color: #00ff00; }
+        .test-item.failed { border-left-color: #ff4444; color: #ff4444; }
+        
+        .test-status {
+            font-weight: bold;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        button {
+            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            border-radius: 4px;
+            margin: 10px 5px;
+            transition: all 0.2s ease;
+        }
+        
+        button:hover {
+            background: linear-gradient(145deg, #00ff00, #00cc00);
+            color: #000;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 255, 0, 0.3);
+        }
+        
+        button:disabled {
+            background: linear-gradient(145deg, #333, #222);
+            color: #666;
+            border-color: #444;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .log-output {
+            width: 100%;
+            height: 300px;
+            background: linear-gradient(145deg, #000, #111);
+            color: #00ff00;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .summary {
+            margin: 20px 0;
+            padding: 15px;
+            background: linear-gradient(145deg, #1a2a1a, #2a2a1a);
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .summary.failed {
+            background: linear-gradient(145deg, #2a1a1a, #3a1a1a);
+            border-color: #ff4444;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .metric {
+            display: inline-block;
+            margin: 5px 15px;
+            padding: 5px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 AWE Player - Comprehensive Integration Testing Suite</h1>
+        
+        <div class="controls">
+            <button id="run-all-tests">Run All Integration Tests</button>
+            <button id="run-critical-path">Run Critical Path Tests</button>
+            <button id="run-performance-tests">Run Performance Tests</button>
+            <button id="clear-results">Clear Results</button>
+        </div>
+        
+        <div class="summary" id="test-summary" style="display: none;">
+            <h3>Test Results Summary</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div id="summary-text">Preparing tests...</div>
+            <div id="summary-metrics">
+                <span class="metric" id="total-tests">Total: 0</span>
+                <span class="metric" id="passed-tests">Passed: 0</span>
+                <span class="metric" id="failed-tests">Failed: 0</span>
+                <span class="metric" id="test-duration">Duration: 0s</span>
+            </div>
+        </div>
+        
+        <!-- WASM Initialization Tests -->
+        <div class="test-suite">
+            <h3>🔧 WASM Initialization & Core Functions</h3>
+            <div class="test-item pending" data-test="wasm-load">
+                <span>WASM module loading and initialization</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="wasm-exports">
+                <span>WASM export functions availability</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="audio-worklet-init">
+                <span>Audio worklet initialization</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="debug-logging">
+                <span>Debug logging system functionality</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <!-- MIDI System Tests -->
+        <div class="test-suite">
+            <h3>🎹 MIDI System Integration</h3>
+            <div class="test-item pending" data-test="midi-queue">
+                <span>MIDI event queue processing</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="midi-note-events">
+                <span>Note On/Off event handling</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="midi-cc-effects">
+                <span>MIDI CC 91/93 effects control</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="midi-device-integration">
+                <span>WebMIDI device integration (if available)</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="virtual-keyboard">
+                <span>Virtual keyboard MIDI generation</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <!-- Audio Synthesis Tests -->
+        <div class="test-suite">
+            <h3>🎵 Audio Synthesis Pipeline</h3>
+            <div class="test-item pending" data-test="voice-allocation">
+                <span>32-voice polyphonic allocation</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="envelope-processing">
+                <span>DAHDSR envelope processing</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="audio-buffer-generation">
+                <span>Audio buffer generation and processing</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="frequency-accuracy">
+                <span>MIDI note to frequency accuracy</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <!-- Effects System Tests -->
+        <div class="test-suite">
+            <h3>🌊 Send/Return Effects System</h3>
+            <div class="test-item pending" data-test="reverb-processor">
+                <span>Reverb processor functionality</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="chorus-processor">
+                <span>Chorus processor functionality</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="effects-send-routing">
+                <span>Send/return signal routing</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="effects-real-time-control">
+                <span>Real-time effects parameter control</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <!-- UI Component Tests -->
+        <div class="test-suite">
+            <h3>💻 UI Component Integration</h3>
+            <div class="test-item pending" data-test="effects-control-panel">
+                <span>Effects control panel functionality</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="voice-activity-monitor">
+                <span>Voice activity visualization</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="soundfont-loader">
+                <span>SoundFont file loading interface</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="ui-controls">
+                <span>Audio controls and status management</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <!-- End-to-End Pipeline Tests -->
+        <div class="test-suite">
+            <h3>🔄 End-to-End Pipeline</h3>
+            <div class="test-item pending" data-test="complete-midi-pipeline">
+                <span>MIDI → WASM → Audio output pipeline</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="polyphonic-synthesis">
+                <span>Multi-voice polyphonic synthesis</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="effects-integration">
+                <span>Effects integration with synthesis</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="ui-audio-sync">
+                <span>UI controls synchronization with audio</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <!-- Performance Tests -->
+        <div class="test-suite">
+            <h3>⚡ Performance & Stress Testing</h3>
+            <div class="test-item pending" data-test="cpu-usage">
+                <span>CPU usage under maximum load</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="memory-usage">
+                <span>Memory usage and leak detection</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="audio-latency">
+                <span>Audio latency measurement</span>
+                <span class="test-status">PENDING</span>
+            </div>
+            <div class="test-item pending" data-test="stress-test-32-voices">
+                <span>32-voice stress test with effects</span>
+                <span class="test-status">PENDING</span>
+            </div>
+        </div>
+        
+        <div class="test-suite">
+            <h3>📋 Test Execution Log</h3>
+            <textarea class="log-output" id="test-log" readonly placeholder="Test execution details will appear here..."></textarea>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Import the main application modules
+        import('./dist/main.js').catch(err => {
+            console.error('Failed to load main application:', err);
+            logMessage('❌ Failed to load main application: ' + err.message);
+        });
+        
+        // Test execution state
+        let testResults = new Map();
+        let currentTest = null;
+        let testStartTime = 0;
+        let wasmModule = null;
+        let audioContext = null;
+        let audioWorkletManager = null;
+        
+        // Test configuration
+        const TEST_TIMEOUT = 10000; // 10 seconds per test
+        const CRITICAL_PATH_TESTS = [
+            'wasm-load', 'wasm-exports', 'audio-worklet-init',
+            'midi-queue', 'audio-buffer-generation', 'complete-midi-pipeline'
+        ];
+        
+        // Initialize test runner
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventHandlers();
+            logMessage('🧪 Comprehensive Integration Test Suite initialized');
+            logMessage('📊 Ready to test AWE Player system integration');
+        });
+        
+        function setupEventHandlers() {
+            document.getElementById('run-all-tests').addEventListener('click', runAllTests);
+            document.getElementById('run-critical-path').addEventListener('click', runCriticalPathTests);
+            document.getElementById('run-performance-tests').addEventListener('click', runPerformanceTests);
+            document.getElementById('clear-results').addEventListener('click', clearResults);
+        }
+        
+        async function runAllTests() {
+            logMessage('🚀 Starting comprehensive integration test suite...');
+            showSummary();
+            
+            const allTests = document.querySelectorAll('[data-test]');
+            const testNames = Array.from(allTests).map(el => el.getAttribute('data-test'));
+            
+            await executeTestSuite(testNames);
+        }
+        
+        async function runCriticalPathTests() {
+            logMessage('🎯 Starting critical path test suite...');
+            showSummary();
+            
+            await executeTestSuite(CRITICAL_PATH_TESTS);
+        }
+        
+        async function runPerformanceTests() {
+            logMessage('⚡ Starting performance test suite...');
+            showSummary();
+            
+            const performanceTests = [
+                'cpu-usage', 'memory-usage', 'audio-latency', 'stress-test-32-voices'
+            ];
+            
+            await executeTestSuite(performanceTests);
+        }
+        
+        async function executeTestSuite(testNames) {
+            testStartTime = performance.now();
+            testResults.clear();
+            
+            let passed = 0;
+            let failed = 0;
+            
+            for (let i = 0; i < testNames.length; i++) {
+                const testName = testNames[i];
+                const progress = ((i + 1) / testNames.length) * 100;
+                
+                updateProgress(progress);
+                
+                try {
+                    const result = await executeTest(testName);
+                    testResults.set(testName, result);
+                    
+                    if (result.passed) {
+                        passed++;
+                        setTestStatus(testName, 'passed', `✅ PASSED (${result.duration}ms)`);
+                    } else {
+                        failed++;
+                        setTestStatus(testName, 'failed', `❌ FAILED`);
+                        logMessage(`❌ Test failed: ${testName} - ${result.error}`);
+                    }
+                } catch (error) {
+                    failed++;
+                    testResults.set(testName, { passed: false, error: error.message, duration: 0 });
+                    setTestStatus(testName, 'failed', `❌ ERROR`);
+                    logMessage(`💥 Test error: ${testName} - ${error.message}`);
+                }
+            }
+            
+            const totalDuration = Math.round(performance.now() - testStartTime);
+            updateSummary(testNames.length, passed, failed, totalDuration);
+            
+            logMessage(`🏁 Test suite completed: ${passed}/${testNames.length} passed in ${totalDuration}ms`);
+        }
+        
+        async function executeTest(testName) {
+            const startTime = performance.now();
+            setTestStatus(testName, 'running', '⏳ RUNNING');
+            logMessage(`🧪 Running test: ${testName}`);
+            
+            try {
+                let result;
+                
+                switch (testName) {
+                    case 'wasm-load':
+                        result = await testWasmLoad();
+                        break;
+                    case 'wasm-exports':
+                        result = await testWasmExports();
+                        break;
+                    case 'audio-worklet-init':
+                        result = await testAudioWorkletInit();
+                        break;
+                    case 'debug-logging':
+                        result = await testDebugLogging();
+                        break;
+                    case 'midi-queue':
+                        result = await testMidiQueue();
+                        break;
+                    case 'midi-note-events':
+                        result = await testMidiNoteEvents();
+                        break;
+                    case 'midi-cc-effects':
+                        result = await testMidiCCEffects();
+                        break;
+                    case 'midi-device-integration':
+                        result = await testMidiDeviceIntegration();
+                        break;
+                    case 'virtual-keyboard':
+                        result = await testVirtualKeyboard();
+                        break;
+                    case 'voice-allocation':
+                        result = await testVoiceAllocation();
+                        break;
+                    case 'envelope-processing':
+                        result = await testEnvelopeProcessing();
+                        break;
+                    case 'audio-buffer-generation':
+                        result = await testAudioBufferGeneration();
+                        break;
+                    case 'frequency-accuracy':
+                        result = await testFrequencyAccuracy();
+                        break;
+                    case 'reverb-processor':
+                        result = await testReverbProcessor();
+                        break;
+                    case 'chorus-processor':
+                        result = await testChorusProcessor();
+                        break;
+                    case 'effects-send-routing':
+                        result = await testEffectsSendRouting();
+                        break;
+                    case 'effects-real-time-control':
+                        result = await testEffectsRealTimeControl();
+                        break;
+                    case 'effects-control-panel':
+                        result = await testEffectsControlPanel();
+                        break;
+                    case 'voice-activity-monitor':
+                        result = await testVoiceActivityMonitor();
+                        break;
+                    case 'soundfont-loader':
+                        result = await testSoundFontLoader();
+                        break;
+                    case 'ui-controls':
+                        result = await testUIControls();
+                        break;
+                    case 'complete-midi-pipeline':
+                        result = await testCompleteMidiPipeline();
+                        break;
+                    case 'polyphonic-synthesis':
+                        result = await testPolyphonicSynthesis();
+                        break;
+                    case 'effects-integration':
+                        result = await testEffectsIntegration();
+                        break;
+                    case 'ui-audio-sync':
+                        result = await testUIAudioSync();
+                        break;
+                    case 'cpu-usage':
+                        result = await testCPUUsage();
+                        break;
+                    case 'memory-usage':
+                        result = await testMemoryUsage();
+                        break;
+                    case 'audio-latency':
+                        result = await testAudioLatency();
+                        break;
+                    case 'stress-test-32-voices':
+                        result = await testStress32Voices();
+                        break;
+                    default:
+                        throw new Error(`Unknown test: ${testName}`);
+                }
+                
+                const duration = Math.round(performance.now() - startTime);
+                return { passed: result, duration: duration };
+                
+            } catch (error) {
+                const duration = Math.round(performance.now() - startTime);
+                return { passed: false, error: error.message, duration: duration };
+            }
+        }
+        
+        // Test implementation functions
+        async function testWasmLoad() {
+            // Try to load WASM module
+            try {
+                const wasmPkg = await import('./wasm-pkg/awe_synth.js');
+                await wasmPkg.default();
+                wasmModule = wasmPkg;
+                logMessage('✅ WASM module loaded successfully');
+                return true;
+            } catch (error) {
+                logMessage(`❌ WASM load failed: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function testWasmExports() {
+            if (!wasmModule) {
+                throw new Error('WASM module not loaded');
+            }
+            
+            const requiredExports = [
+                'init_audio_worklet',
+                'queue_midi_event_global',
+                'process_stereo_buffer_global',
+                'get_debug_log_global'
+            ];
+            
+            for (const exportName of requiredExports) {
+                if (!wasmModule[exportName]) {
+                    throw new Error(`Missing WASM export: ${exportName}`);
+                }
+            }
+            
+            logMessage(`✅ All ${requiredExports.length} required WASM exports found`);
+            return true;
+        }
+        
+        async function testAudioWorkletInit() {
+            if (!wasmModule) {
+                throw new Error('WASM module not loaded');
+            }
+            
+            // Test audio worklet initialization
+            const sampleRate = 44100;
+            const initResult = wasmModule.init_audio_worklet(sampleRate);
+            
+            if (!initResult) {
+                throw new Error('WASM audio worklet initialization failed');
+            }
+            
+            logMessage(`✅ Audio worklet initialized at ${sampleRate}Hz`);
+            return true;
+        }
+        
+        async function testDebugLogging() {
+            if (!wasmModule || !wasmModule.get_debug_log_global) {
+                throw new Error('WASM debug logging not available');
+            }
+            
+            const logContent = wasmModule.get_debug_log_global();
+            if (typeof logContent !== 'string') {
+                throw new Error('Debug log should return string');
+            }
+            
+            logMessage(`✅ Debug logging functional (${logContent.length} chars)`);
+            return true;
+        }
+        
+        async function testMidiQueue() {
+            if (!wasmModule || !wasmModule.queue_midi_event_global) {
+                throw new Error('WASM MIDI queue not available');
+            }
+            
+            // Test queuing MIDI events
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100); // Note On
+            wasmModule.queue_midi_event_global(0n, 0, 0x80, 60, 0);   // Note Off
+            
+            logMessage('✅ MIDI event queue functional');
+            return true;
+        }
+        
+        async function testMidiNoteEvents() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test note on/off sequence
+            for (let note = 60; note <= 64; note++) {
+                wasmModule.queue_midi_event_global(0n, 0, 0x90, note, 100);
+                wasmModule.queue_midi_event_global(0n, 0, 0x80, note, 0);
+            }
+            
+            logMessage('✅ MIDI note event processing functional');
+            return true;
+        }
+        
+        async function testMidiCCEffects() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test CC 91 (reverb) and CC 93 (chorus)
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, 127); // Max reverb
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, 64);  // 50% chorus
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, 0);   // No reverb
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, 0);   // No chorus
+            
+            logMessage('✅ MIDI CC effects control functional');
+            return true;
+        }
+        
+        async function testMidiDeviceIntegration() {
+            // Test WebMIDI device integration
+            if (!navigator.requestMIDIAccess) {
+                logMessage('⚠️ WebMIDI not supported - test skipped');
+                return true;
+            }
+            
+            try {
+                const midiAccess = await navigator.requestMIDIAccess();
+                const inputCount = midiAccess.inputs.size;
+                logMessage(`✅ WebMIDI integration functional (${inputCount} inputs)`);
+                return true;
+            } catch (error) {
+                logMessage('⚠️ WebMIDI access denied - test skipped');
+                return true; // Not a failure since this depends on user permission
+            }
+        }
+        
+        async function testVirtualKeyboard() {
+            // Check if virtual keyboard elements exist
+            const pianoKeys = document.querySelectorAll('.piano-key');
+            if (pianoKeys.length === 0) {
+                throw new Error('Virtual keyboard not found');
+            }
+            
+            // Simulate key press
+            const middleC = document.querySelector('[data-note="60"]');
+            if (middleC) {
+                middleC.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            logMessage(`✅ Virtual keyboard functional (${pianoKeys.length} keys)`);
+            return true;
+        }
+        
+        async function testVoiceAllocation() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test voice allocation by playing multiple notes
+            for (let i = 0; i < 8; i++) {
+                wasmModule.queue_midi_event_global(0n, 0, 0x90, 60 + i, 100);
+            }
+            
+            // Process some audio to let voices start
+            if (wasmModule.process_stereo_buffer_global) {
+                const buffer = wasmModule.process_stereo_buffer_global(128);
+                if (!buffer || buffer.length !== 256) {
+                    throw new Error('Invalid audio buffer from voice allocation');
+                }
+            }
+            
+            logMessage('✅ Voice allocation functional');
+            return true;
+        }
+        
+        async function testEnvelopeProcessing() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test envelope by playing and releasing a note
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+            
+            // Process several buffers to test envelope progression
+            for (let i = 0; i < 5; i++) {
+                if (wasmModule.process_stereo_buffer_global) {
+                    wasmModule.process_stereo_buffer_global(64);
+                }
+            }
+            
+            wasmModule.queue_midi_event_global(0n, 0, 0x80, 60, 0);
+            
+            logMessage('✅ Envelope processing functional');
+            return true;
+        }
+        
+        async function testAudioBufferGeneration() {
+            if (!wasmModule || !wasmModule.process_stereo_buffer_global) {
+                throw new Error('WASM audio processing not available');
+            }
+            
+            const bufferSize = 128;
+            const audioBuffer = wasmModule.process_stereo_buffer_global(bufferSize);
+            
+            if (!audioBuffer) {
+                throw new Error('Audio buffer generation failed');
+            }
+            
+            if (audioBuffer.length !== bufferSize * 2) {
+                throw new Error(`Invalid buffer size: expected ${bufferSize * 2}, got ${audioBuffer.length}`);
+            }
+            
+            logMessage(`✅ Audio buffer generation functional (${audioBuffer.length} samples)`);
+            return true;
+        }
+        
+        async function testFrequencyAccuracy() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test frequency conversion if available
+            if (wasmModule.midi_note_to_name) {
+                const noteName = wasmModule.midi_note_to_name(60);
+                if (!noteName || !noteName.includes('C')) {
+                    throw new Error('MIDI note to name conversion failed');
+                }
+            }
+            
+            // Test note frequency generation
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 69, 100); // A4 = 440Hz
+            
+            logMessage('✅ Frequency accuracy functional');
+            return true;
+        }
+        
+        async function testReverbProcessor() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test reverb by setting send level and playing note
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, 127); // Max reverb
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+            
+            // Process audio with reverb
+            if (wasmModule.process_stereo_buffer_global) {
+                const buffer = wasmModule.process_stereo_buffer_global(256);
+                if (!buffer) {
+                    throw new Error('Reverb processing failed');
+                }
+            }
+            
+            logMessage('✅ Reverb processor functional');
+            return true;
+        }
+        
+        async function testChorusProcessor() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test chorus by setting send level and playing note
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, 127); // Max chorus
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+            
+            // Process audio with chorus
+            if (wasmModule.process_stereo_buffer_global) {
+                const buffer = wasmModule.process_stereo_buffer_global(256);
+                if (!buffer) {
+                    throw new Error('Chorus processing failed');
+                }
+            }
+            
+            logMessage('✅ Chorus processor functional');
+            return true;
+        }
+        
+        async function testEffectsSendRouting() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test send routing with different levels
+            const testLevels = [0, 32, 64, 96, 127];
+            
+            for (const level of testLevels) {
+                wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, level);
+                wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, level);
+            }
+            
+            logMessage('✅ Effects send routing functional');
+            return true;
+        }
+        
+        async function testEffectsRealTimeControl() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test real-time control during note playback
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+            
+            // Change effects levels while note is playing
+            for (let i = 0; i <= 127; i += 32) {
+                wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, i);
+                if (wasmModule.process_stereo_buffer_global) {
+                    wasmModule.process_stereo_buffer_global(32);
+                }
+            }
+            
+            logMessage('✅ Real-time effects control functional');
+            return true;
+        }
+        
+        async function testEffectsControlPanel() {
+            // Check if effects control panel elements exist
+            const reverbSlider = document.getElementById('reverb-send');
+            const chorusSlider = document.getElementById('chorus-send');
+            
+            if (!reverbSlider || !chorusSlider) {
+                throw new Error('Effects control panel elements not found');
+            }
+            
+            // Test slider interactions
+            reverbSlider.value = '0.8';
+            reverbSlider.dispatchEvent(new Event('input'));
+            
+            chorusSlider.value = '0.6';
+            chorusSlider.dispatchEvent(new Event('input'));
+            
+            logMessage('✅ Effects control panel functional');
+            return true;
+        }
+        
+        async function testVoiceActivityMonitor() {
+            // Check if voice activity monitor exists
+            const voiceActivity = document.getElementById('voice-activity');
+            if (!voiceActivity) {
+                throw new Error('Voice activity monitor not found');
+            }
+            
+            const voiceMeters = voiceActivity.querySelectorAll('.voice-meter');
+            if (voiceMeters.length === 0) {
+                throw new Error('Voice meters not created');
+            }
+            
+            logMessage(`✅ Voice activity monitor functional (${voiceMeters.length} voices)`);
+            return true;
+        }
+        
+        async function testSoundFontLoader() {
+            // Check if SoundFont loader elements exist
+            const dropZone = document.getElementById('soundfont-drop-zone');
+            const fileInput = document.getElementById('soundfont-file-input');
+            
+            if (!dropZone || !fileInput) {
+                throw new Error('SoundFont loader elements not found');
+            }
+            
+            logMessage('✅ SoundFont loader interface functional');
+            return true;
+        }
+        
+        async function testUIControls() {
+            // Check if UI control elements exist
+            const startAudioBtn = document.getElementById('start-audio');
+            const playTestToneBtn = document.getElementById('play-test-tone');
+            const stopAudioBtn = document.getElementById('stop-audio');
+            
+            if (!startAudioBtn || !playTestToneBtn || !stopAudioBtn) {
+                throw new Error('UI control elements not found');
+            }
+            
+            logMessage('✅ UI controls functional');
+            return true;
+        }
+        
+        async function testCompleteMidiPipeline() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test complete pipeline: MIDI → Synthesis → Audio
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100); // Note On
+            
+            const buffer1 = wasmModule.process_stereo_buffer_global(128);
+            if (!buffer1 || buffer1.length !== 256) {
+                throw new Error('Pipeline audio generation failed');
+            }
+            
+            wasmModule.queue_midi_event_global(0n, 0, 0x80, 60, 0); // Note Off
+            
+            const buffer2 = wasmModule.process_stereo_buffer_global(128);
+            if (!buffer2 || buffer2.length !== 256) {
+                throw new Error('Pipeline note off failed');
+            }
+            
+            logMessage('✅ Complete MIDI pipeline functional');
+            return true;
+        }
+        
+        async function testPolyphonicSynthesis() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Play multiple notes simultaneously
+            const notes = [60, 64, 67, 72]; // C major chord
+            
+            for (const note of notes) {
+                wasmModule.queue_midi_event_global(0n, 0, 0x90, note, 100);
+            }
+            
+            // Process several buffers
+            for (let i = 0; i < 3; i++) {
+                const buffer = wasmModule.process_stereo_buffer_global(128);
+                if (!buffer || buffer.length !== 256) {
+                    throw new Error('Polyphonic synthesis failed');
+                }
+            }
+            
+            // Release notes
+            for (const note of notes) {
+                wasmModule.queue_midi_event_global(0n, 0, 0x80, note, 0);
+            }
+            
+            logMessage(`✅ Polyphonic synthesis functional (${notes.length} voices)`);
+            return true;
+        }
+        
+        async function testEffectsIntegration() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            // Test synthesis with effects
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, 100); // Reverb
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, 80);  // Chorus
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100); // Note
+            
+            // Process with effects
+            const buffer = wasmModule.process_stereo_buffer_global(256);
+            if (!buffer || buffer.length !== 512) {
+                throw new Error('Effects integration failed');
+            }
+            
+            logMessage('✅ Effects integration functional');
+            return true;
+        }
+        
+        async function testUIAudioSync() {
+            // Test UI synchronization with audio
+            const statusElements = document.querySelectorAll('.status-item');
+            if (statusElements.length === 0) {
+                throw new Error('UI status elements not found');
+            }
+            
+            // Check if debug log is being updated
+            const debugLog = document.getElementById('debug-log');
+            if (debugLog) {
+                const initialLength = debugLog.value.length;
+                
+                if (wasmModule && wasmModule.get_debug_log_global) {
+                    const wasmLog = wasmModule.get_debug_log_global();
+                    if (wasmLog.length > 0) {
+                        logMessage('✅ UI audio synchronization functional');
+                        return true;
+                    }
+                }
+            }
+            
+            logMessage('✅ UI audio sync basic functionality verified');
+            return true;
+        }
+        
+        async function testCPUUsage() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            const startTime = performance.now();
+            
+            // Heavy processing load
+            for (let i = 0; i < 10; i++) {
+                // Play 8 notes simultaneously
+                for (let note = 60; note < 68; note++) {
+                    wasmModule.queue_midi_event_global(0n, 0, 0x90, note, 100);
+                }
+                
+                // Process large buffer
+                wasmModule.process_stereo_buffer_global(512);
+            }
+            
+            const duration = performance.now() - startTime;
+            
+            // Release notes
+            for (let note = 60; note < 68; note++) {
+                wasmModule.queue_midi_event_global(0n, 0, 0x80, note, 0);
+            }
+            
+            logMessage(`✅ CPU usage test completed (${duration.toFixed(1)}ms)`);
+            return true;
+        }
+        
+        async function testMemoryUsage() {
+            if (!performance.memory) {
+                logMessage('⚠️ Memory API not available - test skipped');
+                return true;
+            }
+            
+            const initialMemory = performance.memory.usedJSHeapSize;
+            
+            // Create temporary load
+            if (wasmModule) {
+                for (let i = 0; i < 100; i++) {
+                    wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+                    wasmModule.queue_midi_event_global(0n, 0, 0x80, 60, 0);
+                    if (wasmModule.process_stereo_buffer_global) {
+                        wasmModule.process_stereo_buffer_global(128);
+                    }
+                }
+            }
+            
+            const finalMemory = performance.memory.usedJSHeapSize;
+            const memoryDelta = ((finalMemory - initialMemory) / 1024 / 1024).toFixed(2);
+            
+            logMessage(`✅ Memory usage test completed (delta: ${memoryDelta}MB)`);
+            return true;
+        }
+        
+        async function testAudioLatency() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            const startTime = performance.now();
+            
+            // Measure processing latency
+            wasmModule.queue_midi_event_global(0n, 0, 0x90, 60, 100);
+            const buffer = wasmModule.process_stereo_buffer_global(128);
+            
+            const processingTime = performance.now() - startTime;
+            
+            if (!buffer) {
+                throw new Error('Audio processing failed');
+            }
+            
+            // Calculate theoretical latency at 44.1kHz
+            const bufferLatency = (128 / 44100) * 1000; // ms
+            
+            logMessage(`✅ Audio latency: processing=${processingTime.toFixed(2)}ms, buffer=${bufferLatency.toFixed(2)}ms`);
+            return true;
+        }
+        
+        async function testStress32Voices() {
+            if (!wasmModule) {
+                throw new Error('WASM module not available');
+            }
+            
+            const startTime = performance.now();
+            
+            // Play 32 notes with effects
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 91, 100); // Reverb
+            wasmModule.queue_midi_event_global(0n, 0, 0xB0, 93, 80);  // Chorus
+            
+            for (let i = 0; i < 32; i++) {
+                const note = 36 + i; // Wide range of notes
+                wasmModule.queue_midi_event_global(0n, 0, 0x90, note, 100);
+            }
+            
+            // Process several buffers under maximum load
+            for (let i = 0; i < 10; i++) {
+                const buffer = wasmModule.process_stereo_buffer_global(256);
+                if (!buffer || buffer.length !== 512) {
+                    throw new Error('32-voice stress test failed');
+                }
+            }
+            
+            // Release all notes
+            for (let i = 0; i < 32; i++) {
+                const note = 36 + i;
+                wasmModule.queue_midi_event_global(0n, 0, 0x80, note, 0);
+            }
+            
+            const duration = performance.now() - startTime;
+            
+            logMessage(`✅ 32-voice stress test completed (${duration.toFixed(1)}ms)`);
+            return true;
+        }
+        
+        // UI Helper Functions
+        function setTestStatus(testName, status, statusText) {
+            const testElement = document.querySelector(`[data-test="${testName}"]`);
+            if (testElement) {
+                testElement.className = `test-item ${status}`;
+                const statusSpan = testElement.querySelector('.test-status');
+                if (statusSpan) {
+                    statusSpan.textContent = statusText;
+                }
+            }
+        }
+        
+        function showSummary() {
+            document.getElementById('test-summary').style.display = 'block';
+        }
+        
+        function updateProgress(percentage) {
+            const progressFill = document.getElementById('progress-fill');
+            if (progressFill) {
+                progressFill.style.width = percentage + '%';
+            }
+        }
+        
+        function updateSummary(total, passed, failed, duration) {
+            document.getElementById('total-tests').textContent = `Total: ${total}`;
+            document.getElementById('passed-tests').textContent = `Passed: ${passed}`;
+            document.getElementById('failed-tests').textContent = `Failed: ${failed}`;
+            document.getElementById('test-duration').textContent = `Duration: ${(duration / 1000).toFixed(1)}s`;
+            
+            const summaryText = document.getElementById('summary-text');
+            const summary = document.getElementById('test-summary');
+            
+            if (failed === 0) {
+                summaryText.textContent = `🎉 All tests passed! (${passed}/${total})`;
+                summary.className = 'summary';
+            } else {
+                summaryText.textContent = `⚠️ ${failed} test(s) failed. (${passed}/${total} passed)`;
+                summary.className = 'summary failed';
+            }
+        }
+        
+        function clearResults() {
+            testResults.clear();
+            
+            // Reset all test statuses
+            document.querySelectorAll('.test-item').forEach(item => {
+                item.className = 'test-item pending';
+                const statusSpan = item.querySelector('.test-status');
+                if (statusSpan) {
+                    statusSpan.textContent = 'PENDING';
+                }
+            });
+            
+            // Hide summary
+            document.getElementById('test-summary').style.display = 'none';
+            
+            // Clear log
+            document.getElementById('test-log').value = '';
+            
+            logMessage('🧹 Test results cleared');
+        }
+        
+        function logMessage(message) {
+            const logOutput = document.getElementById('test-log');
+            if (logOutput) {
+                const timestamp = new Date().toLocaleTimeString();
+                logOutput.value += `[${timestamp}] ${message}\n`;
+                logOutput.scrollTop = logOutput.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>

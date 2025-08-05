@@ -1,0 +1,211 @@
+name: AWE Player CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: wasm32-unknown-unknown
+        override: true
+        components: rustfmt, clippy
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: web/package-lock.json
+    
+    - name: Install dependencies
+      run: cd web && npm ci
+    
+    - name: Rust format check
+      run: cargo fmt -- --check
+    
+    - name: Rust clippy
+      run: cargo clippy -- -D warnings
+    
+    - name: Rust tests
+      run: cargo test
+    
+    - name: Build WASM (debug)
+      run: wasm-pack build --target web --dev
+    
+    - name: JavaScript tests
+      run: cd web && npm test
+    
+    - name: Integration tests
+      run: cd web && npm run test:integration
+    
+    - name: Browser compatibility tests
+      run: cd web && npm run test:browser
+    
+    - name: MIDI device tests
+      run: cd web && npm run test:midi
+    
+    - name: SoundFont compatibility tests
+      run: cd web && npm run test:soundfont
+
+  build-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: wasm32-unknown-unknown
+        override: true
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Build for staging
+      run: chmod +x build-staging.sh && ./build-staging.sh
+    
+    - name: Upload staging artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: staging-build
+        path: dist/
+    
+    - name: Deploy to staging
+      if: success()
+      run: |
+        # Deploy to staging environment
+        echo "Deploying to staging..."
+        # Add actual deployment commands here
+
+  build-production:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: wasm32-unknown-unknown
+        override: true
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Build for production
+      run: chmod +x build-production.sh && ./build-production.sh
+    
+    - name: Upload production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-build
+        path: dist/
+    
+    - name: Build Docker image
+      run: |
+        docker build -t aweplayer/awe-player:${{ github.event.release.tag_name }} -f Dockerfile.production .
+        docker tag aweplayer/awe-player:${{ github.event.release.tag_name }} aweplayer/awe-player:latest
+    
+    - name: Deploy to production
+      if: success()
+      run: |
+        # Deploy to production environment
+        echo "Deploying to production..."
+        # Add actual deployment commands here
+    
+    - name: Create GitHub release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/awe-player.min.js
+          dist/awe_synth_bg.wasm
+          dist/deployment.json
+        draft: false
+        prerelease: false
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  performance-audit:
+    needs: build-staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      with:
+        name: staging-build
+        path: dist/
+    
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install Lighthouse CI
+      run: npm install -g @lhci/cli
+    
+    - name: Run Lighthouse audit
+      run: |
+        npx serve dist/ &
+        sleep 5
+        lhci autorun --collect.url=http://localhost:3000
+    
+    - name: Upload Lighthouse results
+      uses: actions/upload-artifact@v3
+      with:
+        name: lighthouse-results
+        path: .lighthouseci/
