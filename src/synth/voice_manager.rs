@@ -1068,4 +1068,81 @@ impl VoiceManager {
         
         active_count
     }
+    
+    /// Apply pitch bend to all active voices
+    /// 
+    /// # Arguments
+    /// * `bend_value` - 14-bit pitch bend value (-8192 to 8191)
+    /// * `bend_range_semitones` - Pitch bend range in semitones (default 2.0 for EMU8000)
+    pub fn apply_pitch_bend(&mut self, bend_value: i16, bend_range_semitones: f32) {
+        // Convert 14-bit bend value to cents
+        let bend_cents = (bend_value as f32 / 8192.0) * (bend_range_semitones * 100.0);
+        
+        log(&format!("Applying pitch bend: value={} cents={:.1} range={:.1} semitones", 
+                   bend_value, bend_cents, bend_range_semitones));
+        
+        // Apply to all active multi-zone voices
+        for voice in self.multi_zone_voices.iter_mut() {
+            if voice.is_active || voice.is_processing {
+                // Multi-zone voices need pitch bend applied to all sample layers
+                for layer in voice.sample_layers.iter_mut() {
+                    apply_pitch_bend_to_sample_player(&mut layer.sample_player, bend_cents);
+                }
+            }
+        }
+        
+        // Apply to all active sample voices
+        for voice in self.sample_voices.iter_mut() {
+            if voice.is_active || voice.is_processing {
+                apply_pitch_bend_to_sample_player(&mut voice.sample_player, bend_cents);
+            }
+        }
+        
+        // Apply to all active legacy voices
+        for voice in self.voices.iter_mut() {
+            if voice.is_active || voice.is_processing {
+                apply_pitch_bend_to_legacy_voice(voice, bend_cents);
+            }
+        }
+    }
+    
+}
+
+/// Apply pitch bend to a sample player by adjusting playback rate
+fn apply_pitch_bend_to_sample_player(sample_player: &mut crate::synth::sample_player::SamplePlayer, bend_cents: f32) {
+    // Convert cents to frequency ratio: freq_ratio = 2^(cents/1200)
+    let pitch_ratio = (2.0_f32).powf(bend_cents / 1200.0);
+    
+    // Apply pitch ratio to playback rate
+    let current_rate = sample_player.playback_rate;
+    let base_rate = current_rate / sample_player.pitch_bend_ratio.unwrap_or(1.0);
+    sample_player.playback_rate = base_rate * pitch_ratio as f64;
+    sample_player.pitch_bend_ratio = Some(pitch_ratio as f64);
+    
+    if bend_cents.abs() > 1.0 {
+        log(&format!("Sample player pitch bend: {:.1} cents -> rate {:.6} (ratio {:.6})", 
+                   bend_cents, sample_player.playback_rate, pitch_ratio));
+    }
+}
+
+/// Apply pitch bend to a legacy voice by adjusting sample rate ratio
+fn apply_pitch_bend_to_legacy_voice(voice: &mut Voice, bend_cents: f32) {
+    // Convert cents to frequency ratio
+    let pitch_ratio = (2.0_f32).powf(bend_cents / 1200.0);
+    
+    if voice.is_soundfont_voice {
+        // For SoundFont voices, adjust sample rate ratio
+        let base_ratio = voice.sample_rate_ratio / voice.pitch_bend_ratio.unwrap_or(1.0);
+        voice.sample_rate_ratio = base_ratio * pitch_ratio as f64;
+        voice.pitch_bend_ratio = Some(pitch_ratio as f64);
+    } else {
+        // For oscillator voices, adjust frequency
+        let base_frequency = crate::synth::oscillator::midi_note_to_frequency(voice.note);
+        voice.oscillator.frequency = base_frequency * pitch_ratio;
+    }
+    
+    if bend_cents.abs() > 1.0 {
+        log(&format!("Voice {} pitch bend: {:.1} cents -> ratio {:.6}", 
+                   voice.note, bend_cents, pitch_ratio));
+    }
 }

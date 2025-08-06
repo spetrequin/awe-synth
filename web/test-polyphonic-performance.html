@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>32-Voice Polyphonic Performance Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1400px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .control-panel {
+            background: #111;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        button.active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        button:disabled {
+            background: #444;
+            color: #666;
+            border-color: #666;
+            cursor: not-allowed;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #222;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 3px solid #00ff00;
+        }
+
+        .metric-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            color: #00ffff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .voice-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 5px;
+            margin: 20px 0;
+        }
+
+        .voice-indicator {
+            width: 40px;
+            height: 40px;
+            background: #333;
+            border: 1px solid #666;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .voice-indicator.active {
+            background: #00ff00;
+            color: #000;
+            border-color: #00ff00;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .test-results {
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border-radius: 8px;
+        }
+
+        .result-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #333;
+            padding-left: 15px;
+        }
+
+        .result-item.pass {
+            border-left-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .result-item.fail {
+            border-left-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .result-item.info {
+            border-left-color: #00ffff;
+            color: #00ffff;
+        }
+
+        #debug-log {
+            width: 100%;
+            height: 250px;
+            background: #111;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+            margin-top: 20px;
+        }
+
+        .performance-chart {
+            height: 150px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 32-Voice Polyphonic Performance Test 🎵</h1>
+
+    <div class="test-section">
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Performance Testing Controls</h2>
+            
+            <div style="margin-bottom: 20px;">
+                <button id="init-audio">Initialize Audio</button>
+                <button id="test-voice-scaling" disabled>Test Voice Scaling</button>
+                <button id="test-full-polyphony" disabled>Test 32-Voice Polyphony</button>
+                <button id="test-sustained" disabled>Test Sustained Performance</button>
+                <button id="test-effects" disabled>Test With Effects</button>
+                <button id="stop-all">Stop All Voices</button>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Active Voices</div>
+                    <div class="metric-value" id="active-voices">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Frame Time</div>
+                    <div class="metric-value" id="frame-time">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-usage">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">FPS</div>
+                    <div class="metric-value" id="fps">--</div>
+                </div>
+            </div>
+
+            <div>
+                <h3 style="color: #888;">CPU Usage Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="cpu-progress"></div>
+                </div>
+                <div style="font-size: 12px; color: #666;">Target: <70% CPU for real-time performance</div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Voice Activity Monitor</h2>
+            <div class="voice-grid" id="voice-grid">
+                <!-- Voice indicators will be generated here -->
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Performance Chart</h2>
+            <div class="performance-chart">
+                <canvas id="performance-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Test Results</h2>
+            <div class="test-results" id="test-results">
+                <div class="result-item info">Ready to test polyphonic performance...</div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Debug Log</h2>
+            <textarea id="debug-log" readonly></textarea>
+        </div>
+    </div>
+
+    <script type="module">
+        // Debug logging function
+        function addLog(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            debugLog.value += `[${timestamp}] ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        // Test result display
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultItem = document.createElement('div');
+            resultItem.className = `result-item ${type}`;
+            resultItem.textContent = message;
+            resultsDiv.appendChild(resultItem);
+        }
+
+        // Clear results
+        function clearResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '';
+        }
+
+        // Initialize variables
+        let midiPlayer = null;
+        let activeVoices = [];
+        let performanceMetrics = {
+            frameTimes: [],
+            cpuUsages: []
+        };
+        let monitoringInterval = null;
+        let chartCanvas = null;
+        let chartCtx = null;
+
+        // Performance monitoring
+        function startPerformanceMonitoring() {
+            if (monitoringInterval) return;
+
+            monitoringInterval = setInterval(() => {
+                updatePerformanceMetrics();
+                updateVoiceDisplay();
+                updateChart();
+            }, 100); // 10Hz update rate
+        }
+
+        function stopPerformanceMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+            }
+        }
+
+        function updatePerformanceMetrics() {
+            const frameStart = performance.now();
+            
+            // Simulate processing by calling WASM process function
+            if (midiPlayer) {
+                try {
+                    midiPlayer.process(); // Single sample processing
+                } catch (error) {
+                    // Ignore processing errors for this test
+                }
+            }
+            
+            const frameEnd = performance.now();
+            const frameTime = frameEnd - frameStart;
+            const cpuUsage = (frameTime / 16.67) * 100; // % of 60fps budget
+            const fps = 1000 / Math.max(frameTime, 0.001);
+            
+            // Store metrics
+            performanceMetrics.frameTimes.push(frameTime);
+            performanceMetrics.cpuUsages.push(cpuUsage);
+            
+            // Keep only last 60 samples
+            if (performanceMetrics.frameTimes.length > 60) {
+                performanceMetrics.frameTimes.shift();
+                performanceMetrics.cpuUsages.shift();
+            }
+            
+            // Update display
+            document.getElementById('frame-time').textContent = frameTime.toFixed(2) + 'ms';
+            document.getElementById('cpu-usage').textContent = cpuUsage.toFixed(1) + '%';
+            document.getElementById('fps').textContent = fps.toFixed(0);
+            
+            // Update progress bar
+            const cpuProgress = Math.min(cpuUsage, 100);
+            document.getElementById('cpu-progress').style.width = cpuProgress + '%';
+            
+            document.getElementById('active-voices').textContent = activeVoices.length;
+        }
+
+        function updateVoiceDisplay() {
+            const voiceGrid = document.getElementById('voice-grid');
+            const indicators = voiceGrid.children;
+            
+            for (let i = 0; i < indicators.length; i++) {
+                const indicator = indicators[i];
+                const isActive = activeVoices.includes(i);
+                
+                if (isActive) {
+                    indicator.classList.add('active');
+                    indicator.textContent = activeVoices.indexOf(i) + 1;
+                } else {
+                    indicator.classList.remove('active');
+                    indicator.textContent = i + 1;
+                }
+            }
+        }
+
+        function updateChart() {
+            if (!chartCtx || performanceMetrics.cpuUsages.length === 0) return;
+            
+            const width = chartCanvas.width;
+            const height = chartCanvas.height;
+            
+            // Clear canvas
+            chartCtx.clearRect(0, 0, width, height);
+            
+            // Draw grid
+            chartCtx.strokeStyle = '#333';
+            chartCtx.lineWidth = 1;
+            
+            // Horizontal grid lines
+            for (let i = 0; i <= 10; i++) {
+                const y = (height / 10) * i;
+                chartCtx.beginPath();
+                chartCtx.moveTo(0, y);
+                chartCtx.lineTo(width, y);
+                chartCtx.stroke();
+            }
+            
+            // Draw CPU usage line
+            if (performanceMetrics.cpuUsages.length > 1) {
+                chartCtx.strokeStyle = '#00ff00';
+                chartCtx.lineWidth = 2;
+                chartCtx.beginPath();
+                
+                const maxCpu = 100;
+                const step = width / (performanceMetrics.cpuUsages.length - 1);
+                
+                for (let i = 0; i < performanceMetrics.cpuUsages.length; i++) {
+                    const x = i * step;
+                    const y = height - (performanceMetrics.cpuUsages[i] / maxCpu) * height;
+                    
+                    if (i === 0) {
+                        chartCtx.moveTo(x, y);
+                    } else {
+                        chartCtx.lineTo(x, y);
+                    }
+                }
+                
+                chartCtx.stroke();
+            }
+            
+            // Draw target line (70% CPU)
+            chartCtx.strokeStyle = '#ff9800';
+            chartCtx.lineWidth = 1;
+            chartCtx.setLineDash([5, 5]);
+            const targetY = height - (70 / 100) * height;
+            chartCtx.beginPath();
+            chartCtx.moveTo(0, targetY);
+            chartCtx.lineTo(width, targetY);
+            chartCtx.stroke();
+            chartCtx.setLineDash([]);
+        }
+
+        // Create voice indicators
+        function createVoiceGrid() {
+            const voiceGrid = document.getElementById('voice-grid');
+            
+            for (let i = 0; i < 32; i++) {
+                const indicator = document.createElement('div');
+                indicator.className = 'voice-indicator';
+                indicator.textContent = i + 1;
+                indicator.title = `Voice ${i + 1}`;
+                voiceGrid.appendChild(indicator);
+            }
+        }
+
+        // Voice management
+        function startVoice(note, velocity) {
+            if (!midiPlayer) return null;
+            
+            try {
+                const noteOn = new Uint8Array([0x90, note, velocity]);
+                midiPlayer.send_midi_message(noteOn);
+                
+                // Find an available voice slot
+                for (let i = 0; i < 32; i++) {
+                    if (!activeVoices.includes(i)) {
+                        activeVoices.push(i);
+                        addLog(`Voice ${i + 1} started: Note ${note} Velocity ${velocity}`);
+                        return i;
+                    }
+                }
+                
+                return null; // No available voices
+            } catch (error) {
+                addLog(`Error starting voice: ${error}`);
+                return null;
+            }
+        }
+
+        function stopVoice(note) {
+            if (!midiPlayer) return;
+            
+            try {
+                const noteOff = new Uint8Array([0x80, note, 0]);
+                midiPlayer.send_midi_message(noteOff);
+                
+                // Remove from active voices (simplified)
+                if (activeVoices.length > 0) {
+                    const voiceIndex = activeVoices.shift();
+                    addLog(`Voice ${voiceIndex + 1} stopped: Note ${note}`);
+                }
+            } catch (error) {
+                addLog(`Error stopping voice: ${error}`);
+            }
+        }
+
+        function stopAllVoices() {
+            if (!midiPlayer) return;
+            
+            // Send all notes off
+            for (let note = 0; note < 128; note++) {
+                try {
+                    const noteOff = new Uint8Array([0x80, note, 0]);
+                    midiPlayer.send_midi_message(noteOff);
+                } catch (error) {
+                    // Ignore errors
+                }
+            }
+            
+            activeVoices = [];
+            addLog('All voices stopped');
+        }
+
+        // Test functions
+        async function testVoiceScaling() {
+            clearResults();
+            addResult('Testing voice scaling performance...', 'info');
+            
+            const voiceCounts = [1, 2, 4, 8, 16, 24, 32];
+            
+            for (const voiceCount of voiceCounts) {
+                addResult(`Testing ${voiceCount} voice${voiceCount > 1 ? 's' : ''}...`, 'info');
+                
+                // Start voices
+                for (let i = 0; i < voiceCount; i++) {
+                    startVoice(60 + i, 100);
+                }
+                
+                // Wait for metrics to stabilize
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Get current CPU usage
+                const cpuUsages = performanceMetrics.cpuUsages.slice(-10);
+                const avgCpu = cpuUsages.reduce((a, b) => a + b) / cpuUsages.length;
+                
+                if (avgCpu <= 70) {
+                    addResult(`✓ ${voiceCount} voices: ${avgCpu.toFixed(1)}% CPU`, 'pass');
+                } else {
+                    addResult(`⚠ ${voiceCount} voices: ${avgCpu.toFixed(1)}% CPU (high)`, 'fail');
+                }
+                
+                addLog(`Voice scaling test: ${voiceCount} voices = ${avgCpu.toFixed(1)}% CPU`);
+            }
+            
+            addResult('Voice scaling test completed', 'info');
+        }
+
+        async function testFullPolyphony() {
+            clearResults();
+            addResult('Testing full 32-voice polyphony...', 'info');
+            
+            // Start all 32 voices with different notes and velocities
+            for (let i = 0; i < 32; i++) {
+                const note = 48 + (i % 48); // Spread across 4 octaves
+                const velocity = 64 + Math.floor(Math.random() * 63); // Random velocity
+                startVoice(note, velocity);
+                
+                // Brief delay to stagger note starts
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            addResult('All 32 voices started', 'info');
+            
+            // Monitor performance for 5 seconds
+            let maxCpu = 0;
+            let avgCpu = 0;
+            const samples = [];
+            
+            addResult('Monitoring performance for 5 seconds...', 'info');
+            
+            for (let i = 0; i < 50; i++) { // 5 seconds at 10Hz
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                if (performanceMetrics.cpuUsages.length > 0) {
+                    const currentCpu = performanceMetrics.cpuUsages[performanceMetrics.cpuUsages.length - 1];
+                    samples.push(currentCpu);
+                    maxCpu = Math.max(maxCpu, currentCpu);
+                }
+            }
+            
+            avgCpu = samples.reduce((a, b) => a + b) / samples.length;
+            
+            // Evaluate results
+            if (avgCpu <= 50) {
+                addResult(`✓ Excellent: Average CPU ${avgCpu.toFixed(1)}%`, 'pass');
+            } else if (avgCpu <= 70) {
+                addResult(`✓ Good: Average CPU ${avgCpu.toFixed(1)}%`, 'pass');
+            } else {
+                addResult(`⚠ High CPU usage: ${avgCpu.toFixed(1)}%`, 'fail');
+            }
+            
+            addResult(`Peak CPU usage: ${maxCpu.toFixed(1)}%`, maxCpu <= 90 ? 'pass' : 'fail');
+            addResult(`Active voices: ${activeVoices.length}/32`, 'info');
+            
+            addLog(`32-voice polyphony test: Avg ${avgCpu.toFixed(1)}% CPU, Peak ${maxCpu.toFixed(1)}%`);
+        }
+
+        async function testSustainedPerformance() {
+            clearResults();
+            addResult('Testing sustained performance (30 seconds)...', 'info');
+            
+            // Ensure we have full polyphony
+            for (let i = activeVoices.length; i < 32; i++) {
+                const note = 48 + (i % 48);
+                startVoice(note, 80);
+            }
+            
+            const testDuration = 30000; // 30 seconds
+            const startTime = Date.now();
+            const samples = [];
+            let sampleCount = 0;
+            
+            while (Date.now() - startTime < testDuration) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Sample every 500ms
+                
+                if (performanceMetrics.cpuUsages.length > 0) {
+                    const currentCpu = performanceMetrics.cpuUsages[performanceMetrics.cpuUsages.length - 1];
+                    samples.push(currentCpu);
+                    sampleCount++;
+                }
+                
+                // Update progress
+                const progress = ((Date.now() - startTime) / testDuration * 100).toFixed(0);
+                addResult(`Progress: ${progress}%`, 'info');
+            }
+            
+            // Calculate statistics
+            const avgCpu = samples.reduce((a, b) => a + b) / samples.length;
+            const maxCpu = Math.max(...samples);
+            const minCpu = Math.min(...samples);
+            
+            // Sort for percentiles
+            const sortedSamples = samples.sort((a, b) => a - b);
+            const p95Cpu = sortedSamples[Math.floor(sortedSamples.length * 0.95)];
+            
+            clearResults();
+            addResult('Sustained performance test completed', 'info');
+            addResult(`Test duration: 30 seconds (${sampleCount} samples)`, 'info');
+            addResult(`Average CPU: ${avgCpu.toFixed(1)}%`, avgCpu <= 70 ? 'pass' : 'fail');
+            addResult(`95th percentile: ${p95Cpu.toFixed(1)}%`, p95Cpu <= 80 ? 'pass' : 'fail');
+            addResult(`Maximum CPU: ${maxCpu.toFixed(1)}%`, maxCpu <= 90 ? 'pass' : 'fail');
+            addResult(`CPU variance: ${(maxCpu - minCpu).toFixed(1)}%`, 'info');
+            
+            // Stability assessment
+            const variance = samples.reduce((sum, cpu) => sum + Math.pow(cpu - avgCpu, 2), 0) / samples.length;
+            const stability = variance < 100 ? 'Excellent' : variance < 400 ? 'Good' : 'Poor';
+            
+            addResult(`Performance stability: ${stability}`, variance < 400 ? 'pass' : 'fail');
+            
+            addLog(`Sustained test: Avg ${avgCpu.toFixed(1)}%, P95 ${p95Cpu.toFixed(1)}%, Max ${maxCpu.toFixed(1)}%`);
+        }
+
+        async function testWithEffects() {
+            clearResults();
+            addResult('Testing performance with full effects enabled...', 'info');
+            addResult('Note: Effects are always enabled in AWE Player', 'info');
+            
+            // Start voices with various settings to stress effects
+            for (let i = 0; i < 32; i++) {
+                const note = 36 + Math.floor(Math.random() * 60); // Wide note range
+                const velocity = 50 + Math.floor(Math.random() * 77); // Varied velocities
+                startVoice(note, velocity);
+                
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            
+            addResult('All voices active with effects processing...', 'info');
+            
+            // Monitor for effects stress test
+            const samples = [];
+            for (let i = 0; i < 30; i++) { // 3 seconds
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                if (performanceMetrics.cpuUsages.length > 0) {
+                    samples.push(performanceMetrics.cpuUsages[performanceMetrics.cpuUsages.length - 1]);
+                }
+            }
+            
+            const avgCpu = samples.reduce((a, b) => a + b) / samples.length;
+            const maxCpu = Math.max(...samples);
+            
+            addResult(`Effects test completed`, 'info');
+            addResult(`Average CPU with effects: ${avgCpu.toFixed(1)}%`, avgCpu <= 70 ? 'pass' : 'fail');
+            addResult(`Peak CPU with effects: ${maxCpu.toFixed(1)}%`, maxCpu <= 85 ? 'pass' : 'fail');
+            
+            addLog(`Effects test: Avg ${avgCpu.toFixed(1)}%, Peak ${maxCpu.toFixed(1)}%`);
+        }
+
+        // Event handlers
+        document.getElementById('init-audio').addEventListener('click', async () => {
+            try {
+                addLog('Initializing audio system...');
+                
+                // Import WASM module
+                const wasmModule = await import('./awe_synth.js');
+                await wasmModule.default();
+                
+                // Create MIDI player instance
+                midiPlayer = new wasmModule.MidiPlayer();
+                addLog('MIDI player created successfully');
+                
+                // Enable test buttons
+                document.getElementById('test-voice-scaling').disabled = false;
+                document.getElementById('test-full-polyphony').disabled = false;
+                document.getElementById('test-sustained').disabled = false;
+                document.getElementById('test-effects').disabled = false;
+                
+                // Start performance monitoring
+                startPerformanceMonitoring();
+                
+                addResult('✓ Audio system initialized', 'pass');
+                addLog('Performance monitoring started');
+                
+            } catch (error) {
+                addLog(`Initialization error: ${error}`);
+                addResult(`✗ Failed to initialize: ${error}`, 'fail');
+            }
+        });
+
+        document.getElementById('test-voice-scaling').addEventListener('click', testVoiceScaling);
+        document.getElementById('test-full-polyphony').addEventListener('click', testFullPolyphony);
+        document.getElementById('test-sustained').addEventListener('click', testSustainedPerformance);
+        document.getElementById('test-effects').addEventListener('click', testWithEffects);
+
+        document.getElementById('stop-all').addEventListener('click', () => {
+            stopAllVoices();
+            clearResults();
+            addResult('All voices stopped', 'info');
+        });
+
+        // Initialize components
+        createVoiceGrid();
+        
+        // Initialize chart
+        chartCanvas = document.getElementById('performance-chart');
+        chartCtx = chartCanvas.getContext('2d');
+        
+        // Set canvas size
+        const chartContainer = chartCanvas.parentElement;
+        chartCanvas.width = chartContainer.clientWidth;
+        chartCanvas.height = chartContainer.clientHeight;
+        
+        addLog('Polyphonic performance test page loaded');
+        addLog('Click "Initialize Audio" to begin testing');
+    </script>
+</body>
+</html>

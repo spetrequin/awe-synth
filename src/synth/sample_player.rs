@@ -30,6 +30,8 @@ pub struct SamplePlayer {
     pub position: f64,
     /// Playback rate ratio for pitch shifting (1.0 = original pitch)
     pub playback_rate: f64,
+    /// Current pitch bend ratio applied to playback rate
+    pub pitch_bend_ratio: Option<f64>,
     /// Interpolation method for pitch shifting accuracy
     pub interpolation: InterpolationMethod,
     /// Whether the sample player is active
@@ -42,6 +44,7 @@ impl SamplePlayer {
         Self {
             position: 0.0,
             playback_rate: 1.0,
+            pitch_bend_ratio: None,
             interpolation: InterpolationMethod::default(),
             is_active: false,
         }

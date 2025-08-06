@@ -1,25 +1,5 @@
 let wasm;
 
-function logError(f, args) {
-    try {
-        return f.apply(this, args);
-    } catch (e) {
-        let error = (function () {
-            try {
-                return e instanceof Error ? `${e.message}\n\nStack:\n${e.stack}` : e.toString();
-            } catch(_) {
-                return "<failed to stringify thrown value>";
-            }
-        }());
-        console.error("wasm-bindgen: imported JS function that was not marked as `catch` threw an error:", error);
-        throw e;
-    }
-}
-
-function _assertNum(n) {
-    if (typeof(n) !== 'number') throw new Error(`expected a number argument, found ${typeof(n)}`);
-}
-
 const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
 
 if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
@@ -37,234 +17,36 @@ function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
-/**
- * Initialize global test sequence generator
- * @param {number} sample_rate
- */
-export function init_test_sequence_generator(sample_rate) {
-    wasm.init_test_sequence_generator(sample_rate);
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
 }
 
 let WASM_VECTOR_LEN = 0;
 
-const cachedTextEncoder = (typeof TextEncoder !== 'undefined' ? new TextEncoder('utf-8') : { encode: () => { throw Error('TextEncoder not available') } } );
-
-const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
-    ? function (arg, view) {
-    return cachedTextEncoder.encodeInto(arg, view);
-}
-    : function (arg, view) {
-    const buf = cachedTextEncoder.encode(arg);
-    view.set(buf);
-    return {
-        read: arg.length,
-        written: buf.length
-    };
-});
-
-function passStringToWasm0(arg, malloc, realloc) {
-
-    if (typeof(arg) !== 'string') throw new Error(`expected a string argument, found ${typeof(arg)}`);
-
-    if (realloc === undefined) {
-        const buf = cachedTextEncoder.encode(arg);
-        const ptr = malloc(buf.length, 1) >>> 0;
-        getUint8ArrayMemory0().subarray(ptr, ptr + buf.length).set(buf);
-        WASM_VECTOR_LEN = buf.length;
-        return ptr;
-    }
-
-    let len = arg.length;
-    let ptr = malloc(len, 1) >>> 0;
-
-    const mem = getUint8ArrayMemory0();
-
-    let offset = 0;
-
-    for (; offset < len; offset++) {
-        const code = arg.charCodeAt(offset);
-        if (code > 0x7F) break;
-        mem[ptr + offset] = code;
-    }
-
-    if (offset !== len) {
-        if (offset !== 0) {
-            arg = arg.slice(offset);
-        }
-        ptr = realloc(ptr, len, len = offset + arg.length * 3, 1) >>> 0;
-        const view = getUint8ArrayMemory0().subarray(ptr + offset, ptr + len);
-        const ret = encodeString(arg, view);
-        if (ret.read !== arg.length) throw new Error('failed to pass whole string');
-        offset += ret.written;
-        ptr = realloc(ptr, len, offset, 1) >>> 0;
-    }
-
-    WASM_VECTOR_LEN = offset;
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
     return ptr;
 }
 
-function isLikeNone(x) {
-    return x === undefined || x === null;
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_export_0.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 /**
- * Generate C major scale test sequence as JSON
- * @param {string | null} [config_json]
- * @returns {string}
+ * Initialize global AudioWorklet bridge with specified sample rate
+ * Must be called once before using other AudioWorklet functions
+ * @param {number} sample_rate
+ * @returns {boolean}
  */
-export function generate_c_major_scale_test(config_json) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        var len0 = WASM_VECTOR_LEN;
-        const ret = wasm.generate_c_major_scale_test(ptr0, len0);
-        deferred2_0 = ret[0];
-        deferred2_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
-}
-
-/**
- * Generate chromatic scale test sequence as JSON
- * @param {string | null} [config_json]
- * @returns {string}
- */
-export function generate_chromatic_scale_test(config_json) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        var len0 = WASM_VECTOR_LEN;
-        const ret = wasm.generate_chromatic_scale_test(ptr0, len0);
-        deferred2_0 = ret[0];
-        deferred2_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
-}
-
-/**
- * Generate C major arpeggio test sequence as JSON
- * @param {string | null} [config_json]
- * @returns {string}
- */
-export function generate_arpeggio_test(config_json) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        var len0 = WASM_VECTOR_LEN;
-        const ret = wasm.generate_arpeggio_test(ptr0, len0);
-        deferred2_0 = ret[0];
-        deferred2_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
-}
-
-/**
- * Generate chord test sequence as JSON
- * @param {string | null} [config_json]
- * @returns {string}
- */
-export function generate_chord_test(config_json) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        var len0 = WASM_VECTOR_LEN;
-        const ret = wasm.generate_chord_test(ptr0, len0);
-        deferred2_0 = ret[0];
-        deferred2_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
-}
-
-/**
- * Generate velocity test sequence as JSON
- * @param {string | null} [config_json]
- * @returns {string}
- */
-export function generate_velocity_test(config_json) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        var len0 = WASM_VECTOR_LEN;
-        const ret = wasm.generate_velocity_test(ptr0, len0);
-        deferred2_0 = ret[0];
-        deferred2_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
-}
-
-/**
- * Convert MIDI note to note name
- * @param {number} note
- * @returns {string}
- */
-export function midi_note_to_name(note) {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        _assertNum(note);
-        const ret = wasm.midi_note_to_name(note);
-        deferred1_0 = ret[0];
-        deferred1_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-    }
-}
-
-/**
- * Convert note name to MIDI note number (returns 255 for invalid)
- * @param {string} note_name
- * @returns {number}
- */
-export function note_name_to_midi(note_name) {
-    const ptr0 = passStringToWasm0(note_name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.note_name_to_midi(ptr0, len0);
-    return ret;
-}
-
-/**
- * Execute a test sequence by queuing all its events
- * Returns number of events queued
- * @param {string} sequence_json
- * @returns {number}
- */
-export function execute_test_sequence(sequence_json) {
-    const ptr0 = passStringToWasm0(sequence_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.execute_test_sequence(ptr0, len0);
-    return ret >>> 0;
-}
-
-/**
- * Quick test function - generate and execute C major scale
- * @returns {string}
- */
-export function quick_c_major_test() {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        const ret = wasm.quick_c_major_test();
-        deferred1_0 = ret[0];
-        deferred1_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-    }
+export function init_audio_worklet(sample_rate) {
+    const ret = wasm.init_audio_worklet(sample_rate);
+    return ret !== 0;
 }
 
 let cachedFloat32ArrayMemory0 = null;
@@ -280,84 +62,6 @@ function getArrayF32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getFloat32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
 }
-
-function _assertBigInt(n) {
-    if (typeof(n) !== 'bigint') throw new Error(`expected a bigint argument, found ${typeof(n)}`);
-}
-
-function _assertBoolean(n) {
-    if (typeof(n) !== 'boolean') {
-        throw new Error(`expected a boolean argument, found ${typeof(n)}`);
-    }
-}
-/**
- * Utility functions for AudioWorklet integration
- * Calculate optimal buffer size based on sample rate and target latency
- * @param {number} sample_rate
- * @param {number} target_latency_ms
- * @returns {number}
- */
-export function calculate_optimal_buffer_size(sample_rate, target_latency_ms) {
-    const ret = wasm.calculate_optimal_buffer_size(sample_rate, target_latency_ms);
-    return ret >>> 0;
-}
-
-/**
- * Validate sample rate for EMU8000 compatibility
- * @param {number} sample_rate
- * @returns {boolean}
- */
-export function validate_sample_rate(sample_rate) {
-    const ret = wasm.validate_sample_rate(sample_rate);
-    return ret !== 0;
-}
-
-/**
- * Convert milliseconds to samples at given sample rate
- * @param {number} milliseconds
- * @param {number} sample_rate
- * @returns {number}
- */
-export function ms_to_samples(milliseconds, sample_rate) {
-    const ret = wasm.ms_to_samples(milliseconds, sample_rate);
-    return ret >>> 0;
-}
-
-/**
- * Convert samples to milliseconds at given sample rate
- * @param {number} samples
- * @param {number} sample_rate
- * @returns {number}
- */
-export function samples_to_ms(samples, sample_rate) {
-    _assertNum(samples);
-    const ret = wasm.samples_to_ms(samples, sample_rate);
-    return ret;
-}
-
-function _assertClass(instance, klass) {
-    if (!(instance instanceof klass)) {
-        throw new Error(`expected instance of ${klass.name}`);
-    }
-}
-
-function passArray8ToWasm0(arg, malloc) {
-    const ptr = malloc(arg.length * 1, 1) >>> 0;
-    getUint8ArrayMemory0().set(arg, ptr / 1);
-    WASM_VECTOR_LEN = arg.length;
-    return ptr;
-}
-/**
- * Initialize global AudioWorklet bridge with specified sample rate
- * Must be called once before using other AudioWorklet functions
- * @param {number} sample_rate
- * @returns {boolean}
- */
-export function init_audio_worklet(sample_rate) {
-    const ret = wasm.init_audio_worklet(sample_rate);
-    return ret !== 0;
-}
-
 /**
  * Process audio buffer using global AudioWorklet bridge
  * Optimized for AudioWorklet process() callback - minimal overhead
@@ -365,7 +69,6 @@ export function init_audio_worklet(sample_rate) {
  * @returns {Float32Array}
  */
 export function process_audio_buffer(buffer_length) {
-    _assertNum(buffer_length);
     const ret = wasm.process_audio_buffer(buffer_length);
     var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
@@ -391,11 +94,6 @@ export function get_sample_rate() {
  * @param {number} data2
  */
 export function queue_midi_event_global(timestamp, channel, message_type, data1, data2) {
-    _assertBigInt(timestamp);
-    _assertNum(channel);
-    _assertNum(message_type);
-    _assertNum(data1);
-    _assertNum(data2);
     wasm.queue_midi_event_global(timestamp, channel, message_type, data1, data2);
 }
 
@@ -405,7 +103,6 @@ export function queue_midi_event_global(timestamp, channel, message_type, data1,
  * @returns {Float32Array}
  */
 export function process_stereo_buffer_global(buffer_length) {
-    _assertNum(buffer_length);
     const ret = wasm.process_stereo_buffer_global(buffer_length);
     var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
@@ -417,7 +114,6 @@ export function process_stereo_buffer_global(buffer_length) {
  * @param {number} size
  */
 export function set_buffer_size_global(size) {
-    _assertNum(size);
     wasm.set_buffer_size_global(size);
 }
 
@@ -446,7 +142,6 @@ export function test_audio_worklet_global(buffer_size) {
     let deferred1_0;
     let deferred1_1;
     try {
-        _assertNum(buffer_size);
         const ret = wasm.test_audio_worklet_global(buffer_size);
         deferred1_0 = ret[0];
         deferred1_1 = ret[1];
@@ -479,8 +174,6 @@ export function get_debug_log_global() {
  * @param {number} device_memory_gb
  */
 export function set_device_info_global(hardware_concurrency, device_memory_gb) {
-    _assertNum(hardware_concurrency);
-    _assertNum(device_memory_gb);
     wasm.set_device_info_global(hardware_concurrency, device_memory_gb);
 }
 
@@ -490,7 +183,6 @@ export function set_device_info_global(hardware_concurrency, device_memory_gb) {
  * @param {number} buffer_size
  */
 export function record_processing_time_global(processing_time_ms, buffer_size) {
-    _assertNum(buffer_size);
     wasm.record_processing_time_global(processing_time_ms, buffer_size);
 }
 
@@ -559,7 +251,6 @@ export function get_current_latency_ms_global() {
  * @param {boolean} enabled
  */
 export function set_adaptive_mode_global(enabled) {
-    _assertBoolean(enabled);
     wasm.set_adaptive_mode_global(enabled);
 }
 
@@ -812,8 +503,6 @@ export function select_preset_global(bank, program) {
     let deferred1_0;
     let deferred1_1;
     try {
-        _assertNum(bank);
-        _assertNum(program);
         const ret = wasm.select_preset_global(bank, program);
         deferred1_0 = ret[0];
         deferred1_1 = ret[1];
@@ -855,6 +544,275 @@ export function test_soundfont_synthesis() {
     } finally {
         wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
+}
+
+/**
+ * Initialize global test sequence generator
+ * @param {number} sample_rate
+ */
+export function init_test_sequence_generator(sample_rate) {
+    wasm.init_test_sequence_generator(sample_rate);
+}
+
+const cachedTextEncoder = (typeof TextEncoder !== 'undefined' ? new TextEncoder('utf-8') : { encode: () => { throw Error('TextEncoder not available') } } );
+
+const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
+    ? function (arg, view) {
+    return cachedTextEncoder.encodeInto(arg, view);
+}
+    : function (arg, view) {
+    const buf = cachedTextEncoder.encode(arg);
+    view.set(buf);
+    return {
+        read: arg.length,
+        written: buf.length
+    };
+});
+
+function passStringToWasm0(arg, malloc, realloc) {
+
+    if (realloc === undefined) {
+        const buf = cachedTextEncoder.encode(arg);
+        const ptr = malloc(buf.length, 1) >>> 0;
+        getUint8ArrayMemory0().subarray(ptr, ptr + buf.length).set(buf);
+        WASM_VECTOR_LEN = buf.length;
+        return ptr;
+    }
+
+    let len = arg.length;
+    let ptr = malloc(len, 1) >>> 0;
+
+    const mem = getUint8ArrayMemory0();
+
+    let offset = 0;
+
+    for (; offset < len; offset++) {
+        const code = arg.charCodeAt(offset);
+        if (code > 0x7F) break;
+        mem[ptr + offset] = code;
+    }
+
+    if (offset !== len) {
+        if (offset !== 0) {
+            arg = arg.slice(offset);
+        }
+        ptr = realloc(ptr, len, len = offset + arg.length * 3, 1) >>> 0;
+        const view = getUint8ArrayMemory0().subarray(ptr + offset, ptr + len);
+        const ret = encodeString(arg, view);
+
+        offset += ret.written;
+        ptr = realloc(ptr, len, offset, 1) >>> 0;
+    }
+
+    WASM_VECTOR_LEN = offset;
+    return ptr;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
+}
+/**
+ * Generate C major scale test sequence as JSON
+ * @param {string | null} [config_json]
+ * @returns {string}
+ */
+export function generate_c_major_scale_test(config_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.generate_c_major_scale_test(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Generate chromatic scale test sequence as JSON
+ * @param {string | null} [config_json]
+ * @returns {string}
+ */
+export function generate_chromatic_scale_test(config_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.generate_chromatic_scale_test(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Generate C major arpeggio test sequence as JSON
+ * @param {string | null} [config_json]
+ * @returns {string}
+ */
+export function generate_arpeggio_test(config_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.generate_arpeggio_test(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Generate chord test sequence as JSON
+ * @param {string | null} [config_json]
+ * @returns {string}
+ */
+export function generate_chord_test(config_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.generate_chord_test(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Generate velocity test sequence as JSON
+ * @param {string | null} [config_json]
+ * @returns {string}
+ */
+export function generate_velocity_test(config_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        var ptr0 = isLikeNone(config_json) ? 0 : passStringToWasm0(config_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        const ret = wasm.generate_velocity_test(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Convert MIDI note to note name
+ * @param {number} note
+ * @returns {string}
+ */
+export function midi_note_to_name(note) {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.midi_note_to_name(note);
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * Convert note name to MIDI note number (returns 255 for invalid)
+ * @param {string} note_name
+ * @returns {number}
+ */
+export function note_name_to_midi(note_name) {
+    const ptr0 = passStringToWasm0(note_name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.note_name_to_midi(ptr0, len0);
+    return ret;
+}
+
+/**
+ * Execute a test sequence by queuing all its events
+ * Returns number of events queued
+ * @param {string} sequence_json
+ * @returns {number}
+ */
+export function execute_test_sequence(sequence_json) {
+    const ptr0 = passStringToWasm0(sequence_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.execute_test_sequence(ptr0, len0);
+    return ret >>> 0;
+}
+
+/**
+ * Quick test function - generate and execute C major scale
+ * @returns {string}
+ */
+export function quick_c_major_test() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.quick_c_major_test();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * Utility functions for AudioWorklet integration
+ * Calculate optimal buffer size based on sample rate and target latency
+ * @param {number} sample_rate
+ * @param {number} target_latency_ms
+ * @returns {number}
+ */
+export function calculate_optimal_buffer_size(sample_rate, target_latency_ms) {
+    const ret = wasm.calculate_optimal_buffer_size(sample_rate, target_latency_ms);
+    return ret >>> 0;
+}
+
+/**
+ * Validate sample rate for EMU8000 compatibility
+ * @param {number} sample_rate
+ * @returns {boolean}
+ */
+export function validate_sample_rate(sample_rate) {
+    const ret = wasm.validate_sample_rate(sample_rate);
+    return ret !== 0;
+}
+
+/**
+ * Convert milliseconds to samples at given sample rate
+ * @param {number} milliseconds
+ * @param {number} sample_rate
+ * @returns {number}
+ */
+export function ms_to_samples(milliseconds, sample_rate) {
+    const ret = wasm.ms_to_samples(milliseconds, sample_rate);
+    return ret >>> 0;
+}
+
+/**
+ * Convert samples to milliseconds at given sample rate
+ * @param {number} samples
+ * @param {number} sample_rate
+ * @returns {number}
+ */
+export function samples_to_ms(samples, sample_rate) {
+    const ret = wasm.samples_to_ms(samples, sample_rate);
+    return ret;
 }
 
 /**
@@ -903,8 +861,6 @@ export class AudioWorkletBridge {
      * @returns {number}
      */
     get_sample_rate() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.audioworkletbridge_get_sample_rate(this.__wbg_ptr);
         return ret;
     }
@@ -913,9 +869,6 @@ export class AudioWorkletBridge {
      * @param {number} size
      */
     set_buffer_size(size) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(size);
         wasm.audioworkletbridge_set_buffer_size(this.__wbg_ptr, size);
     }
     /**
@@ -923,8 +876,6 @@ export class AudioWorkletBridge {
      * @returns {number}
      */
     get_buffer_size() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.audioworkletbridge_get_buffer_size(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -936,9 +887,6 @@ export class AudioWorkletBridge {
      * @returns {Float32Array}
      */
     process_audio_buffer(buffer_length) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(buffer_length);
         const ret = wasm.audioworkletbridge_process_audio_buffer(this.__wbg_ptr, buffer_length);
         var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
@@ -951,9 +899,6 @@ export class AudioWorkletBridge {
      * @returns {Float32Array}
      */
     process_stereo_buffer(buffer_length) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(buffer_length);
         const ret = wasm.audioworkletbridge_process_stereo_buffer(this.__wbg_ptr, buffer_length);
         var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
@@ -966,9 +911,6 @@ export class AudioWorkletBridge {
      * @returns {Array<any>}
      */
     process_dual_mono(buffer_length) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(buffer_length);
         const ret = wasm.audioworkletbridge_process_dual_mono(this.__wbg_ptr, buffer_length);
         return ret;
     }
@@ -978,8 +920,6 @@ export class AudioWorkletBridge {
      * @returns {number}
      */
     get_midi_player() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.audioworkletbridge_get_midi_player(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -992,13 +932,6 @@ export class AudioWorkletBridge {
      * @param {number} data2
      */
     queue_midi_event(timestamp, channel, message_type, data1, data2) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertBigInt(timestamp);
-        _assertNum(channel);
-        _assertNum(message_type);
-        _assertNum(data1);
-        _assertNum(data2);
         wasm.audioworkletbridge_queue_midi_event(this.__wbg_ptr, timestamp, channel, message_type, data1, data2);
     }
     /**
@@ -1007,10 +940,6 @@ export class AudioWorkletBridge {
      * @param {number} device_memory_gb
      */
     set_device_info(hardware_concurrency, device_memory_gb) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(hardware_concurrency);
-        _assertNum(device_memory_gb);
         wasm.audioworkletbridge_set_device_info(this.__wbg_ptr, hardware_concurrency, device_memory_gb);
     }
     /**
@@ -1019,25 +948,18 @@ export class AudioWorkletBridge {
      * @param {number} buffer_size
      */
     record_processing_time(processing_time_ms, buffer_size) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(buffer_size);
         wasm.audioworkletbridge_record_processing_time(this.__wbg_ptr, processing_time_ms, buffer_size);
     }
     /**
      * Record buffer underrun (audio glitch)
      */
     record_underrun() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.audioworkletbridge_record_underrun(this.__wbg_ptr);
     }
     /**
      * Record buffer overrun (processing too fast)
      */
     record_overrun() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.audioworkletbridge_record_overrun(this.__wbg_ptr);
     }
     /**
@@ -1048,8 +970,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_buffer_metrics(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1066,8 +986,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_buffer_status(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1082,8 +1000,6 @@ export class AudioWorkletBridge {
      * @returns {number}
      */
     get_recommended_buffer_size(target_latency_ms) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.audioworkletbridge_get_recommended_buffer_size(this.__wbg_ptr, target_latency_ms);
         return ret >>> 0;
     }
@@ -1092,8 +1008,6 @@ export class AudioWorkletBridge {
      * @returns {number}
      */
     get_current_latency_ms() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.audioworkletbridge_get_current_latency_ms(this.__wbg_ptr);
         return ret;
     }
@@ -1102,9 +1016,6 @@ export class AudioWorkletBridge {
      * @param {number} size
      */
     set_optimal_buffer_size(size) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(size);
         wasm.audioworkletbridge_set_optimal_buffer_size(this.__wbg_ptr, size);
     }
     /**
@@ -1112,17 +1023,12 @@ export class AudioWorkletBridge {
      * @param {boolean} enabled
      */
     set_adaptive_mode(enabled) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertBoolean(enabled);
         wasm.audioworkletbridge_set_adaptive_mode(this.__wbg_ptr, enabled);
     }
     /**
      * Reset buffer performance metrics
      */
     reset_buffer_metrics() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.audioworkletbridge_reset_buffer_metrics(this.__wbg_ptr);
     }
     /**
@@ -1133,8 +1039,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_debug_log(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1152,9 +1056,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
-            _assertNum(buffer_size);
             const ret = wasm.audioworkletbridge_test_worklet_bridge(this.__wbg_ptr, buffer_size);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1167,8 +1068,6 @@ export class AudioWorkletBridge {
      * Reset all audio state (stop all voices, clear events)
      */
     reset_audio_state() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.audioworkletbridge_reset_audio_state(this.__wbg_ptr);
     }
     /**
@@ -1179,8 +1078,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_audio_stats(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1197,8 +1094,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_pipeline_status(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1212,8 +1107,6 @@ export class AudioWorkletBridge {
      * @returns {boolean}
      */
     is_pipeline_ready() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.audioworkletbridge_is_pipeline_ready(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -1225,8 +1118,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_pipeline_stats(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1239,8 +1130,6 @@ export class AudioWorkletBridge {
      * Force pipeline status update (for testing/debugging)
      */
     reset_pipeline() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.audioworkletbridge_reset_pipeline(this.__wbg_ptr);
     }
     /**
@@ -1251,8 +1140,6 @@ export class AudioWorkletBridge {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.audioworkletbridge_get_comprehensive_status(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1284,8 +1171,6 @@ export class MidiEvent {
      * @returns {bigint}
      */
     get timestamp() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_midievent_timestamp(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
@@ -1293,17 +1178,12 @@ export class MidiEvent {
      * @param {bigint} arg0
      */
     set timestamp(arg0) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertBigInt(arg0);
         wasm.__wbg_set_midievent_timestamp(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {number}
      */
     get channel() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_midievent_channel(this.__wbg_ptr);
         return ret;
     }
@@ -1311,17 +1191,12 @@ export class MidiEvent {
      * @param {number} arg0
      */
     set channel(arg0) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(arg0);
         wasm.__wbg_set_midievent_channel(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {number}
      */
     get message_type() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_midievent_message_type(this.__wbg_ptr);
         return ret;
     }
@@ -1329,17 +1204,12 @@ export class MidiEvent {
      * @param {number} arg0
      */
     set message_type(arg0) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(arg0);
         wasm.__wbg_set_midievent_message_type(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {number}
      */
     get data1() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_midievent_data1(this.__wbg_ptr);
         return ret;
     }
@@ -1347,17 +1217,12 @@ export class MidiEvent {
      * @param {number} arg0
      */
     set data1(arg0) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(arg0);
         wasm.__wbg_set_midievent_data1(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {number}
      */
     get data2() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_midievent_data2(this.__wbg_ptr);
         return ret;
     }
@@ -1365,9 +1230,6 @@ export class MidiEvent {
      * @param {number} arg0
      */
     set data2(arg0) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(arg0);
         wasm.__wbg_set_midievent_data2(this.__wbg_ptr, arg0);
     }
     /**
@@ -1378,11 +1240,6 @@ export class MidiEvent {
      * @param {number} data2
      */
     constructor(timestamp, channel, message_type, data1, data2) {
-        _assertBigInt(timestamp);
-        _assertNum(channel);
-        _assertNum(message_type);
-        _assertNum(data1);
-        _assertNum(data2);
         const ret = wasm.midievent_new(timestamp, channel, message_type, data1, data2);
         this.__wbg_ptr = ret >>> 0;
         MidiEventFinalization.register(this, this.__wbg_ptr, this);
@@ -1417,12 +1274,7 @@ export class MidiPlayer {
      * @param {MidiEvent} event
      */
     queue_midi_event(event) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         _assertClass(event, MidiEvent);
-        if (event.__wbg_ptr === 0) {
-            throw new Error('Attempt to use a moved value');
-        }
         var ptr0 = event.__destroy_into_raw();
         wasm.midiplayer_queue_midi_event(this.__wbg_ptr, ptr0);
     }
@@ -1431,9 +1283,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     process_midi_events(current_sample_time) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertBigInt(current_sample_time);
         const ret = wasm.midiplayer_process_midi_events(this.__wbg_ptr, current_sample_time);
         return ret >>> 0;
     }
@@ -1444,8 +1293,6 @@ export class MidiPlayer {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.midiplayer_get_debug_log(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1458,8 +1305,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     play_test_tone() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_play_test_tone(this.__wbg_ptr);
         return ret;
     }
@@ -1470,8 +1315,6 @@ export class MidiPlayer {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.midiplayer_test_envelope_system(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
@@ -1485,50 +1328,36 @@ export class MidiPlayer {
      * @returns {boolean}
      */
     load_midi_file(data) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.midiplayer_load_midi_file(this.__wbg_ptr, ptr0, len0);
         return ret !== 0;
     }
     play() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.midiplayer_play(this.__wbg_ptr);
     }
     pause() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.midiplayer_pause(this.__wbg_ptr);
     }
     stop() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.midiplayer_stop(this.__wbg_ptr);
     }
     /**
      * @param {number} position
      */
     seek(position) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.midiplayer_seek(this.__wbg_ptr, position);
     }
     /**
      * @param {number} multiplier
      */
     set_tempo_multiplier(multiplier) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         wasm.midiplayer_set_tempo_multiplier(this.__wbg_ptr, multiplier);
     }
     /**
      * @returns {number}
      */
     get_playback_state() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_get_playback_state(this.__wbg_ptr);
         return ret;
     }
@@ -1536,8 +1365,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     get_position() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_get_position(this.__wbg_ptr);
         return ret;
     }
@@ -1545,8 +1372,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     get_position_seconds() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_get_position_seconds(this.__wbg_ptr);
         return ret;
     }
@@ -1554,8 +1379,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     get_duration_seconds() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_get_duration_seconds(this.__wbg_ptr);
         return ret;
     }
@@ -1563,8 +1386,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     get_current_tempo_bpm() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_get_current_tempo_bpm(this.__wbg_ptr);
         return ret;
     }
@@ -1572,8 +1393,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     get_original_tempo_bpm() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_get_original_tempo_bpm(this.__wbg_ptr);
         return ret;
     }
@@ -1581,9 +1400,6 @@ export class MidiPlayer {
      * @param {number} samples
      */
     advance_time(samples) {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
-        _assertNum(samples);
         wasm.midiplayer_advance_time(this.__wbg_ptr, samples);
     }
     /**
@@ -1592,8 +1408,6 @@ export class MidiPlayer {
      * @returns {number}
      */
     process() {
-        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-        _assertNum(this.__wbg_ptr);
         const ret = wasm.midiplayer_process(this.__wbg_ptr);
         return ret;
     }
@@ -1606,14 +1420,24 @@ export class MidiPlayer {
         let deferred1_0;
         let deferred1_1;
         try {
-            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
-            _assertNum(this.__wbg_ptr);
             const ret = wasm.midiplayer_test_synthesis_pipeline(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
         } finally {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * Send MIDI message directly (for real-time input and testing)
+     * @param {Uint8Array} message
+     */
+    send_midi_message(message) {
+        const ptr0 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.midiplayer_send_midi_message(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
         }
     }
 }
@@ -1652,27 +1476,26 @@ async function __wbg_load(module, imports) {
 function __wbg_get_imports() {
     const imports = {};
     imports.wbg = {};
-    imports.wbg.__wbg_buffer_609cc3eee51ed158 = function() { return logError(function (arg0) {
+    imports.wbg.__wbg_buffer_609cc3eee51ed158 = function(arg0) {
         const ret = arg0.buffer;
         return ret;
-    }, arguments) };
-    imports.wbg.__wbg_new_780abee5c1739fd7 = function() { return logError(function (arg0) {
+    };
+    imports.wbg.__wbg_new_780abee5c1739fd7 = function(arg0) {
         const ret = new Float32Array(arg0);
         return ret;
-    }, arguments) };
-    imports.wbg.__wbg_new_78feb108b6472713 = function() { return logError(function () {
+    };
+    imports.wbg.__wbg_new_78feb108b6472713 = function() {
         const ret = new Array();
         return ret;
-    }, arguments) };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_e6b7e69acd4c7354 = function() { return logError(function (arg0, arg1, arg2) {
+    };
+    imports.wbg.__wbg_newwithbyteoffsetandlength_e6b7e69acd4c7354 = function(arg0, arg1, arg2) {
         const ret = new Float32Array(arg0, arg1 >>> 0, arg2 >>> 0);
         return ret;
-    }, arguments) };
-    imports.wbg.__wbg_push_737cfc8c1432c2c6 = function() { return logError(function (arg0, arg1) {
+    };
+    imports.wbg.__wbg_push_737cfc8c1432c2c6 = function(arg0, arg1) {
         const ret = arg0.push(arg1);
-        _assertNum(ret);
         return ret;
-    }, arguments) };
+    };
     imports.wbg.__wbindgen_init_externref_table = function() {
         const table = wasm.__wbindgen_export_0;
         const offset = table.grow(4);
@@ -1685,6 +1508,10 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbindgen_memory = function() {
         const ret = wasm.memory;
+        return ret;
+    };
+    imports.wbg.__wbindgen_string_new = function(arg0, arg1) {
+        const ret = getStringFromWasm0(arg0, arg1);
         return ret;
     };
     imports.wbg.__wbindgen_throw = function(arg0, arg1) {

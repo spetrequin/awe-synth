@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Keyboard 88-Key Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1200px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #test-results {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-testing { background: #ffff00; }
+        .status-pass { background: #00ff00; }
+        .status-fail { background: #ff0000; }
+
+        .key-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 5px;
+            margin-top: 20px;
+            padding: 10px;
+            background: #111;
+            border-radius: 4px;
+        }
+
+        .key-status {
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #333;
+            border-radius: 3px;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .key-status.tested { 
+            background: #002200; 
+            border-color: #00ff00;
+        }
+
+        .key-status.active { 
+            background: #ffff00; 
+            color: #000;
+            transform: scale(1.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-box {
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00ffff);
+            transition: width 0.3s;
+            width: 0%;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎹 Virtual Keyboard 88-Key Verification Test</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <div class="test-controls">
+            <button id="start-test">Start 88-Key Test</button>
+            <button id="test-white-keys">Test White Keys Only</button>
+            <button id="test-black-keys">Test Black Keys Only</button>
+            <button id="test-octave">Test Current Octave</button>
+            <button id="test-velocity">Test Velocity Zones</button>
+            <button id="clear-results">Clear Results</button>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Keys Tested</div>
+                <div class="stat-value" id="keys-tested">0 / 88</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">White Keys</div>
+                <div class="stat-value" id="white-keys">0 / 52</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Black Keys</div>
+                <div class="stat-value" id="black-keys">0 / 36</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Test Status</div>
+                <div class="stat-value" id="test-status">Ready</div>
+            </div>
+        </div>
+
+        <h3>Key Status Grid (A0 to C8)</h3>
+        <div class="key-grid" id="key-grid"></div>
+
+        <h3>Test Results</h3>
+        <div id="test-results">Test results will appear here...</div>
+    </div>
+
+    <script type="module">
+        import { init } from './awe_synth.js';
+
+        class KeyboardTester {
+            constructor() {
+                this.results = [];
+                this.testedKeys = new Set();
+                this.isRunning = false;
+                this.initializeUI();
+                this.setupKeyGrid();
+            }
+
+            initializeUI() {
+                document.getElementById('start-test').addEventListener('click', () => this.runFullTest());
+                document.getElementById('test-white-keys').addEventListener('click', () => this.testWhiteKeys());
+                document.getElementById('test-black-keys').addEventListener('click', () => this.testBlackKeys());
+                document.getElementById('test-octave').addEventListener('click', () => this.testCurrentOctave());
+                document.getElementById('test-velocity').addEventListener('click', () => this.testVelocityResponse());
+                document.getElementById('clear-results').addEventListener('click', () => this.clearResults());
+            }
+
+            setupKeyGrid() {
+                const grid = document.getElementById('key-grid');
+                grid.innerHTML = '';
+                
+                // Generate all 88 keys (A0=21 to C8=108)
+                for (let note = 21; note <= 108; note++) {
+                    const keyDiv = document.createElement('div');
+                    keyDiv.className = 'key-status';
+                    keyDiv.id = `key-${note}`;
+                    keyDiv.textContent = this.getNoteName(note);
+                    grid.appendChild(keyDiv);
+                }
+            }
+
+            getNoteName(noteNumber) {
+                const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                const octave = Math.floor((noteNumber - 12) / 12);
+                const noteName = noteNames[noteNumber % 12];
+                return `${noteName}${octave}`;
+            }
+
+            isBlackKey(noteNumber) {
+                const noteInOctave = noteNumber % 12;
+                return [1, 3, 6, 8, 10].includes(noteInOctave);
+            }
+
+            async simulateKeyPress(noteNumber, velocity = 80, duration = 100) {
+                return new Promise(resolve => {
+                    // Find the virtual keyboard element
+                    const keyboard = document.querySelector('.virtual-keyboard');
+                    if (!keyboard) {
+                        this.log(`❌ Virtual keyboard not found!`, 'error');
+                        resolve(false);
+                        return;
+                    }
+
+                    // Find the specific key
+                    const keyElement = keyboard.querySelector(`[data-note="${noteNumber}"]`);
+                    if (!keyElement) {
+                        this.log(`❌ Key element for note ${noteNumber} not found!`, 'error');
+                        resolve(false);
+                        return;
+                    }
+
+                    // Highlight the key in our grid
+                    const gridKey = document.getElementById(`key-${noteNumber}`);
+                    if (gridKey) {
+                        gridKey.classList.add('active');
+                    }
+
+                    // Simulate mouse down
+                    const rect = keyElement.getBoundingClientRect();
+                    const x = rect.left + rect.width / 2;
+                    const y = rect.top + (rect.height * (1 - velocity / 127)); // Y position for velocity
+
+                    const mouseDown = new MouseEvent('mousedown', {
+                        clientX: x,
+                        clientY: y,
+                        bubbles: true
+                    });
+                    keyElement.dispatchEvent(mouseDown);
+
+                    // Hold the key
+                    setTimeout(() => {
+                        // Simulate mouse up
+                        const mouseUp = new MouseEvent('mouseup', {
+                            clientX: x,
+                            clientY: y,
+                            bubbles: true
+                        });
+                        keyElement.dispatchEvent(mouseUp);
+
+                        // Update grid
+                        if (gridKey) {
+                            gridKey.classList.remove('active');
+                            gridKey.classList.add('tested');
+                        }
+
+                        this.testedKeys.add(noteNumber);
+                        this.updateStats();
+                        resolve(true);
+                    }, duration);
+                });
+            }
+
+            async runFullTest() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.clearResults();
+                this.log('🎹 Starting 88-key verification test...', 'info');
+                this.updateStatus('Testing...');
+
+                let successCount = 0;
+                const startTime = Date.now();
+
+                // Test all 88 keys in sequence
+                for (let note = 21; note <= 108; note++) {
+                    this.log(`Testing ${this.getNoteName(note)} (MIDI ${note})...`);
+                    
+                    const success = await this.simulateKeyPress(note, 80, 50);
+                    if (success) successCount++;
+                    
+                    // Small delay between keys
+                    await this.delay(50);
+                }
+
+                const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                this.log(`\n✅ Test completed in ${duration}s`, 'success');
+                this.log(`Successfully tested: ${successCount}/88 keys`, 'success');
+                
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testWhiteKeys() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('⚪ Testing white keys only...', 'info');
+                this.updateStatus('Testing White Keys...');
+
+                let count = 0;
+                for (let note = 21; note <= 108; note++) {
+                    if (!this.isBlackKey(note)) {
+                        await this.simulateKeyPress(note, 90, 75);
+                        count++;
+                        await this.delay(75);
+                    }
+                }
+
+                this.log(`✅ Tested ${count} white keys`, 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testBlackKeys() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('⚫ Testing black keys only...', 'info');
+                this.updateStatus('Testing Black Keys...');
+
+                let count = 0;
+                for (let note = 21; note <= 108; note++) {
+                    if (this.isBlackKey(note)) {
+                        await this.simulateKeyPress(note, 90, 75);
+                        count++;
+                        await this.delay(75);
+                    }
+                }
+
+                this.log(`✅ Tested ${count} black keys`, 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testCurrentOctave() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                const octave = 4; // Middle C octave
+                const startNote = 60; // C4
+                
+                this.log(`🎹 Testing octave ${octave} (C${octave}-B${octave})...`, 'info');
+                this.updateStatus(`Testing Octave ${octave}...`);
+
+                for (let i = 0; i < 12; i++) {
+                    const note = startNote + i;
+                    await this.simulateKeyPress(note, 100, 150);
+                    await this.delay(100);
+                }
+
+                this.log(`✅ Octave ${octave} test complete`, 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testVelocityResponse() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🎚️ Testing velocity response...', 'info');
+                this.updateStatus('Testing Velocity...');
+
+                const testNote = 60; // Middle C
+                const velocities = [1, 32, 64, 96, 127];
+
+                for (const velocity of velocities) {
+                    this.log(`Testing velocity ${velocity}/127...`);
+                    await this.simulateKeyPress(testNote, velocity, 300);
+                    await this.delay(200);
+                }
+
+                this.log('✅ Velocity test complete', 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            clearResults() {
+                this.results = [];
+                this.testedKeys.clear();
+                document.getElementById('test-results').textContent = 'Test results cleared.';
+                this.setupKeyGrid();
+                this.updateStats();
+                this.updateStatus('Ready');
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                this.results.push(logEntry);
+                
+                const resultsDiv = document.getElementById('test-results');
+                resultsDiv.textContent = this.results.join('\n');
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            }
+
+            updateStats() {
+                const total = this.testedKeys.size;
+                const whiteKeys = Array.from(this.testedKeys).filter(n => !this.isBlackKey(n)).length;
+                const blackKeys = Array.from(this.testedKeys).filter(n => this.isBlackKey(n)).length;
+
+                document.getElementById('keys-tested').textContent = `${total} / 88`;
+                document.getElementById('white-keys').textContent = `${whiteKeys} / 52`;
+                document.getElementById('black-keys').textContent = `${blackKeys} / 36`;
+                
+                const progress = (total / 88) * 100;
+                document.getElementById('progress').style.width = `${progress}%`;
+            }
+
+            updateStatus(status) {
+                document.getElementById('test-status').textContent = status;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                await init();
+                window.keyboardTester = new KeyboardTester();
+                window.keyboardTester.log('✅ Virtual Keyboard 88-Key Test Ready', 'success');
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('test-results').textContent = 
+                    `❌ Failed to initialize: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

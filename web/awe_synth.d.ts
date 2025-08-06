@@ -1,64 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Initialize global test sequence generator
- */
-export function init_test_sequence_generator(sample_rate: number): void;
-/**
- * Generate C major scale test sequence as JSON
- */
-export function generate_c_major_scale_test(config_json?: string | null): string;
-/**
- * Generate chromatic scale test sequence as JSON
- */
-export function generate_chromatic_scale_test(config_json?: string | null): string;
-/**
- * Generate C major arpeggio test sequence as JSON
- */
-export function generate_arpeggio_test(config_json?: string | null): string;
-/**
- * Generate chord test sequence as JSON
- */
-export function generate_chord_test(config_json?: string | null): string;
-/**
- * Generate velocity test sequence as JSON
- */
-export function generate_velocity_test(config_json?: string | null): string;
-/**
- * Convert MIDI note to note name
- */
-export function midi_note_to_name(note: number): string;
-/**
- * Convert note name to MIDI note number (returns 255 for invalid)
- */
-export function note_name_to_midi(note_name: string): number;
-/**
- * Execute a test sequence by queuing all its events
- * Returns number of events queued
- */
-export function execute_test_sequence(sequence_json: string): number;
-/**
- * Quick test function - generate and execute C major scale
- */
-export function quick_c_major_test(): string;
-/**
- * Utility functions for AudioWorklet integration
- * Calculate optimal buffer size based on sample rate and target latency
- */
-export function calculate_optimal_buffer_size(sample_rate: number, target_latency_ms: number): number;
-/**
- * Validate sample rate for EMU8000 compatibility  
- */
-export function validate_sample_rate(sample_rate: number): boolean;
-/**
- * Convert milliseconds to samples at given sample rate
- */
-export function ms_to_samples(milliseconds: number, sample_rate: number): number;
-/**
- * Convert samples to milliseconds at given sample rate
- */
-export function samples_to_ms(samples: number, sample_rate: number): number;
-/**
  * Initialize global AudioWorklet bridge with specified sample rate
  * Must be called once before using other AudioWorklet functions
  */
@@ -205,6 +147,64 @@ export function get_current_preset_info_global(): string;
  * Test SoundFont synthesis with MIDI events
  */
 export function test_soundfont_synthesis(): string;
+/**
+ * Initialize global test sequence generator
+ */
+export function init_test_sequence_generator(sample_rate: number): void;
+/**
+ * Generate C major scale test sequence as JSON
+ */
+export function generate_c_major_scale_test(config_json?: string | null): string;
+/**
+ * Generate chromatic scale test sequence as JSON
+ */
+export function generate_chromatic_scale_test(config_json?: string | null): string;
+/**
+ * Generate C major arpeggio test sequence as JSON
+ */
+export function generate_arpeggio_test(config_json?: string | null): string;
+/**
+ * Generate chord test sequence as JSON
+ */
+export function generate_chord_test(config_json?: string | null): string;
+/**
+ * Generate velocity test sequence as JSON
+ */
+export function generate_velocity_test(config_json?: string | null): string;
+/**
+ * Convert MIDI note to note name
+ */
+export function midi_note_to_name(note: number): string;
+/**
+ * Convert note name to MIDI note number (returns 255 for invalid)
+ */
+export function note_name_to_midi(note_name: string): number;
+/**
+ * Execute a test sequence by queuing all its events
+ * Returns number of events queued
+ */
+export function execute_test_sequence(sequence_json: string): number;
+/**
+ * Quick test function - generate and execute C major scale
+ */
+export function quick_c_major_test(): string;
+/**
+ * Utility functions for AudioWorklet integration
+ * Calculate optimal buffer size based on sample rate and target latency
+ */
+export function calculate_optimal_buffer_size(sample_rate: number, target_latency_ms: number): number;
+/**
+ * Validate sample rate for EMU8000 compatibility  
+ */
+export function validate_sample_rate(sample_rate: number): boolean;
+/**
+ * Convert milliseconds to samples at given sample rate
+ */
+export function ms_to_samples(milliseconds: number, sample_rate: number): number;
+/**
+ * Convert samples to milliseconds at given sample rate
+ */
+export function samples_to_ms(samples: number, sample_rate: number): number;
 export enum AweError {
   InvalidSoundFont = 0,
   InvalidMidiFile = 1,
@@ -380,12 +380,87 @@ export class MidiPlayer {
    * Returns test results as JSON string for verification
    */
   test_synthesis_pipeline(): string;
+  /**
+   * Send MIDI message directly (for real-time input and testing)
+   */
+  send_midi_message(message: Uint8Array): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly __wbg_midievent_free: (a: number, b: number) => void;
+  readonly __wbg_get_midievent_timestamp: (a: number) => bigint;
+  readonly __wbg_set_midievent_timestamp: (a: number, b: bigint) => void;
+  readonly __wbg_get_midievent_channel: (a: number) => number;
+  readonly __wbg_set_midievent_channel: (a: number, b: number) => void;
+  readonly __wbg_get_midievent_message_type: (a: number) => number;
+  readonly __wbg_set_midievent_message_type: (a: number, b: number) => void;
+  readonly __wbg_get_midievent_data1: (a: number) => number;
+  readonly __wbg_set_midievent_data1: (a: number, b: number) => void;
+  readonly __wbg_get_midievent_data2: (a: number) => number;
+  readonly __wbg_set_midievent_data2: (a: number, b: number) => void;
+  readonly midievent_new: (a: bigint, b: number, c: number, d: number, e: number) => number;
+  readonly __wbg_midiplayer_free: (a: number, b: number) => void;
+  readonly midiplayer_new: () => number;
+  readonly midiplayer_queue_midi_event: (a: number, b: number) => void;
+  readonly midiplayer_process_midi_events: (a: number, b: bigint) => number;
+  readonly midiplayer_get_debug_log: (a: number) => [number, number];
+  readonly midiplayer_play_test_tone: (a: number) => number;
+  readonly midiplayer_test_envelope_system: (a: number) => [number, number];
+  readonly midiplayer_load_midi_file: (a: number, b: number, c: number) => number;
+  readonly midiplayer_play: (a: number) => void;
+  readonly midiplayer_pause: (a: number) => void;
+  readonly midiplayer_stop: (a: number) => void;
+  readonly midiplayer_seek: (a: number, b: number) => void;
+  readonly midiplayer_set_tempo_multiplier: (a: number, b: number) => void;
+  readonly midiplayer_get_playback_state: (a: number) => number;
+  readonly midiplayer_get_position: (a: number) => number;
+  readonly midiplayer_get_position_seconds: (a: number) => number;
+  readonly midiplayer_get_duration_seconds: (a: number) => number;
+  readonly midiplayer_get_current_tempo_bpm: (a: number) => number;
+  readonly midiplayer_get_original_tempo_bpm: (a: number) => number;
+  readonly midiplayer_advance_time: (a: number, b: number) => void;
+  readonly midiplayer_process: (a: number) => number;
+  readonly midiplayer_test_synthesis_pipeline: (a: number) => [number, number];
+  readonly midiplayer_send_midi_message: (a: number, b: number, c: number) => [number, number];
+  readonly init_audio_worklet: (a: number) => number;
+  readonly process_audio_buffer: (a: number) => [number, number];
+  readonly get_sample_rate: () => number;
+  readonly queue_midi_event_global: (a: bigint, b: number, c: number, d: number, e: number) => void;
+  readonly process_stereo_buffer_global: (a: number) => [number, number];
+  readonly get_buffer_size_global: () => number;
+  readonly test_audio_worklet_global: (a: number) => [number, number];
+  readonly get_debug_log_global: () => [number, number];
+  readonly get_buffer_metrics_global: () => [number, number];
+  readonly get_buffer_status_global: () => [number, number];
+  readonly get_recommended_buffer_size_global: (a: number) => number;
+  readonly get_current_latency_ms_global: () => number;
+  readonly set_adaptive_mode_global: (a: number) => void;
+  readonly get_pipeline_status_global: () => [number, number];
+  readonly is_pipeline_ready_global: () => number;
+  readonly get_pipeline_stats_global: () => [number, number];
+  readonly get_comprehensive_status_global: () => [number, number];
+  readonly init_all_systems: (a: number) => number;
+  readonly get_system_status: () => [number, number];
+  readonly get_version_info: () => [number, number];
+  readonly init_soundfont_module: () => [number, number];
+  readonly validate_soundfont_header: (a: number, b: number) => [number, number];
+  readonly get_soundfont_info: () => [number, number];
+  readonly test_soundfont_module: () => [number, number];
+  readonly parse_soundfont_file: (a: number, b: number) => [number, number];
+  readonly test_soundfont_parsing: () => [number, number];
+  readonly load_soundfont_into_player: (a: number, b: number) => [number, number];
+  readonly select_preset_global: (a: number, b: number) => [number, number];
+  readonly get_current_preset_info_global: () => [number, number];
+  readonly test_soundfont_synthesis: () => [number, number];
+  readonly reset_pipeline_global: () => void;
+  readonly set_device_info_global: (a: number, b: number) => void;
+  readonly record_processing_time_global: (a: number, b: number) => void;
+  readonly reset_audio_state_global: () => void;
+  readonly set_buffer_size_global: (a: number) => void;
+  readonly record_underrun_global: () => void;
   readonly init_test_sequence_generator: (a: number) => void;
   readonly generate_c_major_scale_test: (a: number, b: number) => [number, number];
   readonly generate_chromatic_scale_test: (a: number, b: number) => [number, number];
@@ -430,80 +505,11 @@ export interface InitOutput {
   readonly validate_sample_rate: (a: number) => number;
   readonly ms_to_samples: (a: number, b: number) => number;
   readonly samples_to_ms: (a: number, b: number) => number;
-  readonly __wbg_midievent_free: (a: number, b: number) => void;
-  readonly __wbg_get_midievent_timestamp: (a: number) => bigint;
-  readonly __wbg_set_midievent_timestamp: (a: number, b: bigint) => void;
-  readonly __wbg_get_midievent_channel: (a: number) => number;
-  readonly __wbg_set_midievent_channel: (a: number, b: number) => void;
-  readonly __wbg_get_midievent_message_type: (a: number) => number;
-  readonly __wbg_set_midievent_message_type: (a: number, b: number) => void;
-  readonly __wbg_get_midievent_data1: (a: number) => number;
-  readonly __wbg_set_midievent_data1: (a: number, b: number) => void;
-  readonly __wbg_get_midievent_data2: (a: number) => number;
-  readonly __wbg_set_midievent_data2: (a: number, b: number) => void;
-  readonly midievent_new: (a: bigint, b: number, c: number, d: number, e: number) => number;
-  readonly __wbg_midiplayer_free: (a: number, b: number) => void;
-  readonly midiplayer_new: () => number;
-  readonly midiplayer_queue_midi_event: (a: number, b: number) => void;
-  readonly midiplayer_process_midi_events: (a: number, b: bigint) => number;
-  readonly midiplayer_get_debug_log: (a: number) => [number, number];
-  readonly midiplayer_play_test_tone: (a: number) => number;
-  readonly midiplayer_test_envelope_system: (a: number) => [number, number];
-  readonly midiplayer_load_midi_file: (a: number, b: number, c: number) => number;
-  readonly midiplayer_play: (a: number) => void;
-  readonly midiplayer_pause: (a: number) => void;
-  readonly midiplayer_stop: (a: number) => void;
-  readonly midiplayer_seek: (a: number, b: number) => void;
-  readonly midiplayer_set_tempo_multiplier: (a: number, b: number) => void;
-  readonly midiplayer_get_playback_state: (a: number) => number;
-  readonly midiplayer_get_position: (a: number) => number;
-  readonly midiplayer_get_position_seconds: (a: number) => number;
-  readonly midiplayer_get_duration_seconds: (a: number) => number;
-  readonly midiplayer_get_current_tempo_bpm: (a: number) => number;
-  readonly midiplayer_get_original_tempo_bpm: (a: number) => number;
-  readonly midiplayer_advance_time: (a: number, b: number) => void;
-  readonly midiplayer_process: (a: number) => number;
-  readonly midiplayer_test_synthesis_pipeline: (a: number) => [number, number];
-  readonly init_audio_worklet: (a: number) => number;
-  readonly process_audio_buffer: (a: number) => [number, number];
-  readonly get_sample_rate: () => number;
-  readonly queue_midi_event_global: (a: bigint, b: number, c: number, d: number, e: number) => void;
-  readonly process_stereo_buffer_global: (a: number) => [number, number];
-  readonly set_buffer_size_global: (a: number) => void;
-  readonly get_buffer_size_global: () => number;
-  readonly reset_audio_state_global: () => void;
-  readonly test_audio_worklet_global: (a: number) => [number, number];
-  readonly get_debug_log_global: () => [number, number];
-  readonly set_device_info_global: (a: number, b: number) => void;
-  readonly record_processing_time_global: (a: number, b: number) => void;
-  readonly record_underrun_global: () => void;
-  readonly get_buffer_metrics_global: () => [number, number];
-  readonly get_buffer_status_global: () => [number, number];
-  readonly get_recommended_buffer_size_global: (a: number) => number;
-  readonly get_current_latency_ms_global: () => number;
-  readonly set_adaptive_mode_global: (a: number) => void;
-  readonly get_pipeline_status_global: () => [number, number];
-  readonly is_pipeline_ready_global: () => number;
-  readonly get_pipeline_stats_global: () => [number, number];
-  readonly reset_pipeline_global: () => void;
-  readonly get_comprehensive_status_global: () => [number, number];
-  readonly init_all_systems: (a: number) => number;
-  readonly get_system_status: () => [number, number];
-  readonly get_version_info: () => [number, number];
-  readonly init_soundfont_module: () => [number, number];
-  readonly validate_soundfont_header: (a: number, b: number) => [number, number];
-  readonly get_soundfont_info: () => [number, number];
-  readonly test_soundfont_module: () => [number, number];
-  readonly parse_soundfont_file: (a: number, b: number) => [number, number];
-  readonly test_soundfont_parsing: () => [number, number];
-  readonly load_soundfont_into_player: (a: number, b: number) => [number, number];
-  readonly select_preset_global: (a: number, b: number) => [number, number];
-  readonly get_current_preset_info_global: () => [number, number];
-  readonly test_soundfont_synthesis: () => [number, number];
   readonly __wbindgen_export_0: WebAssembly.Table;
-  readonly __wbindgen_malloc: (a: number, b: number) => number;
-  readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+  readonly __wbindgen_malloc: (a: number, b: number) => number;
+  readonly __externref_table_dealloc: (a: number) => void;
+  readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_start: () => void;
 }
 

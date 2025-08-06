@@ -337,10 +337,14 @@ impl MidiPlayer {
                 // TODO: Handle program changes for instrument selection
             },
             MIDI_EVENT_PITCH_BEND => {
-                // Pitch Bend
+                // Pitch Bend - Convert 14-bit value to signed range
                 let pitch_value = ((event.data2 as u16) << 7) | (event.data1 as u16);
-                log(&format!("VoiceManager: Pitch Bend {} (Ch {})", pitch_value, event.channel));
-                // TODO: Handle pitch bend messages
+                let signed_bend = pitch_value as i16 - 8192; // Convert to -8192..8191 range
+                
+                log(&format!("VoiceManager: Pitch Bend {} -> {} (Ch {})", pitch_value, signed_bend, event.channel));
+                
+                // Apply pitch bend with standard EMU8000 range (±2 semitones)
+                self.voice_manager.apply_pitch_bend(signed_bend, 2.0);
             },
             _ => {
                 log(&format!("VoiceManager: Unhandled MIDI message type 0x{:02X}", message_type));
@@ -419,6 +423,41 @@ impl MidiPlayer {
             log("❌ Synthesis test failed: No voice available");
             error
         }
+    }
+    
+    /// Send MIDI message directly (for real-time input and testing)
+    #[wasm_bindgen]
+    pub fn send_midi_message(&mut self, message: &[u8]) -> Result<(), String> {
+        if message.len() < 1 {
+            return Err("MIDI message too short".to_string());
+        }
+        
+        let status_byte = message[0];
+        let message_type = (status_byte & 0xF0) >> 4;
+        let channel = status_byte & 0x0F;
+        
+        let (data1, data2) = match message.len() {
+            1 => (0, 0),  // System messages
+            2 => (message[1], 0),  // 2-byte messages (Program Change, Channel Pressure)
+            3 | _ => (message[1], message[2]),  // 3-byte messages (Note On/Off, CC, Pitch Bend)
+        };
+        
+        // Create MIDI event with current timestamp
+        let midi_event = MidiEvent {
+            timestamp: self.current_sample,
+            channel,
+            message_type: status_byte,
+            data1,
+            data2,
+        };
+        
+        // Process immediately for real-time response
+        self.handle_midi_event(&midi_event);
+        
+        log(&format!("Direct MIDI: 0x{:02X} 0x{:02X} 0x{:02X} (type=0x{:02X}, ch={})", 
+                   status_byte, data1, data2, message_type, channel));
+        
+        Ok(())
     }
 }
 

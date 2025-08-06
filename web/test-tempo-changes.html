@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tempo Changes Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1600px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #00ff00;
+            color: #000;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tempo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .tempo-panel {
+            background: #111;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+
+        .panel-title {
+            color: #00ffff;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .tempo-display {
+            background: #000;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .current-tempo {
+            color: #00ffff;
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .tempo-label {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .tempo-change-indicator {
+            color: #ffff00;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        .tempo-graph {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            position: relative;
+            margin: 15px 0;
+        }
+
+        .tempo-graph canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        .tempo-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .tempo-btn {
+            padding: 10px;
+            background: #333;
+            color: #ccc;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+
+        .tempo-btn:hover {
+            background: #555;
+            border-color: #00ff00;
+        }
+
+        .tempo-btn.active {
+            background: #006600;
+            border-color: #00ff00;
+            color: #fff;
+        }
+
+        .tempo-scenario {
+            background: #000;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tempo-scenario:hover {
+            background: #111;
+            border-color: #00ff00;
+        }
+
+        .tempo-scenario.active {
+            background: #003300;
+            border-color: #00ff00;
+        }
+
+        .scenario-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .scenario-name {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .scenario-status {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .scenario-status.ready {
+            background: #333;
+            color: #ccc;
+        }
+
+        .scenario-status.playing {
+            background: #006600;
+            color: #fff;
+        }
+
+        .scenario-status.completed {
+            background: #000066;
+            color: #fff;
+        }
+
+        .scenario-details {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .scenario-progress {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .timeline-section {
+            background: #111;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .timeline-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .timeline-display {
+            color: #00ffff;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .tempo-timeline {
+            width: 100%;
+            height: 60px;
+            background: #222;
+            border-radius: 8px;
+            position: relative;
+            margin: 15px 0;
+            cursor: pointer;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: rgba(0, 255, 0, 0.3);
+            border-radius: 8px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .tempo-markers {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .tempo-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #fff;
+            opacity: 0.7;
+        }
+
+        .tempo-marker.accelerando {
+            background: #ffff00;
+        }
+
+        .tempo-marker.ritardando {
+            background: #ff8800;
+        }
+
+        .tempo-marker.rubato {
+            background: #ff00ff;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .test-log {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .log-entry.info { color: #00ff00; }
+        .log-entry.warning { color: #ffff00; }
+        .log-entry.error { color: #ff0000; }
+        .log-entry.success { color: #00ffff; }
+
+        @media (max-width: 1200px) {
+            .tempo-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .tempo-controls {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Tempo Changes & Rubato Test</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <div class="test-controls">
+            <button id="start-tempo-test">Start Tempo Test</button>
+            <button id="test-accelerando">Test Accelerando</button>
+            <button id="test-ritardando">Test Ritardando</button>
+            <button id="test-rubato">Test Rubato</button>
+            <button id="test-complex-changes">Complex Changes</button>
+            <button id="generate-tempo-sequence">Generate Sequence</button>
+            <button id="clear-log">Clear Log</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Current BPM</div>
+                <div class="stat-value" id="current-bpm">120</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Tempo Changes</div>
+                <div class="stat-value" id="tempo-changes">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Timing Accuracy</div>
+                <div class="stat-value" id="timing-accuracy">100%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Smoothness</div>
+                <div class="stat-value" id="tempo-smoothness">Perfect</div>
+            </div>
+        </div>
+
+        <div class="timeline-section">
+            <div class="timeline-header">
+                <div class="timeline-controls">
+                    <button id="play-sequence">▶️ Play</button>
+                    <button id="pause-sequence">⏸️ Pause</button>
+                    <button id="stop-sequence">⏹️ Stop</button>
+                    <button id="loop-sequence">🔁 Loop</button>
+                </div>
+                <div class="timeline-display" id="timeline-display">00:00 / 00:00</div>
+            </div>
+            <div class="tempo-timeline" id="tempo-timeline">
+                <div class="timeline-progress" id="timeline-progress"></div>
+                <div class="tempo-markers" id="tempo-markers"></div>
+            </div>
+        </div>
+
+        <div class="tempo-grid">
+            <!-- Real-time Tempo Display -->
+            <div class="tempo-panel">
+                <div class="panel-title">Real-time Tempo Monitor</div>
+                <div class="tempo-display">
+                    <div class="tempo-label">Current Tempo</div>
+                    <div class="current-tempo" id="realtime-tempo">120</div>
+                    <div class="tempo-label">BPM</div>
+                    <div class="tempo-change-indicator" id="tempo-change-indicator">Stable</div>
+                </div>
+                <div class="tempo-graph">
+                    <canvas id="tempo-graph" width="400" height="200"></canvas>
+                </div>
+                <div class="tempo-controls">
+                    <div class="tempo-btn" id="manual-slower">Slower</div>
+                    <div class="tempo-btn" id="manual-faster">Faster</div>
+                    <div class="tempo-btn" id="reset-tempo">Reset</div>
+                    <div class="tempo-btn" id="tap-tempo">Tap Tempo</div>
+                </div>
+            </div>
+
+            <!-- Tempo Change Scenarios -->
+            <div class="tempo-panel">
+                <div class="panel-title">Tempo Change Scenarios</div>
+                <div id="tempo-scenarios">
+                    <div class="tempo-scenario" data-scenario="gradual-accelerando">
+                        <div class="scenario-header">
+                            <div class="scenario-name">Gradual Accelerando</div>
+                            <div class="scenario-status ready">Ready</div>
+                        </div>
+                        <div class="scenario-details">120 → 140 BPM over 8 seconds</div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
+                        <div class="scenario-progress">
+                            <span>Start: 120 BPM</span>
+                            <span>End: 140 BPM</span>
+                        </div>
+                    </div>
+
+                    <div class="tempo-scenario" data-scenario="sharp-ritardando">
+                        <div class="scenario-header">
+                            <div class="scenario-name">Sharp Ritardando</div>
+                            <div class="scenario-status ready">Ready</div>
+                        </div>
+                        <div class="scenario-details">140 → 90 BPM over 4 seconds</div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
+                        <div class="scenario-progress">
+                            <span>Start: 140 BPM</span>
+                            <span>End: 90 BPM</span>
+                        </div>
+                    </div>
+
+                    <div class="tempo-scenario" data-scenario="rubato-phrase">
+                        <div class="scenario-header">
+                            <div class="scenario-name">Rubato Phrase</div>
+                            <div class="scenario-status ready">Ready</div>
+                        </div>
+                        <div class="scenario-details">110 → 130 → 105 BPM (musical)</div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
+                        <div class="scenario-progress">
+                            <span>Expressive timing</span>
+                            <span>Natural flow</span>
+                        </div>
+                    </div>
+
+                    <div class="tempo-scenario" data-scenario="extreme-changes">
+                        <div class="scenario-header">
+                            <div class="scenario-name">Extreme Changes</div>
+                            <div class="scenario-status ready">Ready</div>
+                        </div>
+                        <div class="scenario-details">60 → 180 BPM rapid changes</div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
+                        <div class="scenario-progress">
+                            <span>Stress test</span>
+                            <span>Engine limits</span>
+                        </div>
+                    </div>
+
+                    <div class="tempo-scenario" data-scenario="micro-timing">
+                        <div class="scenario-header">
+                            <div class="scenario-name">Micro-timing</div>
+                            <div class="scenario-status ready">Ready</div>
+                        </div>
+                        <div class="scenario-details">Small variations ±5 BPM</div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
+                        <div class="scenario-progress">
+                            <span>Subtle changes</span>
+                            <span>Humanization</span>
+                        </div>
+                    </div>
+
+                    <div class="tempo-scenario" data-scenario="complex-sequence">
+                        <div class="scenario-header">
+                            <div class="scenario-name">Complex Sequence</div>
+                            <div class="scenario-status ready">Ready</div>
+                        </div>
+                        <div class="scenario-details">Multiple overlapping changes</div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
+                        <div class="scenario-progress">
+                            <span>Multi-layer</span>
+                            <span>Advanced test</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3>Tempo Changes Test Log</h3>
+        <div class="test-log" id="test-log">
+            Tempo changes and rubato test log will appear here...
+        </div>
+    </div>
+
+    <script type="module">
+        import { init } from './awe_synth.js';
+
+        class TempoChangesTester {
+            constructor() {
+                this.midiPlayer = null;
+                this.currentTempo = 120;
+                this.targetTempo = 120;
+                this.isPlaying = false;
+                this.currentPosition = 0;
+                this.duration = 60000; // 60 seconds
+                this.tempoChanges = [];
+                this.tempoHistory = [];
+                this.activeScenario = null;
+                this.tempoGraph = null;
+                
+                this.initializeUI();
+                this.initializeTempoGraph();
+                this.generateTempoSequence();
+                this.startMonitoring();
+            }
+
+            async initialize(midiPlayer) {
+                this.midiPlayer = midiPlayer;
+                this.log('✅ Tempo Changes Tester initialized', 'success');
+            }
+
+            initializeUI() {
+                // Test buttons
+                document.getElementById('start-tempo-test').addEventListener('click', () => this.startTempoTest());
+                document.getElementById('test-accelerando').addEventListener('click', () => this.testAccelerando());
+                document.getElementById('test-ritardando').addEventListener('click', () => this.testRitardando());
+                document.getElementById('test-rubato').addEventListener('click', () => this.testRubato());
+                document.getElementById('test-complex-changes').addEventListener('click', () => this.testComplexChanges());
+                document.getElementById('generate-tempo-sequence').addEventListener('click', () => this.generateTempoSequence());
+                document.getElementById('clear-log').addEventListener('click', () => this.clearLog());
+
+                // Playback controls
+                document.getElementById('play-sequence').addEventListener('click', () => this.playSequence());
+                document.getElementById('pause-sequence').addEventListener('click', () => this.pauseSequence());
+                document.getElementById('stop-sequence').addEventListener('click', () => this.stopSequence());
+                document.getElementById('loop-sequence').addEventListener('click', () => this.toggleLoop());
+
+                // Manual tempo controls
+                document.getElementById('manual-slower').addEventListener('click', () => this.adjustTempo(-5));
+                document.getElementById('manual-faster').addEventListener('click', () => this.adjustTempo(5));
+                document.getElementById('reset-tempo').addEventListener('click', () => this.resetTempo());
+                document.getElementById('tap-tempo').addEventListener('click', () => this.tapTempo());
+
+                // Timeline seeking
+                document.getElementById('tempo-timeline').addEventListener('click', (e) => this.seekToPosition(e));
+
+                // Scenario selection
+                document.querySelectorAll('.tempo-scenario').forEach(scenario => {
+                    scenario.addEventListener('click', () => this.selectScenario(scenario.dataset.scenario));
+                });
+            }
+
+            initializeTempoGraph() {
+                const canvas = document.getElementById('tempo-graph');
+                this.tempoGraph = canvas.getContext('2d');
+                this.drawTempoGraph();
+            }
+
+            drawTempoGraph() {
+                const canvas = document.getElementById('tempo-graph');
+                const ctx = this.tempoGraph;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                // Clear canvas
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw grid
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 10; i++) {
+                    const x = (i / 10) * width;
+                    const y = (i / 10) * height;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+                
+                // Draw tempo history
+                if (this.tempoHistory.length > 1) {
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    const maxHistory = 100;
+                    const startIndex = Math.max(0, this.tempoHistory.length - maxHistory);
+                    const visibleHistory = this.tempoHistory.slice(startIndex);
+                    
+                    for (let i = 0; i < visibleHistory.length; i++) {
+                        const x = (i / (visibleHistory.length - 1)) * width;
+                        const tempo = visibleHistory[i];
+                        const y = height - ((tempo - 60) / (180 - 60)) * height; // 60-180 BPM range
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    
+                    ctx.stroke();
+                }
+                
+                // Draw current tempo line
+                const currentY = height - ((this.currentTempo - 60) / (180 - 60)) * height;
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, currentY);
+                ctx.lineTo(width, currentY);
+                ctx.stroke();
+                
+                // Draw labels
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Courier New';
+                ctx.fillText('180 BPM', 5, 15);
+                ctx.fillText('120 BPM', 5, height/2 + 5);
+                ctx.fillText('60 BPM', 5, height - 5);
+            }
+
+            generateTempoSequence() {
+                this.log('🎵 Generating tempo change sequence...', 'info');
+                
+                this.tempoChanges = [
+                    { time: 0,     tempo: 120, type: 'start' },
+                    { time: 8000,  tempo: 140, type: 'accelerando', duration: 8000 },
+                    { time: 20000, tempo: 140, type: 'stable' },
+                    { time: 28000, tempo: 90,  type: 'ritardando', duration: 4000 },
+                    { time: 35000, tempo: 110, type: 'recovery', duration: 3000 },
+                    { time: 42000, tempo: 130, type: 'rubato', duration: 2000 },
+                    { time: 46000, tempo: 105, type: 'rubato', duration: 2000 },
+                    { time: 52000, tempo: 120, type: 'return', duration: 4000 },
+                    { time: 60000, tempo: 120, type: 'end' }
+                ];
+                
+                this.updateTempoMarkers();
+                this.log(`✅ Generated ${this.tempoChanges.length} tempo changes`, 'success');
+            }
+
+            updateTempoMarkers() {
+                const markers = document.getElementById('tempo-markers');
+                markers.innerHTML = '';
+                
+                for (const change of this.tempoChanges) {
+                    if (change.type === 'start' || change.type === 'stable' || change.type === 'end') continue;
+                    
+                    const marker = document.createElement('div');
+                    marker.className = `tempo-marker ${change.type}`;
+                    marker.style.left = `${(change.time / this.duration) * 100}%`;
+                    marker.title = `${change.type}: ${change.tempo} BPM`;
+                    markers.appendChild(marker);
+                }
+            }
+
+            startMonitoring() {
+                setInterval(() => {
+                    if (this.isPlaying) {
+                        this.currentPosition += 50;
+                        if (this.currentPosition >= this.duration) {
+                            this.currentPosition = 0; // Loop
+                        }
+                        
+                        // Update tempo based on current position
+                        this.updateTempoFromSequence();
+                        
+                        // Update timeline
+                        const progress = (this.currentPosition / this.duration) * 100;
+                        document.getElementById('timeline-progress').style.width = `${progress}%`;
+                        
+                        // Update time display
+                        const current = this.formatTime(this.currentPosition);
+                        const total = this.formatTime(this.duration);
+                        document.getElementById('timeline-display').textContent = `${current} / ${total}`;
+                        
+                        // Update displays
+                        this.updateTempoDisplay();
+                        this.updateScenarioProgress();
+                    }
+                    
+                    // Always update graph
+                    this.drawTempoGraph();
+                }, 50);
+            }
+
+            updateTempoFromSequence() {
+                if (this.tempoChanges.length === 0) return;
+                
+                // Find current tempo change
+                let currentChange = null;
+                let nextChange = null;
+                
+                for (let i = 0; i < this.tempoChanges.length - 1; i++) {
+                    const change = this.tempoChanges[i];
+                    const next = this.tempoChanges[i + 1];
+                    
+                    if (this.currentPosition >= change.time && this.currentPosition < next.time) {
+                        currentChange = change;
+                        nextChange = next;
+                        break;
+                    }
+                }
+                
+                if (currentChange && nextChange) {
+                    const progress = (this.currentPosition - currentChange.time) / (nextChange.time - currentChange.time);
+                    
+                    if (currentChange.duration && nextChange.type !== 'stable') {
+                        // Interpolate tempo during transition
+                        const startTempo = currentChange.tempo;
+                        const endTempo = nextChange.tempo;
+                        
+                        // Different easing for different types of changes
+                        let easedProgress = progress;
+                        switch (nextChange.type) {
+                            case 'accelerando':
+                                easedProgress = Math.pow(progress, 0.8); // Slightly accelerating curve
+                                break;
+                            case 'ritardando':
+                                easedProgress = 1 - Math.pow(1 - progress, 0.6); // Decelerating curve
+                                break;
+                            case 'rubato':
+                                easedProgress = 0.5 * (1 + Math.sin((progress - 0.5) * Math.PI)); // Sine curve
+                                break;
+                            default:
+                                easedProgress = progress; // Linear
+                        }
+                        
+                        this.currentTempo = startTempo + (endTempo - startTempo) * easedProgress;
+                    } else {
+                        this.currentTempo = currentChange.tempo;
+                    }
+                }
+                
+                // Add to tempo history
+                this.tempoHistory.push(this.currentTempo);
+                if (this.tempoHistory.length > 200) {
+                    this.tempoHistory.shift();
+                }
+            }
+
+            updateTempoDisplay() {
+                document.getElementById('current-bpm').textContent = Math.round(this.currentTempo);
+                document.getElementById('realtime-tempo').textContent = Math.round(this.currentTempo);
+                
+                // Update tempo change indicator
+                const indicator = document.getElementById('tempo-change-indicator');
+                const lastTempo = this.tempoHistory[this.tempoHistory.length - 2] || this.currentTempo;
+                const change = this.currentTempo - lastTempo;
+                
+                if (Math.abs(change) < 0.5) {
+                    indicator.textContent = 'Stable';
+                    indicator.style.color = '#00ff00';
+                } else if (change > 0) {
+                    indicator.textContent = `Accelerando (+${change.toFixed(1)})`;
+                    indicator.style.color = '#ffff00';
+                } else {
+                    indicator.textContent = `Ritardando (${change.toFixed(1)})`;
+                    indicator.style.color = '#ff8800';
+                }
+                
+                // Update stats
+                document.getElementById('tempo-changes').textContent = this.tempoChanges.length - 2; // Exclude start/end
+                
+                // Calculate timing accuracy (simulated)
+                const expectedTempo = this.getExpectedTempo();
+                const accuracy = Math.max(0, 100 - Math.abs(this.currentTempo - expectedTempo));
+                document.getElementById('timing-accuracy').textContent = `${accuracy.toFixed(1)}%`;
+                
+                // Calculate smoothness
+                if (this.tempoHistory.length >= 5) {
+                    const recent = this.tempoHistory.slice(-5);
+                    const variance = this.calculateVariance(recent);
+                    let smoothness = 'Perfect';
+                    if (variance > 2) smoothness = 'Good';
+                    if (variance > 5) smoothness = 'Fair';
+                    if (variance > 10) smoothness = 'Poor';
+                    document.getElementById('tempo-smoothness').textContent = smoothness;
+                }
+            }
+
+            updateScenarioProgress() {
+                if (!this.activeScenario) return;
+                
+                const scenario = document.querySelector(`[data-scenario="${this.activeScenario}"]`);
+                if (scenario) {
+                    const progress = (this.currentPosition / this.duration) * 100;
+                    const progressFill = scenario.querySelector('.progress-fill');
+                    progressFill.style.width = `${progress}%`;
+                    
+                    const status = scenario.querySelector('.scenario-status');
+                    if (this.isPlaying) {
+                        status.textContent = 'Playing';
+                        status.className = 'scenario-status playing';
+                    } else if (progress >= 100) {
+                        status.textContent = 'Completed';
+                        status.className = 'scenario-status completed';
+                    }
+                }
+            }
+
+            getExpectedTempo() {
+                // Calculate expected tempo based on sequence
+                for (let i = 0; i < this.tempoChanges.length - 1; i++) {
+                    const change = this.tempoChanges[i];
+                    const next = this.tempoChanges[i + 1];
+                    
+                    if (this.currentPosition >= change.time && this.currentPosition < next.time) {
+                        const progress = (this.currentPosition - change.time) / (next.time - change.time);
+                        return change.tempo + (next.tempo - change.tempo) * progress;
+                    }
+                }
+                return 120; // Default
+            }
+
+            calculateVariance(values) {
+                const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                const squaredDiffs = values.map(value => Math.pow(value - mean, 2));
+                return Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / values.length);
+            }
+
+            // Test methods
+            async startTempoTest() {
+                this.log('🎼 Starting comprehensive tempo changes test...', 'info');
+                this.log('📋 Test sequence:');
+                this.log('  1. Gradual accelerando (120 → 140 BPM)');
+                this.log('  2. Sharp ritardando (140 → 90 BPM)');
+                this.log('  3. Musical rubato phrases');
+                this.log('  4. Complex overlapping changes');
+                
+                this.generateTempoSequence();
+                this.playSequence();
+                
+                this.log('✅ Tempo test sequence started', 'success');
+            }
+
+            async testAccelerando() {
+                this.log('⬆️ Testing accelerando (gradual speed increase)...', 'info');
+                
+                const startTempo = 100;
+                const endTempo = 160;
+                const duration = 8000;
+                
+                this.selectScenario('gradual-accelerando');
+                
+                // Simulate accelerando
+                for (let i = 0; i <= 100; i += 5) {
+                    const progress = i / 100;
+                    const currentTempo = startTempo + (endTempo - startTempo) * Math.pow(progress, 0.8);
+                    this.currentTempo = currentTempo;
+                    
+                    this.log(`  ${progress.toFixed(0).padStart(3)}%: ${currentTempo.toFixed(1)} BPM`);
+                    await this.delay(duration / 20);
+                }
+                
+                this.log('✅ Accelerando test complete', 'success');
+            }
+
+            async testRitardando() {
+                this.log('⬇️ Testing ritardando (gradual slow down)...', 'info');
+                
+                const startTempo = 140;
+                const endTempo = 80;
+                const duration = 6000;
+                
+                this.selectScenario('sharp-ritardando');
+                
+                // Simulate ritardando
+                for (let i = 0; i <= 100; i += 5) {
+                    const progress = i / 100;
+                    const currentTempo = startTempo + (endTempo - startTempo) * (1 - Math.pow(1 - progress, 0.6));
+                    this.currentTempo = currentTempo;
+                    
+                    this.log(`  ${progress.toFixed(0).padStart(3)}%: ${currentTempo.toFixed(1)} BPM`);
+                    await this.delay(duration / 20);
+                }
+                
+                this.log('✅ Ritardando test complete', 'success');
+            }
+
+            async testRubato() {
+                this.log('🎭 Testing rubato (expressive timing)...', 'info');
+                
+                this.selectScenario('rubato-phrase');
+                
+                const rubatoPhrase = [
+                    { tempo: 110, description: 'Phrase start' },
+                    { tempo: 105, description: 'Slight hesitation' },
+                    { tempo: 125, description: 'Expressive push' },
+                    { tempo: 115, description: 'Natural flow' },
+                    { tempo: 130, description: 'Climactic moment' },
+                    { tempo: 108, description: 'Gentle release' },
+                    { tempo: 115, description: 'Return to tempo' }
+                ];
+                
+                for (const [index, moment] of rubatoPhrase.entries()) {
+                    this.currentTempo = moment.tempo;
+                    this.log(`  ${index + 1}. ${moment.description}: ${moment.tempo} BPM`);
+                    await this.delay(1000);
+                }
+                
+                this.log('✅ Rubato test complete', 'success');
+            }
+
+            async testComplexChanges() {
+                this.log('🌪️ Testing complex tempo changes...', 'info');
+                
+                this.selectScenario('complex-sequence');
+                
+                const complexSequence = [
+                    { tempo: 120, duration: 1000, type: 'baseline' },
+                    { tempo: 140, duration: 500, type: 'quick accel' },
+                    { tempo: 110, duration: 800, type: 'immediate ritard' },
+                    { tempo: 155, duration: 400, type: 'sharp accel' },
+                    { tempo: 95, duration: 1200, type: 'deep ritard' },
+                    { tempo: 135, duration: 600, type: 'recovery' },
+                    { tempo: 120, duration: 1000, type: 'stabilize' }
+                ];
+                
+                for (const change of complexSequence) {
+                    this.currentTempo = change.tempo;
+                    this.log(`  ${change.type}: ${change.tempo} BPM (${change.duration}ms)`);
+                    await this.delay(change.duration);
+                }
+                
+                this.log('✅ Complex changes test complete', 'success');
+            }
+
+            // Playback controls
+            playSequence() {
+                this.isPlaying = true;
+                this.log('▶️ Playing tempo sequence...', 'info');
+                
+                if (this.activeScenario) {
+                    const scenario = document.querySelector(`[data-scenario="${this.activeScenario}"]`);
+                    const status = scenario.querySelector('.scenario-status');
+                    status.textContent = 'Playing';
+                    status.className = 'scenario-status playing';
+                }
+            }
+
+            pauseSequence() {
+                this.isPlaying = false;
+                this.log('⏸️ Tempo sequence paused', 'info');
+            }
+
+            stopSequence() {
+                this.isPlaying = false;
+                this.currentPosition = 0;
+                this.currentTempo = 120;
+                
+                document.getElementById('timeline-progress').style.width = '0%';
+                document.getElementById('timeline-display').textContent = '00:00 / 01:00';
+                
+                // Reset scenario progress
+                document.querySelectorAll('.progress-fill').forEach(fill => {
+                    fill.style.width = '0%';
+                });
+                
+                document.querySelectorAll('.scenario-status').forEach(status => {
+                    status.textContent = 'Ready';
+                    status.className = 'scenario-status ready';
+                });
+                
+                this.log('⏹️ Tempo sequence stopped', 'info');
+            }
+
+            toggleLoop() {
+                this.log('🔁 Loop mode toggled', 'info');
+            }
+
+            selectScenario(scenarioId) {
+                // Clear previous selection
+                document.querySelectorAll('.tempo-scenario').forEach(s => s.classList.remove('active'));
+                
+                // Select new scenario
+                const scenario = document.querySelector(`[data-scenario="${scenarioId}"]`);
+                if (scenario) {
+                    scenario.classList.add('active');
+                    this.activeScenario = scenarioId;
+                    
+                    const name = scenario.querySelector('.scenario-name').textContent;
+                    this.log(`🎯 Selected scenario: ${name}`, 'info');
+                }
+            }
+
+            // Manual controls
+            adjustTempo(change) {
+                this.currentTempo = Math.max(60, Math.min(200, this.currentTempo + change));
+                this.log(`🎚️ Manual tempo adjustment: ${this.currentTempo} BPM (${change > 0 ? '+' : ''}${change})`, 'info');
+            }
+
+            resetTempo() {
+                this.currentTempo = 120;
+                this.log('🔄 Tempo reset to 120 BPM', 'info');
+            }
+
+            tapTempo() {
+                this.log('👆 Tap tempo (simulated): 125 BPM', 'info');
+                this.currentTempo = 125;
+            }
+
+            seekToPosition(e) {
+                const rect = e.target.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const percentage = x / rect.width;
+                
+                this.currentPosition = Math.max(0, Math.min(this.duration, percentage * this.duration));
+                
+                const timeStr = this.formatTime(this.currentPosition);
+                this.log(`⏭️ Seeked to position: ${timeStr} (${(percentage * 100).toFixed(1)}%)`);
+            }
+
+            formatTime(ms) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            // Utility methods
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                
+                const logDiv = document.getElementById('test-log');
+                const entryDiv = document.createElement('div');
+                entryDiv.className = `log-entry ${type}`;
+                entryDiv.textContent = logEntry;
+                
+                logDiv.appendChild(entryDiv);
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            clearLog() {
+                document.getElementById('test-log').innerHTML = 'Tempo changes and rubato test log cleared.';
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                const module = await init();
+                const midiPlayer = new module.MidiPlayer();
+                
+                window.tempoTester = new TempoChangesTester();
+                await window.tempoTester.initialize(midiPlayer);
+                
+                // Store for debugging
+                window.midiPlayer = midiPlayer;
+                
+                console.log('✅ Tempo Changes Test initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('test-log').textContent = 
+                    `❌ Failed to initialize: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

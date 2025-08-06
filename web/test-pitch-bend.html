@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitch Bend Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1200px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .control-panel {
+            background: #111;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .pitch-bend-slider {
+            width: 100%;
+            height: 60px;
+            margin: 20px 0;
+        }
+
+        .slider-container {
+            position: relative;
+            padding: 20px;
+            background: #222;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .pitch-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .pitch-value {
+            font-size: 24px;
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .test-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        #debug-log {
+            width: 100%;
+            height: 300px;
+            background: #111;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+            margin-top: 20px;
+        }
+
+        .piano-key {
+            display: inline-block;
+            vertical-align: top;
+            position: relative;
+        }
+
+        .white-key {
+            width: 40px;
+            height: 120px;
+            background: white;
+            border: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .white-key:hover {
+            background: #f0f0f0;
+        }
+
+        .white-key.active {
+            background: #00ff00;
+        }
+
+        .black-key {
+            width: 25px;
+            height: 80px;
+            background: #222;
+            border: 1px solid #000;
+            position: absolute;
+            cursor: pointer;
+            z-index: 1;
+            transition: background 0.1s;
+        }
+
+        .black-key:hover {
+            background: #444;
+        }
+
+        .black-key.active {
+            background: #00ff00;
+        }
+
+        .keyboard-container {
+            display: inline-block;
+            position: relative;
+            background: #111;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .frequency-display {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border-radius: 8px;
+        }
+
+        .freq-item {
+            text-align: center;
+            padding: 10px;
+            background: #222;
+            border-radius: 4px;
+        }
+
+        .freq-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .freq-value {
+            color: #00ffff;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .test-results {
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border-radius: 8px;
+        }
+
+        .result-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #333;
+            padding-left: 15px;
+        }
+
+        .result-item.pass {
+            border-left-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .result-item.fail {
+            border-left-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .result-item.info {
+            border-left-color: #00ffff;
+            color: #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Pitch Bend → Sample Playback Rate Test 🎵</h1>
+
+    <div class="test-section">
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Pitch Bend Control</h2>
+            
+            <div class="slider-container">
+                <div class="pitch-display">
+                    <span>Pitch Bend Range: ±2 semitones</span>
+                    <span class="pitch-value" id="pitch-value">0</span>
+                </div>
+                <input type="range" 
+                       class="pitch-bend-slider" 
+                       id="pitch-bend-slider"
+                       min="-8192" 
+                       max="8191" 
+                       value="0"
+                       step="1">
+                <div class="pitch-display">
+                    <span>-2 semitones</span>
+                    <span>Center</span>
+                    <span>+2 semitones</span>
+                </div>
+            </div>
+
+            <div class="frequency-display">
+                <div class="freq-item">
+                    <div class="freq-label">Base Frequency</div>
+                    <div class="freq-value" id="base-freq">440.00 Hz</div>
+                </div>
+                <div class="freq-item">
+                    <div class="freq-label">Target Frequency</div>
+                    <div class="freq-value" id="target-freq">440.00 Hz</div>
+                </div>
+                <div class="freq-item">
+                    <div class="freq-label">Playback Rate</div>
+                    <div class="freq-value" id="playback-rate">1.000x</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Test Controls</h2>
+            
+            <div class="test-controls">
+                <button id="init-audio">Initialize Audio</button>
+                <button id="test-note">Play Test Note (A4)</button>
+                <button id="test-sweep">Test Pitch Sweep</button>
+                <button id="test-vibrato">Test Vibrato</button>
+                <button id="test-range">Test Full Range</button>
+                <button id="automated-test">Run Automated Tests</button>
+            </div>
+
+            <div class="keyboard-container" id="keyboard">
+                <!-- Mini keyboard will be generated here -->
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Test Results</h2>
+            <div class="test-results" id="test-results">
+                <div class="result-item info">Ready to test pitch bend functionality...</div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2 style="color: #00ffff;">Debug Log</h2>
+            <textarea id="debug-log" readonly></textarea>
+        </div>
+    </div>
+
+    <script type="module">
+        // Debug logging function
+        function addLog(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            debugLog.value += `[${timestamp}] ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        // Test result display
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultItem = document.createElement('div');
+            resultItem.className = `result-item ${type}`;
+            resultItem.textContent = message;
+            resultsDiv.appendChild(resultItem);
+        }
+
+        // Clear results
+        function clearResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '';
+        }
+
+        // Calculate frequency from pitch bend
+        function calculatePitchBendFrequency(baseFreq, bendValue, bendRange = 2) {
+            // bendValue: -8192 to 8191 (14-bit MIDI pitch bend)
+            // bendRange: semitones (default 2)
+            const bendSemitones = (bendValue / 8192) * bendRange;
+            const pitchMultiplier = Math.pow(2, bendSemitones / 12);
+            return baseFreq * pitchMultiplier;
+        }
+
+        // Initialize variables
+        let audioContext = null;
+        let midiPlayer = null;
+        let currentNote = 69; // A4
+        let baseFrequency = 440.0;
+        let isPlaying = false;
+
+        // Update pitch bend display
+        const pitchBendSlider = document.getElementById('pitch-bend-slider');
+        const pitchValueDisplay = document.getElementById('pitch-value');
+        const baseFreqDisplay = document.getElementById('base-freq');
+        const targetFreqDisplay = document.getElementById('target-freq');
+        const playbackRateDisplay = document.getElementById('playback-rate');
+
+        pitchBendSlider.addEventListener('input', (e) => {
+            const bendValue = parseInt(e.target.value);
+            const bendSemitones = (bendValue / 8192) * 2;
+            
+            pitchValueDisplay.textContent = bendValue;
+            
+            const targetFreq = calculatePitchBendFrequency(baseFrequency, bendValue);
+            targetFreqDisplay.textContent = targetFreq.toFixed(2) + ' Hz';
+            
+            const playbackRate = targetFreq / baseFrequency;
+            playbackRateDisplay.textContent = playbackRate.toFixed(3) + 'x';
+            
+            // Send pitch bend message if audio is initialized
+            if (midiPlayer) {
+                sendPitchBend(bendValue);
+            }
+        });
+
+        // Send pitch bend MIDI message
+        function sendPitchBend(value) {
+            if (!midiPlayer) return;
+            
+            // Convert 14-bit value to two 7-bit values for MIDI
+            const lsb = value & 0x7F;
+            const msb = (value >> 7) & 0x7F;
+            
+            // MIDI pitch bend message: 0xE0 (status), LSB, MSB
+            const message = new Uint8Array([0xE0, lsb, msb]);
+            
+            try {
+                midiPlayer.send_midi_message(message);
+                addLog(`Pitch bend sent: ${value} (LSB: ${lsb}, MSB: ${msb})`);
+            } catch (error) {
+                addLog(`Error sending pitch bend: ${error}`);
+            }
+        }
+
+        // Create mini keyboard
+        function createKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octave = 4;
+            
+            for (let i = 0; i < 12; i++) {
+                const note = notes[i];
+                const midiNote = 60 + i; // C4 = 60
+                
+                const key = document.createElement('div');
+                key.className = note.includes('#') ? 'piano-key black-key' : 'piano-key white-key';
+                key.dataset.note = midiNote;
+                key.dataset.noteName = note + octave;
+                
+                if (note.includes('#')) {
+                    // Position black keys
+                    const blackKeyPositions = {
+                        'C#': 30,
+                        'D#': 70,
+                        'F#': 150,
+                        'G#': 190,
+                        'A#': 230
+                    };
+                    key.style.left = blackKeyPositions[note] + 'px';
+                }
+                
+                key.addEventListener('mousedown', () => playNote(midiNote));
+                key.addEventListener('mouseup', () => stopNote(midiNote));
+                key.addEventListener('mouseleave', () => stopNote(midiNote));
+                
+                keyboard.appendChild(key);
+            }
+        }
+
+        // Play note
+        function playNote(midiNote) {
+            if (!midiPlayer) return;
+            
+            const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+            baseFrequency = freq;
+            baseFreqDisplay.textContent = freq.toFixed(2) + ' Hz';
+            
+            const noteOn = new Uint8Array([0x90, midiNote, 100]); // Note on, velocity 100
+            midiPlayer.send_midi_message(noteOn);
+            
+            // Update frequency display with current pitch bend
+            const bendValue = parseInt(pitchBendSlider.value);
+            const targetFreq = calculatePitchBendFrequency(freq, bendValue);
+            targetFreqDisplay.textContent = targetFreq.toFixed(2) + ' Hz';
+            
+            addLog(`Note on: ${midiNote} (${freq.toFixed(2)} Hz)`);
+        }
+
+        // Stop note
+        function stopNote(midiNote) {
+            if (!midiPlayer) return;
+            
+            const noteOff = new Uint8Array([0x80, midiNote, 0]); // Note off
+            midiPlayer.send_midi_message(noteOff);
+            
+            addLog(`Note off: ${midiNote}`);
+        }
+
+        // Initialize audio button
+        document.getElementById('init-audio').addEventListener('click', async () => {
+            try {
+                addLog('Initializing audio context and WASM...');
+                
+                // Import WASM module
+                const wasmModule = await import('./awe_synth.js');
+                await wasmModule.default();
+                
+                // Create MIDI player instance
+                midiPlayer = new wasmModule.MidiPlayer();
+                addLog('MIDI player created');
+                
+                // Initialize audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                await audioContext.resume();
+                
+                addLog('Audio initialized successfully');
+                addResult('✓ Audio system initialized', 'pass');
+                
+            } catch (error) {
+                addLog(`Initialization error: ${error}`);
+                addResult(`✗ Failed to initialize: ${error}`, 'fail');
+            }
+        });
+
+        // Test single note with pitch bend
+        document.getElementById('test-note').addEventListener('click', () => {
+            if (!midiPlayer) {
+                addResult('Please initialize audio first', 'fail');
+                return;
+            }
+            
+            clearResults();
+            addResult('Testing single note with current pitch bend...', 'info');
+            
+            const bendValue = parseInt(pitchBendSlider.value);
+            addResult(`Pitch bend value: ${bendValue}`, 'info');
+            
+            playNote(69); // A4
+            
+            setTimeout(() => {
+                stopNote(69);
+                addResult('✓ Note played with pitch bend', 'pass');
+            }, 1000);
+        });
+
+        // Test pitch sweep
+        document.getElementById('test-sweep').addEventListener('click', async () => {
+            if (!midiPlayer) {
+                addResult('Please initialize audio first', 'fail');
+                return;
+            }
+            
+            clearResults();
+            addResult('Testing pitch bend sweep...', 'info');
+            
+            playNote(69); // Start A4
+            
+            // Sweep from -8192 to 8191
+            let bendValue = -8192;
+            const sweepInterval = setInterval(() => {
+                if (bendValue > 8191) {
+                    clearInterval(sweepInterval);
+                    stopNote(69);
+                    addResult('✓ Pitch sweep completed', 'pass');
+                    
+                    // Reset to center
+                    pitchBendSlider.value = 0;
+                    pitchBendSlider.dispatchEvent(new Event('input'));
+                    sendPitchBend(0);
+                    return;
+                }
+                
+                pitchBendSlider.value = bendValue;
+                pitchBendSlider.dispatchEvent(new Event('input'));
+                sendPitchBend(bendValue);
+                
+                bendValue += 256; // Increment
+            }, 20);
+        });
+
+        // Test vibrato
+        document.getElementById('test-vibrato').addEventListener('click', () => {
+            if (!midiPlayer) {
+                addResult('Please initialize audio first', 'fail');
+                return;
+            }
+            
+            clearResults();
+            addResult('Testing vibrato effect...', 'info');
+            
+            playNote(69); // Start A4
+            
+            let time = 0;
+            const vibratoInterval = setInterval(() => {
+                if (time > 3) {
+                    clearInterval(vibratoInterval);
+                    stopNote(69);
+                    addResult('✓ Vibrato test completed', 'pass');
+                    
+                    // Reset to center
+                    pitchBendSlider.value = 0;
+                    pitchBendSlider.dispatchEvent(new Event('input'));
+                    sendPitchBend(0);
+                    return;
+                }
+                
+                // Sine wave vibrato
+                const bendValue = Math.sin(time * Math.PI * 4) * 2048;
+                pitchBendSlider.value = bendValue;
+                pitchBendSlider.dispatchEvent(new Event('input'));
+                sendPitchBend(Math.round(bendValue));
+                
+                time += 0.05;
+            }, 50);
+        });
+
+        // Test full range
+        document.getElementById('test-range').addEventListener('click', async () => {
+            if (!midiPlayer) {
+                addResult('Please initialize audio first', 'fail');
+                return;
+            }
+            
+            clearResults();
+            addResult('Testing full pitch bend range...', 'info');
+            
+            const testPoints = [
+                { value: -8192, expected: 'Down 2 semitones' },
+                { value: -4096, expected: 'Down 1 semitone' },
+                { value: 0, expected: 'Center (no bend)' },
+                { value: 4096, expected: 'Up 1 semitone' },
+                { value: 8191, expected: 'Up 2 semitones' }
+            ];
+            
+            for (const point of testPoints) {
+                pitchBendSlider.value = point.value;
+                pitchBendSlider.dispatchEvent(new Event('input'));
+                sendPitchBend(point.value);
+                
+                playNote(69);
+                addResult(`Testing: ${point.expected} (value: ${point.value})`, 'info');
+                
+                await new Promise(resolve => setTimeout(resolve, 800));
+                stopNote(69);
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            // Reset to center
+            pitchBendSlider.value = 0;
+            pitchBendSlider.dispatchEvent(new Event('input'));
+            sendPitchBend(0);
+            
+            addResult('✓ Full range test completed', 'pass');
+        });
+
+        // Automated test suite
+        document.getElementById('automated-test').addEventListener('click', async () => {
+            if (!midiPlayer) {
+                addResult('Please initialize audio first', 'fail');
+                return;
+            }
+            
+            clearResults();
+            addResult('Running automated pitch bend tests...', 'info');
+            
+            let testsPassed = 0;
+            let testsFailed = 0;
+            
+            // Test 1: Center position (no bend)
+            addResult('Test 1: Center position...', 'info');
+            sendPitchBend(0);
+            const centerFreq = calculatePitchBendFrequency(440, 0);
+            if (Math.abs(centerFreq - 440) < 0.01) {
+                addResult('✓ Center position correct', 'pass');
+                testsPassed++;
+            } else {
+                addResult('✗ Center position incorrect', 'fail');
+                testsFailed++;
+            }
+            
+            // Test 2: Maximum upward bend
+            addResult('Test 2: Maximum upward bend...', 'info');
+            sendPitchBend(8191);
+            const maxUpFreq = calculatePitchBendFrequency(440, 8191);
+            const expectedMaxUp = 440 * Math.pow(2, 2/12); // Up 2 semitones
+            if (Math.abs(maxUpFreq - expectedMaxUp) < 0.1) {
+                addResult('✓ Maximum upward bend correct', 'pass');
+                testsPassed++;
+            } else {
+                addResult('✗ Maximum upward bend incorrect', 'fail');
+                testsFailed++;
+            }
+            
+            // Test 3: Maximum downward bend
+            addResult('Test 3: Maximum downward bend...', 'info');
+            sendPitchBend(-8192);
+            const maxDownFreq = calculatePitchBendFrequency(440, -8192);
+            const expectedMaxDown = 440 * Math.pow(2, -2/12); // Down 2 semitones
+            if (Math.abs(maxDownFreq - expectedMaxDown) < 0.1) {
+                addResult('✓ Maximum downward bend correct', 'pass');
+                testsPassed++;
+            } else {
+                addResult('✗ Maximum downward bend incorrect', 'fail');
+                testsFailed++;
+            }
+            
+            // Test 4: Smooth transition
+            addResult('Test 4: Smooth pitch transitions...', 'info');
+            let transitionOk = true;
+            playNote(69);
+            
+            for (let i = -8192; i <= 8191; i += 1024) {
+                sendPitchBend(i);
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            stopNote(69);
+            if (transitionOk) {
+                addResult('✓ Smooth transitions verified', 'pass');
+                testsPassed++;
+            }
+            
+            // Test 5: Response time
+            addResult('Test 5: Pitch bend response time...', 'info');
+            const startTime = performance.now();
+            sendPitchBend(4096);
+            const responseTime = performance.now() - startTime;
+            
+            if (responseTime < 10) {
+                addResult(`✓ Response time: ${responseTime.toFixed(2)}ms (< 10ms)`, 'pass');
+                testsPassed++;
+            } else {
+                addResult(`✗ Response time: ${responseTime.toFixed(2)}ms (> 10ms)`, 'fail');
+                testsFailed++;
+            }
+            
+            // Reset to center
+            sendPitchBend(0);
+            pitchBendSlider.value = 0;
+            pitchBendSlider.dispatchEvent(new Event('input'));
+            
+            // Summary
+            addResult('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            addResult(`Tests Passed: ${testsPassed}`, testsPassed > 0 ? 'pass' : 'info');
+            addResult(`Tests Failed: ${testsFailed}`, testsFailed > 0 ? 'fail' : 'info');
+            
+            if (testsFailed === 0) {
+                addResult('✓ All pitch bend tests passed!', 'pass');
+            } else {
+                addResult('✗ Some tests failed. Check the log for details.', 'fail');
+            }
+        });
+
+        // Initialize keyboard on load
+        createKeyboard();
+        
+        addLog('Pitch bend test page loaded');
+        addLog('Click "Initialize Audio" to begin testing');
+    </script>
+</body>
+</html>

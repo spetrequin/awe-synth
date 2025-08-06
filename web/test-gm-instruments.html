@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>General MIDI Instrument Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1400px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #00ff00;
+            color: #000;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .instrument-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        .instrument-item {
+            padding: 10px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .instrument-item:hover {
+            background: #333;
+            border-color: #00ff00;
+        }
+
+        .instrument-item.active {
+            background: #003300;
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        .instrument-item.tested {
+            background: #002200;
+            border-color: #008800;
+        }
+
+        .instrument-number {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .category-header {
+            grid-column: 1 / -1;
+            padding: 10px;
+            background: #000;
+            color: #00ffff;
+            text-align: center;
+            border: 1px solid #00ffff;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        #test-results {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00ffff);
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .drum-kit-selector {
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        select {
+            padding: 8px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .test-note-display {
+            padding: 10px;
+            background: #111;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            text-align: center;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎼 General MIDI Instrument Selector Test</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <div class="test-controls">
+            <button id="test-all-instruments">Test All 128 Instruments</button>
+            <button id="test-by-category">Test By Category</button>
+            <button id="test-drum-kits">Test Drum Kits (Channel 10)</button>
+            <button id="test-program-changes">Test Program Changes</button>
+            <button id="test-bank-select">Test Bank Select + Program</button>
+            <button id="stop-test">Stop Test</button>
+            <button id="clear-results">Clear Results</button>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Instruments Tested</div>
+                <div class="stat-value" id="instruments-tested">0 / 128</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Current Instrument</div>
+                <div class="stat-value" id="current-instrument">None</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Test Status</div>
+                <div class="stat-value" id="test-status">Ready</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">MIDI Channel</div>
+                <div class="stat-value" id="current-channel">1</div>
+            </div>
+        </div>
+
+        <div class="test-note-display" id="test-note-display">
+            Click an instrument to hear it or run automated tests
+        </div>
+
+        <h3>General MIDI Instruments (0-127)</h3>
+        <div class="instrument-grid" id="instrument-grid"></div>
+
+        <div class="drum-kit-selector">
+            <h3>Drum Kit Selector (Channel 10)</h3>
+            <select id="drum-kit-select">
+                <option value="0">Standard Kit</option>
+                <option value="8">Room Kit</option>
+                <option value="16">Power Kit</option>
+                <option value="24">Electronic Kit</option>
+                <option value="25">TR-808 Kit</option>
+                <option value="32">Jazz Kit</option>
+                <option value="40">Brush Kit</option>
+                <option value="48">Orchestra Kit</option>
+                <option value="56">SFX Kit</option>
+            </select>
+            <button id="test-drum-notes">Test Drum Notes (35-81)</button>
+        </div>
+
+        <h3>Test Results</h3>
+        <div id="test-results">Test results will appear here...</div>
+    </div>
+
+    <script type="module">
+        import { init } from './awe_synth.js';
+
+        // General MIDI Instrument definitions
+        const GM_INSTRUMENTS = [
+            // Piano (0-7)
+            { program: 0, name: "Acoustic Grand Piano", category: "Piano" },
+            { program: 1, name: "Bright Acoustic Piano", category: "Piano" },
+            { program: 2, name: "Electric Grand Piano", category: "Piano" },
+            { program: 3, name: "Honky-tonk Piano", category: "Piano" },
+            { program: 4, name: "Electric Piano 1", category: "Piano" },
+            { program: 5, name: "Electric Piano 2", category: "Piano" },
+            { program: 6, name: "Harpsichord", category: "Piano" },
+            { program: 7, name: "Clavinet", category: "Piano" },
+            
+            // Chromatic Percussion (8-15)
+            { program: 8, name: "Celesta", category: "Chromatic Percussion" },
+            { program: 9, name: "Glockenspiel", category: "Chromatic Percussion" },
+            { program: 10, name: "Music Box", category: "Chromatic Percussion" },
+            { program: 11, name: "Vibraphone", category: "Chromatic Percussion" },
+            { program: 12, name: "Marimba", category: "Chromatic Percussion" },
+            { program: 13, name: "Xylophone", category: "Chromatic Percussion" },
+            { program: 14, name: "Tubular Bells", category: "Chromatic Percussion" },
+            { program: 15, name: "Dulcimer", category: "Chromatic Percussion" },
+            
+            // Organ (16-23)
+            { program: 16, name: "Drawbar Organ", category: "Organ" },
+            { program: 17, name: "Percussive Organ", category: "Organ" },
+            { program: 18, name: "Rock Organ", category: "Organ" },
+            { program: 19, name: "Church Organ", category: "Organ" },
+            { program: 20, name: "Reed Organ", category: "Organ" },
+            { program: 21, name: "Accordion", category: "Organ" },
+            { program: 22, name: "Harmonica", category: "Organ" },
+            { program: 23, name: "Tango Accordion", category: "Organ" },
+            
+            // Guitar (24-31)
+            { program: 24, name: "Acoustic Guitar (nylon)", category: "Guitar" },
+            { program: 25, name: "Acoustic Guitar (steel)", category: "Guitar" },
+            { program: 26, name: "Electric Guitar (jazz)", category: "Guitar" },
+            { program: 27, name: "Electric Guitar (clean)", category: "Guitar" },
+            { program: 28, name: "Electric Guitar (muted)", category: "Guitar" },
+            { program: 29, name: "Overdriven Guitar", category: "Guitar" },
+            { program: 30, name: "Distortion Guitar", category: "Guitar" },
+            { program: 31, name: "Guitar Harmonics", category: "Guitar" },
+            
+            // Bass (32-39)
+            { program: 32, name: "Acoustic Bass", category: "Bass" },
+            { program: 33, name: "Electric Bass (finger)", category: "Bass" },
+            { program: 34, name: "Electric Bass (pick)", category: "Bass" },
+            { program: 35, name: "Fretless Bass", category: "Bass" },
+            { program: 36, name: "Slap Bass 1", category: "Bass" },
+            { program: 37, name: "Slap Bass 2", category: "Bass" },
+            { program: 38, name: "Synth Bass 1", category: "Bass" },
+            { program: 39, name: "Synth Bass 2", category: "Bass" },
+            
+            // Strings (40-47)
+            { program: 40, name: "Violin", category: "Strings" },
+            { program: 41, name: "Viola", category: "Strings" },
+            { program: 42, name: "Cello", category: "Strings" },
+            { program: 43, name: "Contrabass", category: "Strings" },
+            { program: 44, name: "Tremolo Strings", category: "Strings" },
+            { program: 45, name: "Pizzicato Strings", category: "Strings" },
+            { program: 46, name: "Orchestral Harp", category: "Strings" },
+            { program: 47, name: "Timpani", category: "Strings" },
+            
+            // Ensemble (48-55)
+            { program: 48, name: "String Ensemble 1", category: "Ensemble" },
+            { program: 49, name: "String Ensemble 2", category: "Ensemble" },
+            { program: 50, name: "Synth Strings 1", category: "Ensemble" },
+            { program: 51, name: "Synth Strings 2", category: "Ensemble" },
+            { program: 52, name: "Choir Aahs", category: "Ensemble" },
+            { program: 53, name: "Voice Oohs", category: "Ensemble" },
+            { program: 54, name: "Synth Voice", category: "Ensemble" },
+            { program: 55, name: "Orchestra Hit", category: "Ensemble" },
+            
+            // Brass (56-63)
+            { program: 56, name: "Trumpet", category: "Brass" },
+            { program: 57, name: "Trombone", category: "Brass" },
+            { program: 58, name: "Tuba", category: "Brass" },
+            { program: 59, name: "Muted Trumpet", category: "Brass" },
+            { program: 60, name: "French Horn", category: "Brass" },
+            { program: 61, name: "Brass Section", category: "Brass" },
+            { program: 62, name: "Synth Brass 1", category: "Brass" },
+            { program: 63, name: "Synth Brass 2", category: "Brass" },
+            
+            // Reed (64-71)
+            { program: 64, name: "Soprano Sax", category: "Reed" },
+            { program: 65, name: "Alto Sax", category: "Reed" },
+            { program: 66, name: "Tenor Sax", category: "Reed" },
+            { program: 67, name: "Baritone Sax", category: "Reed" },
+            { program: 68, name: "Oboe", category: "Reed" },
+            { program: 69, name: "English Horn", category: "Reed" },
+            { program: 70, name: "Bassoon", category: "Reed" },
+            { program: 71, name: "Clarinet", category: "Reed" },
+            
+            // Pipe (72-79)
+            { program: 72, name: "Piccolo", category: "Pipe" },
+            { program: 73, name: "Flute", category: "Pipe" },
+            { program: 74, name: "Recorder", category: "Pipe" },
+            { program: 75, name: "Pan Flute", category: "Pipe" },
+            { program: 76, name: "Blown Bottle", category: "Pipe" },
+            { program: 77, name: "Shakuhachi", category: "Pipe" },
+            { program: 78, name: "Whistle", category: "Pipe" },
+            { program: 79, name: "Ocarina", category: "Pipe" },
+            
+            // Synth Lead (80-87)
+            { program: 80, name: "Lead 1 (square)", category: "Synth Lead" },
+            { program: 81, name: "Lead 2 (sawtooth)", category: "Synth Lead" },
+            { program: 82, name: "Lead 3 (calliope)", category: "Synth Lead" },
+            { program: 83, name: "Lead 4 (chiff)", category: "Synth Lead" },
+            { program: 84, name: "Lead 5 (charang)", category: "Synth Lead" },
+            { program: 85, name: "Lead 6 (voice)", category: "Synth Lead" },
+            { program: 86, name: "Lead 7 (fifths)", category: "Synth Lead" },
+            { program: 87, name: "Lead 8 (bass + lead)", category: "Synth Lead" },
+            
+            // Synth Pad (88-95)
+            { program: 88, name: "Pad 1 (new age)", category: "Synth Pad" },
+            { program: 89, name: "Pad 2 (warm)", category: "Synth Pad" },
+            { program: 90, name: "Pad 3 (polysynth)", category: "Synth Pad" },
+            { program: 91, name: "Pad 4 (choir)", category: "Synth Pad" },
+            { program: 92, name: "Pad 5 (bowed)", category: "Synth Pad" },
+            { program: 93, name: "Pad 6 (metallic)", category: "Synth Pad" },
+            { program: 94, name: "Pad 7 (halo)", category: "Synth Pad" },
+            { program: 95, name: "Pad 8 (sweep)", category: "Synth Pad" },
+            
+            // Synth Effects (96-103)
+            { program: 96, name: "FX 1 (rain)", category: "Synth Effects" },
+            { program: 97, name: "FX 2 (soundtrack)", category: "Synth Effects" },
+            { program: 98, name: "FX 3 (crystal)", category: "Synth Effects" },
+            { program: 99, name: "FX 4 (atmosphere)", category: "Synth Effects" },
+            { program: 100, name: "FX 5 (brightness)", category: "Synth Effects" },
+            { program: 101, name: "FX 6 (goblins)", category: "Synth Effects" },
+            { program: 102, name: "FX 7 (echoes)", category: "Synth Effects" },
+            { program: 103, name: "FX 8 (sci-fi)", category: "Synth Effects" },
+            
+            // Ethnic (104-111)
+            { program: 104, name: "Sitar", category: "Ethnic" },
+            { program: 105, name: "Banjo", category: "Ethnic" },
+            { program: 106, name: "Shamisen", category: "Ethnic" },
+            { program: 107, name: "Koto", category: "Ethnic" },
+            { program: 108, name: "Kalimba", category: "Ethnic" },
+            { program: 109, name: "Bagpipe", category: "Ethnic" },
+            { program: 110, name: "Fiddle", category: "Ethnic" },
+            { program: 111, name: "Shanai", category: "Ethnic" },
+            
+            // Percussive (112-119)
+            { program: 112, name: "Tinkle Bell", category: "Percussive" },
+            { program: 113, name: "Agogo", category: "Percussive" },
+            { program: 114, name: "Steel Drums", category: "Percussive" },
+            { program: 115, name: "Woodblock", category: "Percussive" },
+            { program: 116, name: "Taiko Drum", category: "Percussive" },
+            { program: 117, name: "Melodic Tom", category: "Percussive" },
+            { program: 118, name: "Synth Drum", category: "Percussive" },
+            { program: 119, name: "Reverse Cymbal", category: "Percussive" },
+            
+            // Sound Effects (120-127)
+            { program: 120, name: "Guitar Fret Noise", category: "Sound Effects" },
+            { program: 121, name: "Breath Noise", category: "Sound Effects" },
+            { program: 122, name: "Seashore", category: "Sound Effects" },
+            { program: 123, name: "Bird Tweet", category: "Sound Effects" },
+            { program: 124, name: "Telephone Ring", category: "Sound Effects" },
+            { program: 125, name: "Helicopter", category: "Sound Effects" },
+            { program: 126, name: "Applause", category: "Sound Effects" },
+            { program: 127, name: "Gunshot", category: "Sound Effects" }
+        ];
+
+        // GM Drum Note Map (Channel 10)
+        const GM_DRUM_MAP = {
+            35: "Acoustic Bass Drum",
+            36: "Bass Drum 1",
+            37: "Side Stick",
+            38: "Acoustic Snare",
+            39: "Hand Clap",
+            40: "Electric Snare",
+            41: "Low Floor Tom",
+            42: "Closed Hi-Hat",
+            43: "High Floor Tom",
+            44: "Pedal Hi-Hat",
+            45: "Low Tom",
+            46: "Open Hi-Hat",
+            47: "Low-Mid Tom",
+            48: "Hi-Mid Tom",
+            49: "Crash Cymbal 1",
+            50: "High Tom",
+            51: "Ride Cymbal 1",
+            52: "Chinese Cymbal",
+            53: "Ride Bell",
+            54: "Tambourine",
+            55: "Splash Cymbal",
+            56: "Cowbell",
+            57: "Crash Cymbal 2",
+            58: "Vibraslap",
+            59: "Ride Cymbal 2",
+            60: "Hi Bongo",
+            61: "Low Bongo",
+            62: "Mute Hi Conga",
+            63: "Open Hi Conga",
+            64: "Low Conga",
+            65: "High Timbale",
+            66: "Low Timbale",
+            67: "High Agogo",
+            68: "Low Agogo",
+            69: "Cabasa",
+            70: "Maracas",
+            71: "Short Whistle",
+            72: "Long Whistle",
+            73: "Short Guiro",
+            74: "Long Guiro",
+            75: "Claves",
+            76: "Hi Wood Block",
+            77: "Low Wood Block",
+            78: "Mute Cuica",
+            79: "Open Cuica",
+            80: "Mute Triangle",
+            81: "Open Triangle"
+        };
+
+        class GMInstrumentTester {
+            constructor() {
+                this.midiPlayer = null;
+                this.isRunning = false;
+                this.testedInstruments = new Set();
+                this.currentChannel = 0; // Start with channel 1 (0-indexed)
+                this.initializeUI();
+                this.setupInstrumentGrid();
+            }
+
+            async initialize(midiPlayer) {
+                this.midiPlayer = midiPlayer;
+                this.log('✅ GM Instrument Tester initialized', 'success');
+            }
+
+            initializeUI() {
+                // Test buttons
+                document.getElementById('test-all-instruments').addEventListener('click', () => this.testAllInstruments());
+                document.getElementById('test-by-category').addEventListener('click', () => this.testByCategory());
+                document.getElementById('test-drum-kits').addEventListener('click', () => this.testDrumKits());
+                document.getElementById('test-program-changes').addEventListener('click', () => this.testProgramChanges());
+                document.getElementById('test-bank-select').addEventListener('click', () => this.testBankSelect());
+                document.getElementById('stop-test').addEventListener('click', () => this.stopTest());
+                document.getElementById('clear-results').addEventListener('click', () => this.clearResults());
+                document.getElementById('test-drum-notes').addEventListener('click', () => this.testDrumNotes());
+
+                // Drum kit selector
+                document.getElementById('drum-kit-select').addEventListener('change', (e) => {
+                    const kitProgram = parseInt(e.target.value);
+                    this.sendProgramChange(9, kitProgram); // Channel 10 (9 in 0-indexed)
+                    this.log(`Selected drum kit: ${kitProgram}`, 'info');
+                });
+            }
+
+            setupInstrumentGrid() {
+                const grid = document.getElementById('instrument-grid');
+                grid.innerHTML = '';
+                
+                let currentCategory = '';
+                GM_INSTRUMENTS.forEach(instrument => {
+                    // Add category header if changed
+                    if (instrument.category !== currentCategory) {
+                        currentCategory = instrument.category;
+                        const header = document.createElement('div');
+                        header.className = 'category-header';
+                        header.textContent = currentCategory;
+                        grid.appendChild(header);
+                    }
+
+                    // Add instrument item
+                    const item = document.createElement('div');
+                    item.className = 'instrument-item';
+                    item.id = `instrument-${instrument.program}`;
+                    item.innerHTML = `
+                        <span>${instrument.name}</span>
+                        <span class="instrument-number">${instrument.program}</span>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        this.selectInstrument(instrument.program);
+                        this.playTestNote(60); // Middle C
+                    });
+                    
+                    grid.appendChild(item);
+                });
+            }
+
+            async testAllInstruments() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.clearResults();
+                this.log('🎹 Starting test of all 128 General MIDI instruments...', 'info');
+                this.updateStatus('Testing All Instruments...');
+
+                for (let program = 0; program < 128; program++) {
+                    if (!this.isRunning) break;
+                    
+                    await this.testInstrument(program);
+                    this.updateProgress((program + 1) / 128 * 100);
+                    await this.delay(500); // Delay between instruments
+                }
+
+                this.log(`\n✅ Test complete. Tested ${this.testedInstruments.size}/128 instruments`, 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testByCategory() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.clearResults();
+                
+                const categories = [...new Set(GM_INSTRUMENTS.map(i => i.category))];
+                
+                for (const category of categories) {
+                    if (!this.isRunning) break;
+                    
+                    this.log(`\n📁 Testing ${category} instruments...`, 'info');
+                    const instruments = GM_INSTRUMENTS.filter(i => i.category === category);
+                    
+                    for (const instrument of instruments) {
+                        if (!this.isRunning) break;
+                        await this.testInstrument(instrument.program);
+                        await this.delay(400);
+                    }
+                }
+
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testInstrument(program) {
+                const instrument = GM_INSTRUMENTS[program];
+                this.log(`Testing: ${instrument.name} (Program ${program})`, 'info');
+                
+                // Visual feedback
+                this.highlightInstrument(program);
+                this.updateCurrentInstrument(instrument.name);
+                
+                // Send program change
+                this.sendProgramChange(this.currentChannel, program);
+                await this.delay(50); // Small delay for program change
+                
+                // Play test sequence
+                const testNotes = [60, 64, 67, 72]; // C major chord + octave
+                for (const note of testNotes) {
+                    this.sendNoteOn(this.currentChannel, note, 80);
+                    await this.delay(200);
+                    this.sendNoteOff(this.currentChannel, note);
+                    await this.delay(50);
+                }
+                
+                // Mark as tested
+                this.testedInstruments.add(program);
+                document.getElementById(`instrument-${program}`).classList.add('tested');
+                this.updateStats();
+            }
+
+            async testDrumKits() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🥁 Testing drum kits on channel 10...', 'info');
+                this.updateStatus('Testing Drum Kits...');
+
+                const drumKits = [0, 8, 16, 24, 25, 32, 40, 48, 56];
+                const testNotes = [36, 38, 42, 46, 49, 51]; // Kick, snare, hi-hat, open hat, crash, ride
+
+                for (const kit of drumKits) {
+                    if (!this.isRunning) break;
+                    
+                    this.log(`\nTesting drum kit: Program ${kit}`, 'info');
+                    this.sendProgramChange(9, kit); // Channel 10
+                    await this.delay(100);
+                    
+                    for (const note of testNotes) {
+                        const drumName = GM_DRUM_MAP[note] || `Note ${note}`;
+                        this.log(`  Playing: ${drumName}`, 'info');
+                        this.sendNoteOn(9, note, 100);
+                        await this.delay(150);
+                        this.sendNoteOff(9, note);
+                        await this.delay(50);
+                    }
+                }
+
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testDrumNotes() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🥁 Testing all GM drum notes (35-81)...', 'info');
+                this.updateStatus('Testing Drum Notes...');
+
+                for (let note = 35; note <= 81; note++) {
+                    if (!this.isRunning) break;
+                    
+                    const drumName = GM_DRUM_MAP[note] || `Drum Note ${note}`;
+                    this.log(`Playing: ${drumName} (Note ${note})`, 'info');
+                    document.getElementById('test-note-display').textContent = drumName;
+                    
+                    this.sendNoteOn(9, note, 100); // Channel 10
+                    await this.delay(300);
+                    this.sendNoteOff(9, note);
+                    await this.delay(100);
+                }
+
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testProgramChanges() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🔄 Testing rapid program changes...', 'info');
+                this.updateStatus('Testing Program Changes...');
+
+                const testNote = 60; // Middle C
+                const programs = [0, 24, 40, 56, 80, 104]; // Various instruments
+
+                // Test rapid program changes
+                for (let i = 0; i < 3; i++) {
+                    for (const program of programs) {
+                        if (!this.isRunning) break;
+                        
+                        const instrument = GM_INSTRUMENTS[program];
+                        this.log(`Quick change to: ${instrument.name}`, 'info');
+                        
+                        this.sendProgramChange(this.currentChannel, program);
+                        this.sendNoteOn(this.currentChannel, testNote, 80);
+                        await this.delay(200);
+                        this.sendNoteOff(this.currentChannel, testNote);
+                        await this.delay(50);
+                    }
+                }
+
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testBankSelect() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🏦 Testing Bank Select + Program Change...', 'info');
+                this.updateStatus('Testing Bank Select...');
+
+                // Test bank select (MSB/LSB) + program change
+                const testCases = [
+                    { bank: 0, program: 0, name: "Bank 0, Program 0 (Piano)" },
+                    { bank: 0, program: 48, name: "Bank 0, Program 48 (Strings)" },
+                    { bank: 1, program: 0, name: "Bank 1, Program 0 (Variation)" },
+                    { bank: 8, program: 0, name: "Bank 8, Program 0 (GS Variation)" }
+                ];
+
+                for (const test of testCases) {
+                    if (!this.isRunning) break;
+                    
+                    this.log(`\nTesting: ${test.name}`, 'info');
+                    
+                    // Send bank select MSB (CC 0)
+                    this.sendControlChange(this.currentChannel, 0, test.bank);
+                    await this.delay(10);
+                    
+                    // Send bank select LSB (CC 32) - usually 0
+                    this.sendControlChange(this.currentChannel, 32, 0);
+                    await this.delay(10);
+                    
+                    // Send program change
+                    this.sendProgramChange(this.currentChannel, test.program);
+                    await this.delay(50);
+                    
+                    // Play test note
+                    this.sendNoteOn(this.currentChannel, 60, 80);
+                    await this.delay(500);
+                    this.sendNoteOff(this.currentChannel, 60);
+                    await this.delay(200);
+                }
+
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            // Helper methods
+            selectInstrument(program) {
+                // Remove previous active
+                document.querySelectorAll('.instrument-item.active').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Set new active
+                const item = document.getElementById(`instrument-${program}`);
+                if (item) {
+                    item.classList.add('active');
+                }
+                
+                // Send program change
+                this.sendProgramChange(this.currentChannel, program);
+                this.updateCurrentInstrument(GM_INSTRUMENTS[program].name);
+            }
+
+            highlightInstrument(program) {
+                this.selectInstrument(program);
+                
+                // Scroll into view
+                const item = document.getElementById(`instrument-${program}`);
+                if (item) {
+                    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+
+            playTestNote(note) {
+                this.sendNoteOn(this.currentChannel, note, 80);
+                setTimeout(() => {
+                    this.sendNoteOff(this.currentChannel, note);
+                }, 500);
+            }
+
+            // MIDI message helpers
+            sendProgramChange(channel, program) {
+                if (!this.midiPlayer) return;
+                
+                const message = new Uint8Array([
+                    0xC0 | (channel & 0x0F), // Program change + channel
+                    program & 0x7F
+                ]);
+                
+                this.midiPlayer.send_midi_message(message);
+            }
+
+            sendControlChange(channel, controller, value) {
+                if (!this.midiPlayer) return;
+                
+                const message = new Uint8Array([
+                    0xB0 | (channel & 0x0F), // Control change + channel
+                    controller & 0x7F,
+                    value & 0x7F
+                ]);
+                
+                this.midiPlayer.send_midi_message(message);
+            }
+
+            sendNoteOn(channel, note, velocity) {
+                if (!this.midiPlayer) return;
+                
+                const message = new Uint8Array([
+                    0x90 | (channel & 0x0F), // Note on + channel
+                    note & 0x7F,
+                    velocity & 0x7F
+                ]);
+                
+                this.midiPlayer.send_midi_message(message);
+            }
+
+            sendNoteOff(channel, note) {
+                if (!this.midiPlayer) return;
+                
+                const message = new Uint8Array([
+                    0x80 | (channel & 0x0F), // Note off + channel
+                    note & 0x7F,
+                    0 // Velocity (usually 0 for note off)
+                ]);
+                
+                this.midiPlayer.send_midi_message(message);
+            }
+
+            // UI updates
+            updateCurrentInstrument(name) {
+                document.getElementById('current-instrument').textContent = name;
+                document.getElementById('test-note-display').textContent = `Playing: ${name}`;
+            }
+
+            updateStats() {
+                const tested = this.testedInstruments.size;
+                document.getElementById('instruments-tested').textContent = `${tested} / 128`;
+            }
+
+            updateProgress(percent) {
+                document.getElementById('progress').style.width = `${percent}%`;
+            }
+
+            updateStatus(status) {
+                document.getElementById('test-status').textContent = status;
+            }
+
+            stopTest() {
+                this.isRunning = false;
+                this.updateStatus('Stopped');
+                this.log('\n⏹️ Test stopped by user', 'warning');
+            }
+
+            clearResults() {
+                this.testedInstruments.clear();
+                document.getElementById('test-results').textContent = 'Test results cleared.';
+                document.querySelectorAll('.instrument-item').forEach(item => {
+                    item.classList.remove('tested', 'active');
+                });
+                this.updateStats();
+                this.updateProgress(0);
+                this.updateStatus('Ready');
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                
+                const resultsDiv = document.getElementById('test-results');
+                resultsDiv.textContent += logEntry + '\n';
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                const module = await init();
+                const midiPlayer = new module.MidiPlayer();
+                
+                window.gmTester = new GMInstrumentTester();
+                await window.gmTester.initialize(midiPlayer);
+                
+                // Store reference for debugging
+                window.midiPlayer = midiPlayer;
+                
+                console.log('✅ GM Instrument Test initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('test-results').textContent = 
+                    `❌ Failed to initialize: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

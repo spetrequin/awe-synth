@@ -23,6 +23,7 @@ pub struct Voice {
     pub soundfont_sample: Option<SoundFontSample>,
     pub sample_position: f64,     // Current position in sample data
     pub sample_rate_ratio: f64,   // Ratio for sample rate conversion
+    pub pitch_bend_ratio: Option<f64>, // Current pitch bend ratio applied
     pub is_soundfont_voice: bool, // True if playing SoundFont sample, false for sine wave
     
     // EMU8000 per-voice effects
@@ -63,6 +64,7 @@ impl Voice {
             soundfont_sample: None,
             sample_position: 0.0,
             sample_rate_ratio: 1.0,
+            pitch_bend_ratio: None,
             is_soundfont_voice: false,
             // Initialize filter with EMU8000 default parameters
             low_pass_filter: LowPassFilter::new(44100.0, 8000.0, 0.7), // Wide open, minimal resonance

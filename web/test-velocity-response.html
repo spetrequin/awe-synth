@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Velocity Response Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #00ff41;
+            line-height: 1.4;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #00ff41;
+            border-radius: 8px;
+            background: rgba(0, 255, 65, 0.1);
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+
+        .header p {
+            margin: 5px 0;
+            color: #cccccc;
+        }
+
+        .test-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid #00ff41;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .section h2 {
+            margin: 0 0 15px 0;
+            color: #00ff41;
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 5px;
+        }
+
+        .velocity-tester {
+            grid-column: span 2;
+        }
+
+        .velocity-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            background: rgba(0, 255, 65, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid rgba(0, 255, 65, 0.3);
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00ff41;
+            font-weight: bold;
+        }
+
+        .slider-container {
+            position: relative;
+            margin: 10px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 25px;
+            background: #1a1a1a;
+            border-radius: 12px;
+            outline: none;
+            border: 1px solid #00ff41;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00ff41;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #00ff41;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        .velocity-value {
+            display: inline-block;
+            min-width: 40px;
+            text-align: center;
+            color: #00ff41;
+            font-weight: bold;
+            background: rgba(0, 255, 65, 0.2);
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #00ff41;
+            border: 1px solid #00ff41;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .velocity-response-graph {
+            background: #1a1a1a;
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            height: 300px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .graph-canvas {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(0, 255, 65, 0.1) 0%, transparent 50%);
+        }
+
+        .response-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .amplitude-meter, .timbre-meter {
+            background: #1a1a1a;
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .meter-bar {
+            width: 100%;
+            height: 30px;
+            background: #2d2d2d;
+            border-radius: 15px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff41 0%, #ffff00 50%, #ff4500 100%);
+            border-radius: 15px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.8);
+        }
+
+        .meter-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #fff;
+            z-index: 2;
+        }
+
+        select {
+            background: #1a1a1a;
+            color: #00ff41;
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            width: 100%;
+        }
+
+        select option {
+            background: #1a1a1a;
+            color: #00ff41;
+        }
+
+        .test-sequence-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .sequence-button {
+            padding: 8px 12px;
+            font-size: 12px;
+            min-width: auto;
+        }
+
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .metric-box {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff41;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #cccccc;
+        }
+
+        .velocity-curve-display {
+            background: #1a1a1a;
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .curve-options {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .curve-option {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .curve-option:hover, .curve-option.active {
+            background: rgba(0, 255, 65, 0.3);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+        }
+
+        .debug-panel {
+            grid-column: span 2;
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid #00ff41;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .debug-log {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            color: #00ff41;
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .test-sections {
+                grid-template-columns: 1fr;
+            }
+            
+            .velocity-tester {
+                grid-column: span 1;
+            }
+            
+            .velocity-controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .response-display {
+                grid-template-columns: 1fr;
+            }
+            
+            .performance-metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎹 MIDI Velocity Response Test</h1>
+        <p><strong>Task:</strong> 18.3.3 - Test MIDI velocity → voice amplitude and timbre response</p>
+        <p><strong>Focus:</strong> Velocity sensitivity, amplitude scaling, timbre variation, and performance analysis</p>
+    </div>
+
+    <div class="test-sections">
+        <!-- Velocity Response Tester -->
+        <div class="section velocity-tester">
+            <h2>🎚️ Velocity Response Tester</h2>
+            
+            <div class="velocity-controls">
+                <div class="control-group">
+                    <label for="testNote">Test Note:</label>
+                    <select id="testNote">
+                        <option value="60">C4 (Middle C)</option>
+                        <option value="48">C3 (Low)</option>
+                        <option value="72">C5 (High)</option>
+                        <option value="36">C2 (Very Low)</option>
+                        <option value="84">C6 (Very High)</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="testProgram">Instrument:</label>
+                    <select id="testProgram">
+                        <option value="0">Acoustic Grand Piano</option>
+                        <option value="40">Violin</option>
+                        <option value="56">Trumpet</option>
+                        <option value="73">Flute</option>
+                        <option value="24">Acoustic Guitar</option>
+                        <option value="33">Electric Bass</option>
+                        <option value="48">String Ensemble</option>
+                        <option value="80">Square Lead</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="testChannel">MIDI Channel:</label>
+                    <select id="testChannel">
+                        <option value="1">Channel 1</option>
+                        <option value="2">Channel 2</option>
+                        <option value="3">Channel 3</option>
+                        <option value="4">Channel 4</option>
+                        <option value="5">Channel 5</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="velocitySlider">MIDI Velocity: <span class="velocity-value" id="velocityValue">64</span></label>
+                <div class="slider-container">
+                    <input type="range" id="velocitySlider" min="1" max="127" value="64">
+                </div>
+            </div>
+
+            <div class="velocity-response-graph">
+                <canvas class="graph-canvas" id="responseGraph" width="800" height="250"></canvas>
+            </div>
+
+            <div class="response-display">
+                <div class="amplitude-meter">
+                    <h3>🔊 Voice Amplitude</h3>
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="amplitudeFill" style="width: 50%;"></div>
+                        <div class="meter-value" id="amplitudeValue">0.50</div>
+                    </div>
+                    <div>Expected: <span id="expectedAmplitude">0.50</span> | Actual: <span id="actualAmplitude">0.50</span></div>
+                </div>
+                
+                <div class="timbre-meter">
+                    <h3>🎭 Timbre Response</h3>
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="timbreFill" style="width: 50%;"></div>
+                        <div class="meter-value" id="timbreValue">0.50</div>
+                    </div>
+                    <div>Brightness: <span id="timbreBrightness">50%</span> | Harmonics: <span id="timbreHarmonics">50%</span></div>
+                </div>
+            </div>
+
+            <div class="test-sequence-controls">
+                <button class="sequence-button" onclick="testVelocitySequence()">🎯 Velocity Sweep</button>
+                <button class="sequence-button" onclick="testDynamicRange()">📊 Dynamic Range</button>
+                <button class="sequence-button" onclick="testVelocityCurves()">📈 Curve Analysis</button>
+                <button class="sequence-button" onclick="testTimbreVariation()">🎨 Timbre Test</button>
+                <button class="sequence-button" onclick="testRapidVelocities()">⚡ Rapid Changes</button>
+                <button class="sequence-button" onclick="testVelocityStress()">🔥 Stress Test</button>
+            </div>
+
+            <button onclick="playTestNote()" id="playButton">🎵 Play Test Note</button>
+            <button onclick="stopAllNotes()" id="stopButton">⏹️ Stop All Notes</button>
+        </div>
+
+        <!-- Velocity Curve Analysis -->
+        <div class="section">
+            <h2>📈 Velocity Curve Analysis</h2>
+            
+            <div class="velocity-curve-display">
+                <div class="curve-options">
+                    <div class="curve-option active" onclick="selectVelocityCurve('linear')" id="linear-curve">
+                        <strong>Linear</strong><br>1:1 mapping
+                    </div>
+                    <div class="curve-option" onclick="selectVelocityCurve('exponential')" id="exponential-curve">
+                        <strong>Exponential</strong><br>Soft → Loud
+                    </div>
+                    <div class="curve-option" onclick="selectVelocityCurve('logarithmic')" id="logarithmic-curve">
+                        <strong>Logarithmic</strong><br>Compressed
+                    </div>
+                    <div class="curve-option" onclick="selectVelocityCurve('s-curve')" id="s-curve">
+                        <strong>S-Curve</strong><br>Natural feel
+                    </div>
+                </div>
+                
+                <canvas id="velocityCurveCanvas" width="300" height="200" style="width: 100%; height: 200px; border: 1px solid #00ff41; border-radius: 5px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="section">
+            <h2>📊 Performance Metrics</h2>
+            
+            <div class="performance-metrics">
+                <div class="metric-box">
+                    <span class="metric-value" id="responseLatency">0.0ms</span>
+                    <div class="metric-label">Response Latency</div>
+                </div>
+                <div class="metric-box">
+                    <span class="metric-value" id="amplitudeAccuracy">100%</span>
+                    <div class="metric-label">Amplitude Accuracy</div>
+                </div>
+                <div class="metric-box">
+                    <span class="metric-value" id="timbreAccuracy">100%</span>
+                    <div class="metric-label">Timbre Accuracy</div>
+                </div>
+                <div class="metric-box">
+                    <span class="metric-value" id="testCount">0</span>
+                    <div class="metric-label">Tests Run</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <h3>🎚️ Velocity Sensitivity Settings</h3>
+                <div class="control-group">
+                    <label for="sensitivitySlider">Velocity Sensitivity: <span class="velocity-value" id="sensitivityValue">100%</span></label>
+                    <input type="range" id="sensitivitySlider" min="0" max="200" value="100">
+                </div>
+                
+                <div class="control-group" style="margin-top: 15px;">
+                    <label for="timbreResponseSlider">Timbre Response: <span class="velocity-value" id="timbreResponseValue">75%</span></label>
+                    <input type="range" id="timbreResponseSlider" min="0" max="100" value="75">
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Panel -->
+        <div class="debug-panel">
+            <h2>🐛 Debug Log</h2>
+            <textarea class="debug-log" id="debug-log" readonly placeholder="Velocity response test log will appear here..."></textarea>
+            <div style="margin-top: 10px;">
+                <button onclick="clearDebugLog()">Clear Log</button>
+                <button onclick="exportTestResults()">📄 Export Results</button>
+                <button onclick="startAutomatedTests()">🤖 Run Automated Tests</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        class VelocityResponseTest {
+            constructor() {
+                this.currentVelocity = 64;
+                this.currentNote = 60;
+                this.currentProgram = 0;
+                this.currentChannel = 1;
+                this.velocityCurve = 'linear';
+                this.sensitivity = 1.0;
+                this.timbreResponse = 0.75;
+                
+                this.performanceMetrics = {
+                    responseLatency: 0,
+                    amplitudeAccuracy: 100,
+                    timbreAccuracy: 100,
+                    testCount: 0,
+                    totalLatency: 0,
+                    accuracySum: 0
+                };
+                
+                this.velocityHistory = [];
+                this.responseHistory = [];
+                
+                this.initializeInterface();
+                this.setupEventHandlers();
+                this.initializeGraphs();
+                
+                this.log('🎹 Velocity Response Test initialized');
+                this.log('Ready to test MIDI velocity → voice amplitude and timbre response');
+            }
+
+            initializeInterface() {
+                // Update velocity display
+                const velocitySlider = document.getElementById('velocitySlider');
+                const velocityValue = document.getElementById('velocityValue');
+                
+                velocitySlider.addEventListener('input', (e) => {
+                    this.currentVelocity = parseInt(e.target.value);
+                    velocityValue.textContent = this.currentVelocity;
+                    this.updateVelocityResponse();
+                });
+
+                // Sensitivity controls
+                const sensitivitySlider = document.getElementById('sensitivitySlider');
+                const sensitivityValue = document.getElementById('sensitivityValue');
+                
+                sensitivitySlider.addEventListener('input', (e) => {
+                    this.sensitivity = parseFloat(e.target.value) / 100;
+                    sensitivityValue.textContent = e.target.value + '%';
+                    this.updateVelocityResponse();
+                });
+
+                // Timbre response controls
+                const timbreResponseSlider = document.getElementById('timbreResponseSlider');
+                const timbreResponseValue = document.getElementById('timbreResponseValue');
+                
+                timbreResponseSlider.addEventListener('input', (e) => {
+                    this.timbreResponse = parseFloat(e.target.value) / 100;
+                    timbreResponseValue.textContent = e.target.value + '%';
+                    this.updateVelocityResponse();
+                });
+
+                // Control selectors
+                document.getElementById('testNote').addEventListener('change', (e) => {
+                    this.currentNote = parseInt(e.target.value);
+                    this.log(`Test note changed to: ${this.currentNote} (${this.noteToName(this.currentNote)})`);
+                });
+
+                document.getElementById('testProgram').addEventListener('change', (e) => {
+                    this.currentProgram = parseInt(e.target.value);
+                    this.log(`Test instrument changed to: ${e.target.selectedOptions[0].textContent}`);
+                });
+
+                document.getElementById('testChannel').addEventListener('change', (e) => {
+                    this.currentChannel = parseInt(e.target.value);
+                    this.log(`Test channel changed to: ${this.currentChannel}`);
+                });
+            }
+
+            setupEventHandlers() {
+                // Make functions globally available
+                window.playTestNote = () => this.playTestNote();
+                window.stopAllNotes = () => this.stopAllNotes();
+                window.selectVelocityCurve = (curve) => this.selectVelocityCurve(curve);
+                window.testVelocitySequence = () => this.testVelocitySequence();
+                window.testDynamicRange = () => this.testDynamicRange();
+                window.testVelocityCurves = () => this.testVelocityCurves();
+                window.testTimbreVariation = () => this.testTimbreVariation();
+                window.testRapidVelocities = () => this.testRapidVelocities();
+                window.testVelocityStress = () => this.testVelocityStress();
+                window.clearDebugLog = () => this.clearDebugLog();
+                window.exportTestResults = () => this.exportTestResults();
+                window.startAutomatedTests = () => this.startAutomatedTests();
+            }
+
+            initializeGraphs() {
+                this.setupResponseGraph();
+                this.setupVelocityCurveGraph();
+                this.updateVelocityResponse();
+            }
+
+            setupResponseGraph() {
+                const canvas = document.getElementById('responseGraph');
+                const ctx = canvas.getContext('2d');
+                
+                // Clear and setup graph background
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw grid
+                ctx.strokeStyle = 'rgba(0, 255, 65, 0.2)';
+                ctx.lineWidth = 1;
+                
+                // Vertical grid lines (velocity)
+                for (let i = 0; i <= 127; i += 16) {
+                    const x = (i / 127) * canvas.width;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                
+                // Horizontal grid lines (amplitude/timbre)
+                for (let i = 0; i <= 10; i++) {
+                    const y = (i / 10) * canvas.height;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                
+                // Labels
+                ctx.fillStyle = '#00ff41';
+                ctx.font = '12px Courier New';
+                ctx.fillText('Velocity →', canvas.width - 80, canvas.height - 10);
+                ctx.save();
+                ctx.translate(15, canvas.height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText('← Response', -30, 0);
+                ctx.restore();
+            }
+
+            setupVelocityCurveGraph() {
+                const canvas = document.getElementById('velocityCurveCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                this.drawVelocityCurve();
+            }
+
+            drawVelocityCurve() {
+                const canvas = document.getElementById('velocityCurveCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Clear canvas
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw grid
+                ctx.strokeStyle = 'rgba(0, 255, 65, 0.1)';
+                ctx.lineWidth = 1;
+                
+                for (let i = 0; i <= 10; i++) {
+                    const x = (i / 10) * canvas.width;
+                    const y = (i / 10) * canvas.height;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                
+                // Draw curve
+                ctx.strokeStyle = '#00ff41';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i <= canvas.width; i++) {
+                    const normalizedInput = i / canvas.width;
+                    const output = this.applyCurve(normalizedInput, this.velocityCurve);
+                    const x = i;
+                    const y = canvas.height - (output * canvas.height);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                
+                // Draw current velocity point
+                const currentNormalized = this.currentVelocity / 127;
+                const currentOutput = this.applyCurve(currentNormalized, this.velocityCurve);
+                const currentX = currentNormalized * canvas.width;
+                const currentY = canvas.height - (currentOutput * canvas.height);
+                
+                ctx.fillStyle = '#ff4500';
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Labels
+                ctx.fillStyle = '#00ff41';
+                ctx.font = '12px Courier New';
+                ctx.fillText('0', 5, canvas.height - 5);
+                ctx.fillText('127', canvas.width - 25, canvas.height - 5);
+                ctx.fillText('0', 5, canvas.height - 5);
+                ctx.fillText('1.0', 5, 15);
+            }
+
+            applyCurve(input, curveType) {
+                switch (curveType) {
+                    case 'linear':
+                        return input;
+                    case 'exponential':
+                        return Math.pow(input, 2);
+                    case 'logarithmic':
+                        return Math.log(input * (Math.E - 1) + 1);
+                    case 's-curve':
+                        return 0.5 * (1 + Math.tanh(4 * (input - 0.5)));
+                    default:
+                        return input;
+                }
+            }
+
+            selectVelocityCurve(curve) {
+                // Update active curve
+                document.querySelectorAll('.curve-option').forEach(el => el.classList.remove('active'));
+                document.getElementById(curve + '-curve').classList.add('active');
+                
+                this.velocityCurve = curve;
+                this.drawVelocityCurve();
+                this.updateVelocityResponse();
+                
+                this.log(`Velocity curve changed to: ${curve}`);
+            }
+
+            updateVelocityResponse() {
+                const normalizedVelocity = this.currentVelocity / 127;
+                const curvedVelocity = this.applyCurve(normalizedVelocity, this.velocityCurve);
+                
+                // Calculate amplitude response
+                const baseAmplitude = curvedVelocity * this.sensitivity;
+                const amplitude = Math.max(0, Math.min(1, baseAmplitude));
+                
+                // Calculate timbre response (affects brightness and harmonic content)
+                const timbreBase = curvedVelocity * this.timbreResponse;
+                const timbre = Math.max(0, Math.min(1, timbreBase));
+                
+                // Update displays
+                document.getElementById('amplitudeFill').style.width = (amplitude * 100) + '%';
+                document.getElementById('amplitudeValue').textContent = amplitude.toFixed(3);
+                document.getElementById('actualAmplitude').textContent = amplitude.toFixed(3);
+                document.getElementById('expectedAmplitude').textContent = curvedVelocity.toFixed(3);
+                
+                document.getElementById('timbreFill').style.width = (timbre * 100) + '%';
+                document.getElementById('timbreValue').textContent = timbre.toFixed(3);
+                document.getElementById('timbreBrightness').textContent = Math.round(timbre * 100) + '%';
+                document.getElementById('timbreHarmonics').textContent = Math.round(timbre * 100) + '%';
+                
+                // Calculate accuracy
+                const expectedAmplitude = curvedVelocity;
+                const amplitudeAccuracy = 100 - Math.abs(amplitude - expectedAmplitude) * 100;
+                const timbreAccuracy = 100 - Math.abs(timbre - timbreBase) * 100;
+                
+                document.getElementById('amplitudeAccuracy').textContent = Math.round(amplitudeAccuracy) + '%';
+                document.getElementById('timbreAccuracy').textContent = Math.round(timbreAccuracy) + '%';
+                
+                // Update response graph with current point
+                this.updateResponseGraph(normalizedVelocity, amplitude, timbre);
+                this.drawVelocityCurve();
+            }
+
+            updateResponseGraph(velocity, amplitude, timbre) {
+                const canvas = document.getElementById('responseGraph');
+                const ctx = canvas.getContext('2d');
+                
+                // Add point to history
+                this.responseHistory.push({ velocity, amplitude, timbre, timestamp: Date.now() });
+                
+                // Keep only last 100 points
+                if (this.responseHistory.length > 100) {
+                    this.responseHistory.shift();
+                }
+                
+                // Redraw graph
+                this.setupResponseGraph();
+                
+                // Draw amplitude response curve
+                if (this.responseHistory.length > 1) {
+                    ctx.strokeStyle = '#00ff41';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.responseHistory.length; i++) {
+                        const point = this.responseHistory[i];
+                        const x = point.velocity * canvas.width;
+                        const y = canvas.height - (point.amplitude * canvas.height);
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                    
+                    // Draw timbre response curve
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.responseHistory.length; i++) {
+                        const point = this.responseHistory[i];
+                        const x = point.velocity * canvas.width;
+                        const y = canvas.height - (point.timbre * canvas.height);
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+                
+                // Draw current point
+                const currentX = velocity * canvas.width;
+                const currentY = canvas.height - (amplitude * canvas.height);
+                
+                ctx.fillStyle = '#ff4500';
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            async playTestNote() {
+                const startTime = performance.now();
+                
+                try {
+                    this.log(`🎵 Playing note ${this.currentNote} (${this.noteToName(this.currentNote)}) at velocity ${this.currentVelocity}`);
+                    
+                    // Simulate MIDI note on message
+                    const noteOnMessage = [
+                        0x90 + (this.currentChannel - 1),  // Note On + channel
+                        this.currentNote,                    // Note number
+                        this.currentVelocity                // Velocity
+                    ];
+                    
+                    const result = await this.simulateNoteOn(noteOnMessage);
+                    
+                    const latency = performance.now() - startTime;
+                    this.updatePerformanceMetrics(latency, result);
+                    
+                    if (result.success) {
+                        this.log(`✅ Note played successfully - Amplitude: ${result.amplitude.toFixed(3)}, Timbre: ${result.timbre.toFixed(3)}`);
+                    } else {
+                        this.log(`❌ Note playback failed: ${result.error}`);
+                    }
+                    
+                } catch (error) {
+                    const latency = performance.now() - startTime;
+                    this.updatePerformanceMetrics(latency, { success: false, error: error.message });
+                    this.log(`❌ Error playing note: ${error.message}`);
+                }
+            }
+
+            async simulateNoteOn(midiMessage) {
+                // Simulate MIDI note processing with velocity response
+                const processingDelay = 1 + Math.random() * 3; // 1-4ms
+                await this.delay(processingDelay);
+                
+                const velocity = midiMessage[2];
+                const normalizedVelocity = velocity / 127;
+                const curvedVelocity = this.applyCurve(normalizedVelocity, this.velocityCurve);
+                
+                // Calculate voice amplitude (affected by velocity)
+                const amplitude = Math.max(0, Math.min(1, curvedVelocity * this.sensitivity));
+                
+                // Calculate timbre response (brightness, harmonic content)
+                const timbre = Math.max(0, Math.min(1, curvedVelocity * this.timbreResponse));
+                
+                // Simulate filter cutoff adjustment based on velocity
+                const filterCutoff = 1000 + (timbre * 7000); // 1kHz - 8kHz range
+                
+                // Simulate envelope adjustment based on velocity
+                const envelopeAttack = Math.max(0.01, 0.1 - (normalizedVelocity * 0.08)); // Faster attack for higher velocity
+                const envelopeDecay = 0.3 + (normalizedVelocity * 0.4); // Longer decay for higher velocity
+                
+                return {
+                    success: true,
+                    amplitude: amplitude,
+                    timbre: timbre,
+                    filterCutoff: filterCutoff,
+                    envelopeAttack: envelopeAttack,
+                    envelopeDecay: envelopeDecay,
+                    processingTime: processingDelay
+                };
+            }
+
+            stopAllNotes() {
+                this.log('🛑 Stopping all active notes');
+                // Simulate stopping all notes
+            }
+
+            updatePerformanceMetrics(latency, result) {
+                this.performanceMetrics.testCount++;
+                this.performanceMetrics.totalLatency += latency;
+                this.performanceMetrics.responseLatency = this.performanceMetrics.totalLatency / this.performanceMetrics.testCount;
+                
+                if (result.success) {
+                    // Calculate accuracy based on expected vs actual response
+                    const expectedAmplitude = this.applyCurve(this.currentVelocity / 127, this.velocityCurve);
+                    const amplitudeError = Math.abs(result.amplitude - expectedAmplitude);
+                    const accuracy = Math.max(0, 100 - (amplitudeError * 100));
+                    
+                    this.performanceMetrics.accuracySum += accuracy;
+                    this.performanceMetrics.amplitudeAccuracy = this.performanceMetrics.accuracySum / this.performanceMetrics.testCount;
+                }
+                
+                // Update display
+                document.getElementById('responseLatency').textContent = this.performanceMetrics.responseLatency.toFixed(1) + 'ms';
+                document.getElementById('amplitudeAccuracy').textContent = Math.round(this.performanceMetrics.amplitudeAccuracy) + '%';
+                document.getElementById('testCount').textContent = this.performanceMetrics.testCount;
+            }
+
+            async testVelocitySequence() {
+                this.log('🎯 Starting velocity sweep test...');
+                
+                const velocities = [1, 16, 32, 48, 64, 80, 96, 112, 127];
+                
+                for (const velocity of velocities) {
+                    document.getElementById('velocitySlider').value = velocity;
+                    this.currentVelocity = velocity;
+                    document.getElementById('velocityValue').textContent = velocity;
+                    
+                    this.updateVelocityResponse();
+                    await this.playTestNote();
+                    
+                    await this.delay(300); // 300ms between notes
+                }
+                
+                this.log('✅ Velocity sweep test completed');
+            }
+
+            async testDynamicRange() {
+                this.log('📊 Testing dynamic range...');
+                
+                const testVelocities = [1, 32, 64, 96, 127];
+                const results = [];
+                
+                for (const velocity of testVelocities) {
+                    this.currentVelocity = velocity;
+                    this.updateVelocityResponse();
+                    
+                    const result = await this.simulateNoteOn([0x90, this.currentNote, velocity]);
+                    results.push({
+                        velocity: velocity,
+                        amplitude: result.amplitude,
+                        timbre: result.timbre
+                    });
+                    
+                    await this.delay(200);
+                }
+                
+                // Calculate dynamic range
+                const amplitudes = results.map(r => r.amplitude);
+                const minAmplitude = Math.min(...amplitudes);
+                const maxAmplitude = Math.max(...amplitudes);
+                const dynamicRange = maxAmplitude - minAmplitude;
+                
+                this.log(`Dynamic range: ${(dynamicRange * 100).toFixed(1)}% (${minAmplitude.toFixed(3)} - ${maxAmplitude.toFixed(3)})`);
+                this.log('✅ Dynamic range test completed');
+            }
+
+            async testVelocityCurves() {
+                this.log('📈 Testing velocity curves...');
+                
+                const curves = ['linear', 'exponential', 'logarithmic', 's-curve'];
+                
+                for (const curve of curves) {
+                    this.log(`Testing ${curve} curve...`);
+                    this.selectVelocityCurve(curve);
+                    
+                    // Test at multiple velocity points
+                    const testVelocities = [32, 64, 96];
+                    for (const velocity of testVelocities) {
+                        this.currentVelocity = velocity;
+                        this.updateVelocityResponse();
+                        await this.delay(100);
+                    }
+                    
+                    await this.delay(200);
+                }
+                
+                // Reset to linear
+                this.selectVelocityCurve('linear');
+                this.log('✅ Velocity curves test completed');
+            }
+
+            async testTimbreVariation() {
+                this.log('🎨 Testing timbre variation...');
+                
+                const timbreSettings = [0.25, 0.5, 0.75, 1.0];
+                const originalTimbre = this.timbreResponse;
+                
+                for (const timbre of timbreSettings) {
+                    this.timbreResponse = timbre;
+                    document.getElementById('timbreResponseSlider').value = timbre * 100;
+                    document.getElementById('timbreResponseValue').textContent = Math.round(timbre * 100) + '%';
+                    
+                    this.log(`Testing timbre response: ${Math.round(timbre * 100)}%`);
+                    
+                    // Test at different velocities
+                    for (const velocity of [32, 64, 96, 127]) {
+                        this.currentVelocity = velocity;
+                        this.updateVelocityResponse();
+                        await this.delay(150);
+                    }
+                    
+                    await this.delay(200);
+                }
+                
+                // Reset to original
+                this.timbreResponse = originalTimbre;
+                document.getElementById('timbreResponseSlider').value = originalTimbre * 100;
+                document.getElementById('timbreResponseValue').textContent = Math.round(originalTimbre * 100) + '%';
+                
+                this.log('✅ Timbre variation test completed');
+            }
+
+            async testRapidVelocities() {
+                this.log('⚡ Testing rapid velocity changes...');
+                
+                const rapidVelocities = [127, 1, 96, 32, 80, 48, 112, 16, 64];
+                
+                for (const velocity of rapidVelocities) {
+                    document.getElementById('velocitySlider').value = velocity;
+                    this.currentVelocity = velocity;
+                    document.getElementById('velocityValue').textContent = velocity;
+                    
+                    this.updateVelocityResponse();
+                    await this.playTestNote();
+                    
+                    await this.delay(50); // 50ms rapid changes
+                }
+                
+                this.log('✅ Rapid velocity changes test completed');
+            }
+
+            async testVelocityStress() {
+                this.log('🔥 Starting velocity stress test...');
+                
+                const startTime = Date.now();
+                const duration = 10000; // 10 seconds
+                let testCount = 0;
+                
+                while (Date.now() - startTime < duration) {
+                    const randomVelocity = Math.floor(Math.random() * 127) + 1;
+                    
+                    this.currentVelocity = randomVelocity;
+                    this.updateVelocityResponse();
+                    
+                    const result = await this.simulateNoteOn([0x90, this.currentNote, randomVelocity]);
+                    testCount++;
+                    
+                    await this.delay(10); // 10ms intervals
+                }
+                
+                this.log(`✅ Stress test completed: ${testCount} velocity changes in 10 seconds`);
+            }
+
+            async startAutomatedTests() {
+                this.log('🤖 Starting comprehensive automated velocity response tests...');
+                
+                await this.testVelocitySequence();
+                await this.delay(500);
+                
+                await this.testDynamicRange();
+                await this.delay(500);
+                
+                await this.testVelocityCurves();
+                await this.delay(500);
+                
+                await this.testTimbreVariation();
+                await this.delay(500);
+                
+                await this.testRapidVelocities();
+                await this.delay(500);
+                
+                await this.testVelocityStress();
+                
+                this.log('🏆 All automated tests completed successfully!');
+                this.exportTestResults();
+            }
+
+            exportTestResults() {
+                const results = {
+                    timestamp: new Date().toISOString(),
+                    testConfiguration: {
+                        velocityCurve: this.velocityCurve,
+                        sensitivity: this.sensitivity,
+                        timbreResponse: this.timbreResponse,
+                        testNote: this.currentNote,
+                        testProgram: this.currentProgram,
+                        testChannel: this.currentChannel
+                    },
+                    performanceMetrics: this.performanceMetrics,
+                    responseHistory: this.responseHistory
+                };
+                
+                const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `velocity-response-test-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                this.log('📄 Test results exported to JSON file');
+            }
+
+            noteToName(noteNumber) {
+                const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                const octave = Math.floor(noteNumber / 12) - 1;
+                const note = notes[noteNumber % 12];
+                return `${note}${octave}`;
+            }
+
+            clearDebugLog() {
+                document.getElementById('debug-log').value = '';
+            }
+
+            log(message) {
+                const debugLog = document.getElementById('debug-log');
+                const timestamp = new Date().toLocaleTimeString();
+                debugLog.value += `[${timestamp}] ${message}\n`;
+                debugLog.scrollTop = debugLog.scrollHeight;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize the test when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            window.velocityTest = new VelocityResponseTest();
+        });
+    </script>
+</body>
+</html>

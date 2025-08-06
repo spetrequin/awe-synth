@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI File Drag & Drop Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1400px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #00ff00;
+            color: #000;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .drop-zone {
+            width: 100%;
+            height: 200px;
+            border: 3px dashed #666;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+            color: #888;
+            font-size: 18px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .drop-zone.hover {
+            border-color: #00ff00;
+            background: #002200;
+            color: #00ff00;
+            transform: scale(1.02);
+        }
+
+        .drop-zone.active {
+            border-color: #00ffff;
+            background: #003333;
+            color: #00ffff;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .midi-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .midi-info-panel {
+            background: #111;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+
+        .panel-title {
+            color: #00ffff;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px dotted #333;
+        }
+
+        .info-label {
+            color: #888;
+        }
+
+        .info-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .track-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            background: #000;
+        }
+
+        .track-item {
+            padding: 8px;
+            margin: 4px 0;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .track-item:hover {
+            background: #222;
+            border-color: #00ff00;
+        }
+
+        .track-item.active {
+            background: #003300;
+            border-color: #00ff00;
+        }
+
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .track-details {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+
+        .position-slider {
+            flex: 1;
+            margin: 0 15px;
+        }
+
+        .time-display {
+            color: #00ffff;
+            font-weight: bold;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .file-list {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 4px 0;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-item:hover {
+            background: #222;
+            border-color: #00ff00;
+        }
+
+        .file-item.selected {
+            background: #003300;
+            border-color: #00ff00;
+        }
+
+        .file-name {
+            font-weight: bold;
+        }
+
+        .file-size {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .file-actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .test-log {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .midi-info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .playback-controls {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 MIDI File Drag & Drop Test</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <div class="test-controls">
+            <button id="start-drag-drop-test">Start Drag & Drop Test</button>
+            <button id="test-file-formats">Test File Formats</button>
+            <button id="test-file-sizes">Test File Sizes</button>
+            <button id="browse-files">Browse Files</button>
+            <button id="clear-files">Clear All Files</button>
+            <button id="clear-log">Clear Log</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Files Loaded</div>
+                <div class="stat-value" id="files-loaded">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Total Size</div>
+                <div class="stat-value" id="total-size">0 KB</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Load Success Rate</div>
+                <div class="stat-value" id="success-rate">0%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Average Load Time</div>
+                <div class="stat-value" id="avg-load-time">0ms</div>
+            </div>
+        </div>
+
+        <div class="drop-zone" id="drop-zone">
+            <div>
+                <div>📁 Drop MIDI files here</div>
+                <div style="font-size: 14px; margin-top: 10px; color: #666;">
+                    Supports: .mid, .midi, .kar files<br>
+                    Multiple files supported
+                </div>
+            </div>
+        </div>
+
+        <input type="file" id="file-input" class="file-input" multiple accept=".mid,.midi,.kar">
+
+        <div class="file-list" id="file-list">
+            <div style="color: #888; text-align: center; font-style: italic;">
+                No MIDI files loaded yet
+            </div>
+        </div>
+
+        <div class="midi-info-grid">
+            <!-- File Information Panel -->
+            <div class="midi-info-panel">
+                <div class="panel-title">File Information</div>
+                <div id="file-info">
+                    <div class="info-item">
+                        <span class="info-label">File Name:</span>
+                        <span class="info-value" id="file-name">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">File Size:</span>
+                        <span class="info-value" id="file-size">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Format:</span>
+                        <span class="info-value" id="file-format">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Division:</span>
+                        <span class="info-value" id="file-division">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Load Time:</span>
+                        <span class="info-value" id="load-time">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MIDI Content Panel -->
+            <div class="midi-info-panel">
+                <div class="panel-title">MIDI Content</div>
+                <div id="midi-content">
+                    <div class="info-item">
+                        <span class="info-label">Tracks:</span>
+                        <span class="info-value" id="track-count">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Duration:</span>
+                        <span class="info-value" id="duration">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Tempo:</span>
+                        <span class="info-value" id="tempo">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Time Signature:</span>
+                        <span class="info-value" id="time-signature">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Events:</span>
+                        <span class="info-value" id="event-count">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Track Information Panel -->
+            <div class="midi-info-panel">
+                <div class="panel-title">Track Information</div>
+                <div class="track-list" id="track-list">
+                    <div style="color: #888; text-align: center; font-style: italic;">
+                        No tracks loaded
+                    </div>
+                </div>
+            </div>
+
+            <!-- Playback Controls Panel -->
+            <div class="midi-info-panel">
+                <div class="panel-title">Playback Controls</div>
+                <div class="playback-controls">
+                    <button id="play-btn" disabled>▶️ Play</button>
+                    <button id="pause-btn" disabled>⏸️ Pause</button>
+                    <button id="stop-btn" disabled>⏹️ Stop</button>
+                    <input type="range" id="position-slider" class="position-slider" min="0" max="100" value="0" disabled>
+                    <div class="time-display" id="time-display">00:00 / 00:00</div>
+                </div>
+            </div>
+        </div>
+
+        <h3>MIDI Drag & Drop Test Log</h3>
+        <div class="test-log" id="test-log">
+            MIDI file drag & drop test log will appear here...
+        </div>
+    </div>
+
+    <script type="module">
+        import { init } from './awe_synth.js';
+
+        class MidiDragDropTester {
+            constructor() {
+                this.midiPlayer = null;
+                this.loadedFiles = new Map();
+                this.currentFile = null;
+                this.loadStats = {
+                    successful: 0,
+                    failed: 0,
+                    totalSize: 0,
+                    totalLoadTime: 0
+                };
+                
+                this.initializeUI();
+            }
+
+            async initialize(midiPlayer) {
+                this.midiPlayer = midiPlayer;
+                this.log('✅ MIDI Drag & Drop Tester initialized', 'success');
+            }
+
+            initializeUI() {
+                // Test buttons
+                document.getElementById('start-drag-drop-test').addEventListener('click', () => this.startDragDropTest());
+                document.getElementById('test-file-formats').addEventListener('click', () => this.testFileFormats());
+                document.getElementById('test-file-sizes').addEventListener('click', () => this.testFileSizes());
+                document.getElementById('browse-files').addEventListener('click', () => this.browseFiles());
+                document.getElementById('clear-files').addEventListener('click', () => this.clearFiles());
+                document.getElementById('clear-log').addEventListener('click', () => this.clearLog());
+
+                // Drag & drop setup
+                this.setupDragDrop();
+
+                // File input
+                document.getElementById('file-input').addEventListener('change', (e) => this.handleFileSelect(e));
+
+                // Playback controls
+                document.getElementById('play-btn').addEventListener('click', () => this.playCurrentFile());
+                document.getElementById('pause-btn').addEventListener('click', () => this.pausePlayback());
+                document.getElementById('stop-btn').addEventListener('click', () => this.stopPlayback());
+                document.getElementById('position-slider').addEventListener('input', (e) => this.seekPosition(e.target.value));
+            }
+
+            setupDragDrop() {
+                const dropZone = document.getElementById('drop-zone');
+
+                // Prevent default drag behaviors
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, this.preventDefaults, false);
+                    document.body.addEventListener(eventName, this.preventDefaults, false);
+                });
+
+                // Highlight drop zone when item is dragged over it
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, () => dropZone.classList.add('hover'), false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, () => dropZone.classList.remove('hover'), false);
+                });
+
+                // Handle dropped files
+                dropZone.addEventListener('drop', (e) => this.handleDrop(e), false);
+
+                // Click to browse
+                dropZone.addEventListener('click', () => this.browseFiles());
+            }
+
+            preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            async handleDrop(e) {
+                const dropZone = document.getElementById('drop-zone');
+                dropZone.classList.add('active');
+                
+                const dt = e.dataTransfer;
+                const files = dt.files;
+
+                this.log(`📁 Files dropped: ${files.length}`, 'info');
+                await this.processFiles(files);
+
+                setTimeout(() => dropZone.classList.remove('active'), 500);
+            }
+
+            async handleFileSelect(e) {
+                const files = e.target.files;
+                this.log(`📁 Files selected: ${files.length}`, 'info');
+                await this.processFiles(files);
+            }
+
+            async processFiles(files) {
+                for (let file of files) {
+                    await this.processFile(file);
+                }
+                this.updateStats();
+                this.updateFileList();
+            }
+
+            async processFile(file) {
+                const startTime = performance.now();
+                
+                try {
+                    this.log(`📄 Processing: ${file.name} (${this.formatFileSize(file.size)})`);
+                    
+                    // Validate file type
+                    if (!this.isValidMidiFile(file)) {
+                        throw new Error(`Invalid file type: ${file.name}`);
+                    }
+
+                    // Read file data
+                    const arrayBuffer = await this.readFileAsArrayBuffer(file);
+                    const loadTime = performance.now() - startTime;
+
+                    // Try to parse MIDI data (if available)
+                    let midiInfo = null;
+                    try {
+                        midiInfo = await this.parseMidiInfo(arrayBuffer);
+                    } catch (parseError) {
+                        this.log(`⚠️ Could not parse MIDI info: ${parseError.message}`, 'warning');
+                    }
+
+                    // Store file information
+                    const fileInfo = {
+                        file: file,
+                        name: file.name,
+                        size: file.size,
+                        data: arrayBuffer,
+                        loadTime: loadTime,
+                        midiInfo: midiInfo,
+                        loaded: true
+                    };
+
+                    this.loadedFiles.set(file.name, fileInfo);
+                    this.loadStats.successful++;
+                    this.loadStats.totalSize += file.size;
+                    this.loadStats.totalLoadTime += loadTime;
+
+                    this.log(`✅ Loaded: ${file.name} (${loadTime.toFixed(2)}ms)`, 'success');
+
+                } catch (error) {
+                    this.loadStats.failed++;
+                    this.log(`❌ Failed to load ${file.name}: ${error.message}`, 'error');
+                }
+            }
+
+            isValidMidiFile(file) {
+                const validExtensions = ['.mid', '.midi', '.kar'];
+                const fileName = file.name.toLowerCase();
+                return validExtensions.some(ext => fileName.endsWith(ext));
+            }
+
+            readFileAsArrayBuffer(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(new Error('File read error'));
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            async parseMidiInfo(arrayBuffer) {
+                // Basic MIDI file header parsing
+                const view = new DataView(arrayBuffer);
+                
+                // Check for MThd header
+                const header = new TextDecoder().decode(new Uint8Array(arrayBuffer, 0, 4));
+                if (header !== 'MThd') {
+                    throw new Error('Not a valid MIDI file (missing MThd header)');
+                }
+
+                const headerLength = view.getUint32(4, false);
+                const format = view.getUint16(8, false);
+                const tracks = view.getUint16(10, false);
+                const division = view.getUint16(12, false);
+
+                return {
+                    format: format,
+                    tracks: tracks,
+                    division: division,
+                    headerLength: headerLength
+                };
+            }
+
+            updateFileList() {
+                const fileList = document.getElementById('file-list');
+                
+                if (this.loadedFiles.size === 0) {
+                    fileList.innerHTML = '<div style="color: #888; text-align: center; font-style: italic;">No MIDI files loaded yet</div>';
+                    return;
+                }
+
+                let html = '';
+                for (const [fileName, fileInfo] of this.loadedFiles) {
+                    const isSelected = this.currentFile && this.currentFile.name === fileName;
+                    html += `
+                        <div class="file-item ${isSelected ? 'selected' : ''}" data-file="${fileName}">
+                            <div>
+                                <div class="file-name">${fileName}</div>
+                                <div class="file-size">${this.formatFileSize(fileInfo.size)} • ${fileInfo.loadTime.toFixed(1)}ms</div>
+                            </div>
+                            <div class="file-actions">
+                                <button onclick="window.midiTester.selectFile('${fileName}')">Select</button>
+                                <button onclick="window.midiTester.removeFile('${fileName}')">Remove</button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                fileList.innerHTML = html;
+            }
+
+            selectFile(fileName) {
+                const fileInfo = this.loadedFiles.get(fileName);
+                if (!fileInfo) return;
+
+                this.currentFile = fileInfo;
+                this.updateFileList();
+                this.displayFileInfo(fileInfo);
+                this.enablePlaybackControls();
+                
+                this.log(`📋 Selected file: ${fileName}`, 'info');
+            }
+
+            removeFile(fileName) {
+                this.loadedFiles.delete(fileName);
+                if (this.currentFile && this.currentFile.name === fileName) {
+                    this.currentFile = null;
+                    this.clearFileInfo();
+                    this.disablePlaybackControls();
+                }
+                this.updateFileList();
+                this.updateStats();
+                this.log(`🗑️ Removed file: ${fileName}`, 'info');
+            }
+
+            displayFileInfo(fileInfo) {
+                document.getElementById('file-name').textContent = fileInfo.name;
+                document.getElementById('file-size').textContent = this.formatFileSize(fileInfo.size);
+                document.getElementById('load-time').textContent = `${fileInfo.loadTime.toFixed(2)}ms`;
+
+                if (fileInfo.midiInfo) {
+                    document.getElementById('file-format').textContent = `Type ${fileInfo.midiInfo.format}`;
+                    document.getElementById('file-division').textContent = fileInfo.midiInfo.division;
+                    document.getElementById('track-count').textContent = fileInfo.midiInfo.tracks;
+                    
+                    // Estimate duration and other info
+                    document.getElementById('duration').textContent = 'Analyzing...';
+                    document.getElementById('tempo').textContent = '120 BPM (default)';
+                    document.getElementById('time-signature').textContent = '4/4 (default)';
+                    document.getElementById('event-count').textContent = 'Calculating...';
+                } else {
+                    document.getElementById('file-format').textContent = 'Unknown';
+                    document.getElementById('file-division').textContent = '-';
+                    document.getElementById('track-count').textContent = '-';
+                    document.getElementById('duration').textContent = '-';
+                    document.getElementById('tempo').textContent = '-';
+                    document.getElementById('time-signature').textContent = '-';
+                    document.getElementById('event-count').textContent = '-';
+                }
+
+                this.updateTrackList(fileInfo);
+            }
+
+            updateTrackList(fileInfo) {
+                const trackList = document.getElementById('track-list');
+                
+                if (!fileInfo.midiInfo) {
+                    trackList.innerHTML = '<div style="color: #888; text-align: center; font-style: italic;">Track info not available</div>';
+                    return;
+                }
+
+                let html = '';
+                for (let i = 0; i < fileInfo.midiInfo.tracks; i++) {
+                    html += `
+                        <div class="track-item">
+                            <div class="track-header">
+                                <span>Track ${i + 1}</span>
+                                <span style="color: #00ff00;">Active</span>
+                            </div>
+                            <div class="track-details">
+                                Channel: Auto • Events: Analyzing...
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                trackList.innerHTML = html;
+            }
+
+            clearFileInfo() {
+                document.getElementById('file-name').textContent = '-';
+                document.getElementById('file-size').textContent = '-';
+                document.getElementById('file-format').textContent = '-';
+                document.getElementById('file-division').textContent = '-';
+                document.getElementById('load-time').textContent = '-';
+                document.getElementById('track-count').textContent = '-';
+                document.getElementById('duration').textContent = '-';
+                document.getElementById('tempo').textContent = '-';
+                document.getElementById('time-signature').textContent = '-';
+                document.getElementById('event-count').textContent = '-';
+                
+                document.getElementById('track-list').innerHTML = '<div style="color: #888; text-align: center; font-style: italic;">No tracks loaded</div>';
+            }
+
+            enablePlaybackControls() {
+                document.getElementById('play-btn').disabled = false;
+                document.getElementById('pause-btn').disabled = false;
+                document.getElementById('stop-btn').disabled = false;
+                document.getElementById('position-slider').disabled = false;
+            }
+
+            disablePlaybackControls() {
+                document.getElementById('play-btn').disabled = true;
+                document.getElementById('pause-btn').disabled = true;
+                document.getElementById('stop-btn').disabled = true;
+                document.getElementById('position-slider').disabled = true;
+            }
+
+            updateStats() {
+                const total = this.loadStats.successful + this.loadStats.failed;
+                const successRate = total > 0 ? (this.loadStats.successful / total * 100) : 0;
+                const avgLoadTime = this.loadStats.successful > 0 ? (this.loadStats.totalLoadTime / this.loadStats.successful) : 0;
+
+                document.getElementById('files-loaded').textContent = this.loadStats.successful;
+                document.getElementById('total-size').textContent = this.formatFileSize(this.loadStats.totalSize);
+                document.getElementById('success-rate').textContent = `${successRate.toFixed(1)}%`;
+                document.getElementById('avg-load-time').textContent = `${avgLoadTime.toFixed(1)}ms`;
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            }
+
+            // Test methods
+            async startDragDropTest() {
+                this.log('🧪 Starting drag & drop interface test...', 'info');
+                this.log('📋 Test checklist:');
+                this.log('  1. Drag MIDI files from file explorer');
+                this.log('  2. Drop files on the drop zone');
+                this.log('  3. Verify file loading and parsing');
+                this.log('  4. Check file information display');
+                this.log('  5. Test playback controls');
+                this.log('✋ Manual testing required - drag files to continue');
+            }
+
+            async testFileFormats() {
+                this.log('🎵 Testing file format support...', 'info');
+                this.log('📄 Supported formats: .mid, .midi, .kar');
+                this.log('💡 Try dropping files with different extensions');
+            }
+
+            async testFileSizes() {
+                this.log('📊 Testing file size handling...', 'info');
+                this.log('📏 Recommended test sizes:');
+                this.log('  • Small files: < 10KB');
+                this.log('  • Medium files: 10KB - 100KB');  
+                this.log('  • Large files: > 100KB');
+                this.log('⏱️ Monitor load times for performance');
+            }
+
+            browseFiles() {
+                document.getElementById('file-input').click();
+            }
+
+            clearFiles() {
+                this.loadedFiles.clear();
+                this.currentFile = null;
+                this.loadStats = {
+                    successful: 0,
+                    failed: 0,
+                    totalSize: 0,
+                    totalLoadTime: 0
+                };
+                
+                this.updateFileList();
+                this.updateStats();
+                this.clearFileInfo();
+                this.disablePlaybackControls();
+                
+                this.log('🗑️ All files cleared', 'info');
+            }
+
+            // Playback methods (simplified for testing)
+            async playCurrentFile() {
+                if (!this.currentFile) {
+                    this.log('❌ No file selected for playback', 'error');
+                    return;
+                }
+
+                this.log(`▶️ Playing: ${this.currentFile.name}`, 'info');
+                
+                // Try to load MIDI file into player
+                if (this.midiPlayer) {
+                    try {
+                        // This would typically call the WASM MIDI player
+                        // For now, just simulate playback
+                        this.log('🎵 MIDI playback started', 'success');
+                    } catch (error) {
+                        this.log(`❌ Playback error: ${error.message}`, 'error');
+                    }
+                }
+            }
+
+            pausePlayback() {
+                this.log('⏸️ Playback paused', 'info');
+            }
+
+            stopPlayback() {
+                this.log('⏹️ Playback stopped', 'info');
+                document.getElementById('position-slider').value = 0;
+                document.getElementById('time-display').textContent = '00:00 / 00:00';
+            }
+
+            seekPosition(value) {
+                this.log(`⏭️ Seeking to position: ${value}%`, 'info');
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                
+                const logDiv = document.getElementById('test-log');
+                logDiv.textContent += logEntry + '\n';
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            clearLog() {
+                document.getElementById('test-log').textContent = 'MIDI file drag & drop test log cleared.\n';
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                const module = await init();
+                const midiPlayer = new module.MidiPlayer();
+                
+                window.midiTester = new MidiDragDropTester();
+                await window.midiTester.initialize(midiPlayer);
+                
+                // Store for debugging
+                window.midiPlayer = midiPlayer;
+                
+                console.log('✅ MIDI Drag & Drop Test initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('test-log').textContent = 
+                    `❌ Failed to initialize: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

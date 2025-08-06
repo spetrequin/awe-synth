@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI CC Controls Test - AWE Player</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .test-section {
+            margin: 20px auto;
+            max-width: 1400px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .control-panel {
+            background: #111;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .control-panel.active {
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .control-title {
+            color: #00ffff;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .slider {
+            width: 100%;
+            height: 30px;
+            background: #222;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 28px;
+            background: #00ff00;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 28px;
+            background: #00ff00;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .value-display {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .pitch-bend-wheel {
+            width: 60px;
+            height: 150px;
+            background: #222;
+            border: 2px solid #00ff00;
+            border-radius: 30px;
+            margin: 10px auto;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .pitch-bend-indicator {
+            width: 50px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 10px;
+            position: absolute;
+            left: 3px;
+            top: 65px;
+            transition: top 0.1s;
+            pointer-events: none;
+        }
+
+        .pedal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .pedal-button {
+            padding: 15px 25px;
+            background: #222;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .pedal-button:hover {
+            background: #003300;
+        }
+
+        .pedal-button.active {
+            background: #00ff00;
+            color: #000;
+            transform: translateY(2px);
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #222;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #00ff00;
+            color: #000;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .cc-message-log {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .response-time {
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .response-good { color: #00ff00; }
+        .response-warning { color: #ffff00; }
+        .response-bad { color: #ff0000; }
+
+        .keyboard-shortcuts {
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            font-size: 12px;
+        }
+
+        .cc-value-table {
+            margin: 15px 0;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        .cc-value-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cc-value-table th,
+        .cc-value-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+        }
+
+        .cc-value-table th {
+            background: #222;
+            color: #00ffff;
+        }
+
+        @media (max-width: 768px) {
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎛️ MIDI CC Controls Real-Time Test</h1>
+
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <div class="test-controls">
+            <button id="start-cc-test">Start CC Response Test</button>
+            <button id="test-pitch-bend">Test Pitch Bend Range</button>
+            <button id="test-modulation">Test Modulation Response</button>
+            <button id="test-sustain">Test Sustain Pedal</button>
+            <button id="test-all-cc">Test All CC Controllers</button>
+            <button id="play-test-note">Play Test Note</button>
+            <button id="stop-all-notes">Stop All Notes</button>
+            <button id="clear-log">Clear Log</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">CC Messages Sent</div>
+                <div class="stat-value" id="cc-count">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Avg Response Time</div>
+                <div class="stat-value" id="avg-response">0ms</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Active Controllers</div>
+                <div class="stat-value" id="active-cc">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Test Status</div>
+                <div class="stat-value" id="test-status">Ready</div>
+            </div>
+        </div>
+
+        <div class="controls-grid">
+            <!-- Pitch Bend Control -->
+            <div class="control-panel" id="pitch-bend-panel">
+                <div class="control-title">Pitch Bend Wheel</div>
+                <div class="pitch-bend-wheel" id="pitch-bend-wheel">
+                    <div class="pitch-bend-indicator" id="pitch-bend-indicator"></div>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Pitch Bend:</span>
+                        <span class="value-display" id="pitch-bend-value">8192 (center)</span>
+                    </div>
+                    <input type="range" class="slider" id="pitch-bend-slider" 
+                           min="0" max="16383" value="8192" step="1">
+                </div>
+                <div class="response-time" id="pitch-bend-response">Response: Ready</div>
+            </div>
+
+            <!-- Modulation Wheel -->
+            <div class="control-panel" id="mod-wheel-panel">
+                <div class="control-title">Modulation Wheel (CC 1)</div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Modulation:</span>
+                        <span class="value-display" id="mod-wheel-value">0</span>
+                    </div>
+                    <input type="range" class="slider" id="mod-wheel-slider" 
+                           min="0" max="127" value="0" step="1">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Mod Depth:</span>
+                        <span class="value-display" id="mod-depth-value">64</span>
+                    </div>
+                    <input type="range" class="slider" id="mod-depth-slider" 
+                           min="0" max="127" value="64" step="1">
+                </div>
+                <div class="response-time" id="mod-wheel-response">Response: Ready</div>
+            </div>
+
+            <!-- Sustain Pedal -->
+            <div class="control-panel" id="sustain-panel">
+                <div class="control-title">Sustain Pedal (CC 64)</div>
+                <div class="pedal-buttons">
+                    <div class="pedal-button" id="sustain-pedal">Sustain Pedal</div>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Sustain Value:</span>
+                        <span class="value-display" id="sustain-value">0 (Off)</span>
+                    </div>
+                    <input type="range" class="slider" id="sustain-slider" 
+                           min="0" max="127" value="0" step="1">
+                </div>
+                <div class="response-time" id="sustain-response">Response: Ready</div>
+            </div>
+
+            <!-- Volume & Expression -->
+            <div class="control-panel" id="volume-panel">
+                <div class="control-title">Volume & Expression</div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Volume (CC 7):</span>
+                        <span class="value-display" id="volume-value">100</span>
+                    </div>
+                    <input type="range" class="slider" id="volume-slider" 
+                           min="0" max="127" value="100" step="1">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Expression (CC 11):</span>
+                        <span class="value-display" id="expression-value">127</span>
+                    </div>
+                    <input type="range" class="slider" id="expression-slider" 
+                           min="0" max="127" value="127" step="1">
+                </div>
+                <div class="response-time" id="volume-response">Response: Ready</div>
+            </div>
+
+            <!-- Pan & Balance -->
+            <div class="control-panel" id="pan-panel">
+                <div class="control-title">Pan & Balance</div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Pan (CC 10):</span>
+                        <span class="value-display" id="pan-value">64 (Center)</span>
+                    </div>
+                    <input type="range" class="slider" id="pan-slider" 
+                           min="0" max="127" value="64" step="1">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Balance (CC 8):</span>
+                        <span class="value-display" id="balance-value">64 (Center)</span>
+                    </div>
+                    <input type="range" class="slider" id="balance-slider" 
+                           min="0" max="127" value="64" step="1">
+                </div>
+                <div class="response-time" id="pan-response">Response: Ready</div>
+            </div>
+
+            <!-- Effects Controls -->
+            <div class="control-panel" id="effects-panel">
+                <div class="control-title">Effects Send</div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Reverb (CC 91):</span>
+                        <span class="value-display" id="reverb-value">40</span>
+                    </div>
+                    <input type="range" class="slider" id="reverb-slider" 
+                           min="0" max="127" value="40" step="1">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Chorus (CC 93):</span>
+                        <span class="value-display" id="chorus-value">0</span>
+                    </div>
+                    <input type="range" class="slider" id="chorus-slider" 
+                           min="0" max="127" value="0" step="1">
+                </div>
+                <div class="response-time" id="effects-response">Response: Ready</div>
+            </div>
+        </div>
+
+        <div class="keyboard-shortcuts">
+            <h3>Keyboard Shortcuts</h3>
+            <div class="shortcut-grid">
+                <span><strong>Space:</strong></span><span>Sustain pedal toggle</span>
+                <span><strong>↑/↓ Arrow:</strong></span><span>Pitch bend up/down</span>
+                <span><strong>W/S:</strong></span><span>Modulation wheel up/down</span>
+                <span><strong>Q/A:</strong></span><span>Volume up/down</span>
+                <span><strong>E/D:</strong></span><span>Expression up/down</span>
+                <span><strong>R/F:</strong></span><span>Pan left/right</span>
+                <span><strong>Enter:</strong></span><span>Play test note</span>
+                <span><strong>Escape:</strong></span><span>Stop all notes</span>
+            </div>
+        </div>
+
+        <div class="cc-value-table">
+            <h3>MIDI CC Reference</h3>
+            <table>
+                <thead>
+                    <tr><th>CC#</th><th>Controller</th><th>Current Value</th><th>Description</th></tr>
+                </thead>
+                <tbody id="cc-reference-table">
+                    <tr><td>1</td><td>Modulation</td><td id="cc1-value">0</td><td>LFO depth, vibrato</td></tr>
+                    <tr><td>7</td><td>Volume</td><td id="cc7-value">100</td><td>Channel volume</td></tr>
+                    <tr><td>8</td><td>Balance</td><td id="cc8-value">64</td><td>Left/right balance</td></tr>
+                    <tr><td>10</td><td>Pan</td><td id="cc10-value">64</td><td>Stereo position</td></tr>
+                    <tr><td>11</td><td>Expression</td><td id="cc11-value">127</td><td>Dynamic expression</td></tr>
+                    <tr><td>64</td><td>Sustain</td><td id="cc64-value">0</td><td>Sustain pedal on/off</td></tr>
+                    <tr><td>91</td><td>Reverb</td><td id="cc91-value">40</td><td>Reverb send level</td></tr>
+                    <tr><td>93</td><td>Chorus</td><td id="cc93-value">0</td><td>Chorus send level</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>MIDI CC Message Log</h3>
+        <div class="cc-message-log" id="cc-message-log">
+            CC message log will appear here...
+        </div>
+    </div>
+
+    <script type="module">
+        import { init } from './awe_synth.js';
+
+        class CCControlTester {
+            constructor() {
+                this.midiPlayer = null;
+                this.isRunning = false;
+                this.ccCount = 0;
+                this.responseTimes = [];
+                this.activeControllers = new Set();
+                this.testNote = 60; // Middle C
+                this.currentChannel = 0;
+                this.sustainActive = false;
+                
+                this.initializeUI();
+                this.setupKeyboardShortcuts();
+            }
+
+            async initialize(midiPlayer) {
+                this.midiPlayer = midiPlayer;
+                this.log('✅ CC Control Tester initialized', 'success');
+            }
+
+            initializeUI() {
+                // Test buttons
+                document.getElementById('start-cc-test').addEventListener('click', () => this.startCCTest());
+                document.getElementById('test-pitch-bend').addEventListener('click', () => this.testPitchBendRange());
+                document.getElementById('test-modulation').addEventListener('click', () => this.testModulationResponse());
+                document.getElementById('test-sustain').addEventListener('click', () => this.testSustainPedal());
+                document.getElementById('test-all-cc').addEventListener('click', () => this.testAllCCControllers());
+                document.getElementById('play-test-note').addEventListener('click', () => this.playTestNote());
+                document.getElementById('stop-all-notes').addEventListener('click', () => this.stopAllNotes());
+                document.getElementById('clear-log').addEventListener('click', () => this.clearLog());
+
+                // Pitch bend controls
+                this.setupPitchBendWheel();
+                document.getElementById('pitch-bend-slider').addEventListener('input', (e) => {
+                    this.handlePitchBend(parseInt(e.target.value));
+                });
+
+                // CC sliders
+                this.setupCCSlider('mod-wheel-slider', 1);
+                this.setupCCSlider('volume-slider', 7);
+                this.setupCCSlider('balance-slider', 8);
+                this.setupCCSlider('pan-slider', 10);
+                this.setupCCSlider('expression-slider', 11);
+                this.setupCCSlider('sustain-slider', 64);
+                this.setupCCSlider('reverb-slider', 91);
+                this.setupCCSlider('chorus-slider', 93);
+
+                // Sustain pedal button
+                document.getElementById('sustain-pedal').addEventListener('click', () => {
+                    this.toggleSustainPedal();
+                });
+            }
+
+            setupPitchBendWheel() {
+                const wheel = document.getElementById('pitch-bend-wheel');
+                let isDragging = false;
+
+                const handlePitchBendMove = (clientY) => {
+                    const rect = wheel.getBoundingClientRect();
+                    const y = clientY - rect.top;
+                    const percent = Math.max(0, Math.min(1, 1 - (y / rect.height)));
+                    const value = Math.round(percent * 16383);
+                    
+                    document.getElementById('pitch-bend-slider').value = value;
+                    this.handlePitchBend(value);
+                };
+
+                wheel.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    handlePitchBendMove(e.clientY);
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        handlePitchBendMove(e.clientY);
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        // Return to center
+                        setTimeout(() => {
+                            document.getElementById('pitch-bend-slider').value = 8192;
+                            this.handlePitchBend(8192);
+                        }, 100);
+                    }
+                });
+
+                // Touch support
+                wheel.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    isDragging = true;
+                    handlePitchBendMove(e.touches[0].clientY);
+                });
+
+                document.addEventListener('touchmove', (e) => {
+                    if (isDragging) {
+                        e.preventDefault();
+                        handlePitchBendMove(e.touches[0].clientY);
+                    }
+                });
+
+                document.addEventListener('touchend', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        setTimeout(() => {
+                            document.getElementById('pitch-bend-slider').value = 8192;
+                            this.handlePitchBend(8192);
+                        }, 100);
+                    }
+                });
+            }
+
+            setupCCSlider(sliderId, ccNumber) {
+                const slider = document.getElementById(sliderId);
+                slider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.sendControlChange(ccNumber, value);
+                    this.updateCCDisplay(ccNumber, value);
+                });
+            }
+
+            setupKeyboardShortcuts() {
+                document.addEventListener('keydown', (e) => {
+                    switch(e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            this.toggleSustainPedal();
+                            break;
+                        case 'ArrowUp':
+                            e.preventDefault();
+                            this.adjustPitchBend(1000);
+                            break;
+                        case 'ArrowDown':
+                            e.preventDefault();
+                            this.adjustPitchBend(-1000);
+                            break;
+                        case 'KeyW':
+                            this.adjustCC(1, 5);
+                            break;
+                        case 'KeyS':
+                            this.adjustCC(1, -5);
+                            break;
+                        case 'KeyQ':
+                            this.adjustCC(7, 5);
+                            break;
+                        case 'KeyA':
+                            this.adjustCC(7, -5);
+                            break;
+                        case 'KeyE':
+                            this.adjustCC(11, 5);
+                            break;
+                        case 'KeyD':
+                            this.adjustCC(11, -5);
+                            break;
+                        case 'KeyR':
+                            this.adjustCC(10, 5);
+                            break;
+                        case 'KeyF':
+                            this.adjustCC(10, -5);
+                            break;
+                        case 'Enter':
+                            e.preventDefault();
+                            this.playTestNote();
+                            break;
+                        case 'Escape':
+                            this.stopAllNotes();
+                            break;
+                    }
+                });
+            }
+
+            // Test methods
+            async startCCTest() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.clearLog();
+                this.log('🎛️ Starting CC controls response test...', 'info');
+                this.updateStatus('Testing CC Response...');
+
+                // Test basic CC controllers
+                const controllers = [
+                    { cc: 1, name: 'Modulation', values: [0, 64, 127] },
+                    { cc: 7, name: 'Volume', values: [127, 64, 100] },
+                    { cc: 10, name: 'Pan', values: [0, 64, 127] },
+                    { cc: 11, name: 'Expression', values: [127, 64, 127] },
+                    { cc: 64, name: 'Sustain', values: [0, 127, 0] },
+                    { cc: 91, name: 'Reverb', values: [0, 40, 80] },
+                    { cc: 93, name: 'Chorus', values: [0, 64, 127] }
+                ];
+
+                this.playTestNote();
+
+                for (const controller of controllers) {
+                    if (!this.isRunning) break;
+                    
+                    this.log(`Testing ${controller.name} (CC ${controller.cc})...`);
+                    
+                    for (const value of controller.values) {
+                        const startTime = performance.now();
+                        this.sendControlChange(controller.cc, value);
+                        const responseTime = performance.now() - startTime;
+                        
+                        this.responseTimes.push(responseTime);
+                        this.updateResponseDisplay(controller.cc, responseTime);
+                        
+                        await this.delay(500);
+                    }
+                    
+                    await this.delay(200);
+                }
+
+                this.stopAllNotes();
+                this.log('✅ CC response test complete', 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testPitchBendRange() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🎵 Testing pitch bend range...', 'info');
+                this.updateStatus('Testing Pitch Bend...');
+
+                this.playTestNote();
+                await this.delay(500);
+
+                // Test pitch bend range
+                const bendValues = [0, 4096, 8192, 12288, 16383, 8192];
+                const bendNames = ['Max Down', '1/4 Down', 'Center', '1/4 Up', 'Max Up', 'Center'];
+
+                for (let i = 0; i < bendValues.length; i++) {
+                    this.log(`Pitch bend: ${bendNames[i]} (${bendValues[i]})`);
+                    
+                    const startTime = performance.now();
+                    this.handlePitchBend(bendValues[i]);
+                    const responseTime = performance.now() - startTime;
+                    
+                    this.responseTimes.push(responseTime);
+                    this.updateResponseDisplay('pitch-bend', responseTime);
+                    
+                    await this.delay(800);
+                }
+
+                this.stopAllNotes();
+                this.log('✅ Pitch bend test complete', 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testModulationResponse() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🌊 Testing modulation response...', 'info');
+                this.updateStatus('Testing Modulation...');
+
+                this.playTestNote();
+                await this.delay(500);
+
+                // Test modulation sweep
+                for (let value = 0; value <= 127; value += 8) {
+                    this.sendControlChange(1, value);
+                    this.updateCCDisplay(1, value);
+                    
+                    if (value % 32 === 0) {
+                        this.log(`Modulation: ${value}/127`);
+                    }
+                    
+                    await this.delay(100);
+                }
+
+                // Return to 0
+                this.sendControlChange(1, 0);
+                this.updateCCDisplay(1, 0);
+
+                this.stopAllNotes();
+                this.log('✅ Modulation test complete', 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testSustainPedal() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🦶 Testing sustain pedal...', 'info');
+                this.updateStatus('Testing Sustain...');
+
+                // Test sustain pedal behavior
+                this.log('Playing note without sustain...');
+                this.playTestNote();
+                await this.delay(1000);
+                this.stopAllNotes();
+                await this.delay(500);
+
+                this.log('Activating sustain pedal...');
+                this.sendControlChange(64, 127);
+                this.updateCCDisplay(64, 127);
+                
+                this.log('Playing note with sustain...');
+                this.playTestNote();
+                await this.delay(500);
+                this.sendNoteOff(this.currentChannel, this.testNote);
+                
+                this.log('Note should still be playing (sustained)...');
+                await this.delay(1500);
+                
+                this.log('Releasing sustain pedal...');
+                this.sendControlChange(64, 0);
+                this.updateCCDisplay(64, 0);
+                
+                await this.delay(500);
+                this.log('✅ Sustain pedal test complete', 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            async testAllCCControllers() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.log('🎛️ Testing all CC controllers...', 'info');
+                this.updateStatus('Testing All CC...');
+
+                // Test a wider range of CC controllers
+                const ccControllers = [
+                    1, 2, 4, 5, 7, 8, 10, 11, 64, 65, 66, 67, 91, 93, 120, 121, 123
+                ];
+
+                this.playTestNote();
+
+                for (const cc of ccControllers) {
+                    if (!this.isRunning) break;
+                    
+                    this.log(`Testing CC ${cc}...`);
+                    
+                    // Test range
+                    this.sendControlChange(cc, 0);
+                    await this.delay(100);
+                    this.sendControlChange(cc, 127);
+                    await this.delay(100);
+                    this.sendControlChange(cc, 64);
+                    await this.delay(200);
+                }
+
+                this.stopAllNotes();
+                this.log('✅ All CC controllers test complete', 'success');
+                this.updateStatus('Complete');
+                this.isRunning = false;
+            }
+
+            // Control handlers
+            handlePitchBend(value) {
+                const startTime = performance.now();
+                
+                // Send pitch bend message (0xE0-0xEF)
+                if (this.midiPlayer) {
+                    const lsb = value & 0x7F;
+                    const msb = (value >> 7) & 0x7F;
+                    
+                    const message = new Uint8Array([
+                        0xE0 | (this.currentChannel & 0x0F),
+                        lsb,
+                        msb
+                    ]);
+                    
+                    this.midiPlayer.send_midi_message(message);
+                }
+                
+                const responseTime = performance.now() - startTime;
+                this.responseTimes.push(responseTime);
+                
+                // Update display
+                const indicator = document.getElementById('pitch-bend-indicator');
+                const wheel = document.getElementById('pitch-bend-wheel');
+                const percent = value / 16383;
+                const top = (1 - percent) * (wheel.clientHeight - 20);
+                indicator.style.top = `${top}px`;
+                
+                document.getElementById('pitch-bend-value').textContent = 
+                    `${value} (${value === 8192 ? 'center' : value > 8192 ? 'up' : 'down'})`;
+                
+                this.updateResponseDisplay('pitch-bend', responseTime);
+                this.logCCMessage(`Pitch Bend: ${value}`);
+                
+                this.activeControllers.add('pitch-bend');
+                this.updateStats();
+            }
+
+            sendControlChange(cc, value) {
+                const startTime = performance.now();
+                
+                if (this.midiPlayer) {
+                    const message = new Uint8Array([
+                        0xB0 | (this.currentChannel & 0x0F),
+                        cc & 0x7F,
+                        value & 0x7F
+                    ]);
+                    
+                    this.midiPlayer.send_midi_message(message);
+                }
+                
+                const responseTime = performance.now() - startTime;
+                this.responseTimes.push(responseTime);
+                this.ccCount++;
+                
+                this.logCCMessage(`CC ${cc}: ${value}`);
+                this.activeControllers.add(cc);
+                this.updateStats();
+                
+                return responseTime;
+            }
+
+            toggleSustainPedal() {
+                this.sustainActive = !this.sustainActive;
+                const value = this.sustainActive ? 127 : 0;
+                
+                this.sendControlChange(64, value);
+                this.updateCCDisplay(64, value);
+                
+                const pedal = document.getElementById('sustain-pedal');
+                if (this.sustainActive) {
+                    pedal.classList.add('active');
+                } else {
+                    pedal.classList.remove('active');
+                }
+                
+                document.getElementById('sustain-slider').value = value;
+            }
+
+            adjustPitchBend(delta) {
+                const currentValue = parseInt(document.getElementById('pitch-bend-slider').value);
+                const newValue = Math.max(0, Math.min(16383, currentValue + delta));
+                document.getElementById('pitch-bend-slider').value = newValue;
+                this.handlePitchBend(newValue);
+            }
+
+            adjustCC(cc, delta) {
+                const sliderMap = {
+                    1: 'mod-wheel-slider',
+                    7: 'volume-slider',
+                    10: 'pan-slider',
+                    11: 'expression-slider'
+                };
+                
+                const sliderId = sliderMap[cc];
+                if (sliderId) {
+                    const slider = document.getElementById(sliderId);
+                    const currentValue = parseInt(slider.value);
+                    const newValue = Math.max(0, Math.min(127, currentValue + delta));
+                    slider.value = newValue;
+                    
+                    this.sendControlChange(cc, newValue);
+                    this.updateCCDisplay(cc, newValue);
+                }
+            }
+
+            // Display updates
+            updateCCDisplay(cc, value) {
+                const displays = {
+                    1: { element: 'mod-wheel-value', format: (v) => v.toString() },
+                    7: { element: 'volume-value', format: (v) => v.toString() },
+                    8: { element: 'balance-value', format: (v) => v === 64 ? '64 (Center)' : v.toString() },
+                    10: { element: 'pan-value', format: (v) => v === 64 ? '64 (Center)' : v < 64 ? `${v} (Left)` : `${v} (Right)` },
+                    11: { element: 'expression-value', format: (v) => v.toString() },
+                    64: { element: 'sustain-value', format: (v) => v >= 64 ? `${v} (On)` : `${v} (Off)` },
+                    91: { element: 'reverb-value', format: (v) => v.toString() },
+                    93: { element: 'chorus-value', format: (v) => v.toString() }
+                };
+                
+                const display = displays[cc];
+                if (display) {
+                    document.getElementById(display.element).textContent = display.format(value);
+                }
+                
+                // Update reference table
+                const tableCell = document.getElementById(`cc${cc}-value`);
+                if (tableCell) {
+                    tableCell.textContent = value;
+                }
+            }
+
+            updateResponseDisplay(controllerId, responseTime) {
+                const responseElement = document.getElementById(`${controllerId}-response`);
+                if (responseElement) {
+                    const className = responseTime < 5 ? 'response-good' : 
+                                    responseTime < 20 ? 'response-warning' : 'response-bad';
+                    responseElement.className = `response-time ${className}`;
+                    responseElement.textContent = `Response: ${responseTime.toFixed(2)}ms`;
+                }
+            }
+
+            updateStats() {
+                document.getElementById('cc-count').textContent = this.ccCount;
+                document.getElementById('active-cc').textContent = this.activeControllers.size;
+                
+                if (this.responseTimes.length > 0) {
+                    const avg = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+                    document.getElementById('avg-response').textContent = `${avg.toFixed(2)}ms`;
+                }
+            }
+
+            updateStatus(status) {
+                document.getElementById('test-status').textContent = status;
+            }
+
+            // MIDI helpers
+            playTestNote() {
+                this.sendNoteOn(this.currentChannel, this.testNote, 80);
+            }
+
+            stopAllNotes() {
+                // Send note off for test note
+                this.sendNoteOff(this.currentChannel, this.testNote);
+                
+                // Send all notes off (CC 123)
+                this.sendControlChange(123, 0);
+            }
+
+            sendNoteOn(channel, note, velocity) {
+                if (!this.midiPlayer) return;
+                
+                const message = new Uint8Array([
+                    0x90 | (channel & 0x0F),
+                    note & 0x7F,
+                    velocity & 0x7F
+                ]);
+                
+                this.midiPlayer.send_midi_message(message);
+            }
+
+            sendNoteOff(channel, note) {
+                if (!this.midiPlayer) return;
+                
+                const message = new Uint8Array([
+                    0x80 | (channel & 0x0F),
+                    note & 0x7F,
+                    0
+                ]);
+                
+                this.midiPlayer.send_midi_message(message);
+            }
+
+            // Utility methods
+            logCCMessage(message) {
+                const log = document.getElementById('cc-message-log');
+                const timestamp = new Date().toLocaleTimeString();
+                log.textContent += `[${timestamp}] ${message}\n`;
+                log.scrollTop = log.scrollHeight;
+            }
+
+            log(message, type = 'info') {
+                this.logCCMessage(message);
+            }
+
+            clearLog() {
+                document.getElementById('cc-message-log').textContent = 'CC message log cleared.\n';
+                this.ccCount = 0;
+                this.responseTimes = [];
+                this.activeControllers.clear();
+                this.updateStats();
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            try {
+                const module = await init();
+                const midiPlayer = new module.MidiPlayer();
+                
+                window.ccTester = new CCControlTester();
+                await window.ccTester.initialize(midiPlayer);
+                
+                // Store for debugging
+                window.midiPlayer = midiPlayer;
+                
+                console.log('✅ CC Controls Test initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('cc-message-log').textContent = 
+                    `❌ Failed to initialize: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
