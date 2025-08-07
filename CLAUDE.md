@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**⚠️ CRITICAL INSTRUCTION: Always read BOTH this file (CLAUDE.md) AND the ARCHITECTURE.md file completely before starting any work on this project.**
+**⚠️ CRITICAL INSTRUCTION: Always read BOTH this file (CLAUDE.md) AND the docs/ARCHITECTURE.md file completely before starting any work on this project.**
 
 ## 🎯 **PROJECT INTENT**
 
@@ -178,7 +178,7 @@ tests/                    # Completely separate from src/
 - **EMU8000 Compatibility**: Validate against original hardware behavior
 - **Real-time Validation**: Verify sample-accurate timing under all conditions
 
-**See TESTING_ARCHITECTURE.md for complete specifications.**
+**See docs/TESTING_ARCHITECTURE.md for complete specifications.**
 
 ### **Debug System Requirements**
 
@@ -446,13 +446,15 @@ Having complete MIDI implementation in Rust provides:
 ## 📚 **REFERENCE DOCUMENTATION**
 
 For detailed technical specifications, see:
-- **ARCHITECTURE.md** - Complete system design and component details
-- **EMU8000_REFERENCE.md** - Hardware specifications and SoundFont 2.0 details
-- **PROJECT_TODO.md** - Current development status and next steps
+- **docs/ARCHITECTURE.md** - Complete system design and component details
+- **docs/EMU8000_REFERENCE.md** - Hardware specifications and SoundFont 2.0 details
+- **docs/TESTING_ARCHITECTURE.md** - Testing framework and quality assurance approach
+- **docs/PROJECT_TODO.md** - Current development status and next steps
+- **docs/TODO.md** - Complete development history with all micro-tasks
 
 ## 🚀 **GETTING STARTED**
 
-1. **Read all documentation** - CLAUDE.md, ARCHITECTURE.md, EMU8000_REFERENCE.md
+1. **Read all documentation** - CLAUDE.md, docs/ARCHITECTURE.md, docs/EMU8000_REFERENCE.md
 2. **Set up development environment** - Rust, wasm-pack, web server
 3. **Start with tests** - Implement comprehensive test framework first
 4. **Build incrementally** - One component at a time with full error handling
@@ -464,18 +466,18 @@ Remember: **Debug-first development with comprehensive error handling is not opt
 
 ### **📋 TODO LIST MAINTENANCE (MANDATORY)**
 
-**⚠️ CRITICAL INSTRUCTION: After EVERY file alteration, ALWAYS update PROJECT_TODO.md to reflect current task status.**
+**⚠️ CRITICAL INSTRUCTION: After EVERY file alteration, ALWAYS update docs/PROJECT_TODO.md to reflect current task status.**
 
 **Required Todo List Updates:**
-1. **After completing any task** → Mark as [COMPLETED] in PROJECT_TODO.md
-2. **When starting any task** → Mark as [IN_PROGRESS] in PROJECT_TODO.md  
+1. **After completing any task** → Mark as [COMPLETED] in docs/PROJECT_TODO.md
+2. **When starting any task** → Mark as [IN_PROGRESS] in docs/PROJECT_TODO.md  
 3. **After file changes** → Update progress summary and completion percentages
 4. **Before moving to next phase** → Verify all tasks in current phase are marked correctly
 
 **Why This Is Critical:**
 - **Session continuity** - New sessions can immediately see current status
 - **Progress tracking** - Clear visibility into what has been accomplished
-- **Documentation sync** - TodoWrite tool and PROJECT_TODO.md must stay aligned
+- **Documentation sync** - TodoWrite tool and docs/PROJECT_TODO.md must stay aligned
 - **Phase management** - Accurate completion tracking for branch transitions
 
 ### **CRITICAL RULE: Prevent Token Exhaustion**
@@ -531,13 +533,13 @@ Task(description="Create basic MIDI types",
 2. **Use agents for implementation** when task >50 lines
 3. **Review/integrate results** (minimal tokens)
 4. **Mark tasks complete** and add new micro-tasks
-5. **Update PROJECT_TODO.md** with progress
+5. **Update docs/PROJECT_TODO.md** with progress
 
 ### **Session Recovery Protocol**
 
 **If approaching token limits:**
 1. **IMMEDIATELY STOP** implementation
-2. **Document current state** in PROJECT_TODO.md
+2. **Document current state** in docs/PROJECT_TODO.md
 3. **Mark current task status** in todo list
 4. **Create specific resumption instructions**
 5. **Save all work-in-progress**
@@ -612,7 +614,7 @@ The project todo list is maintained using the TodoWrite tool and must always ref
 
 **When starting a session:**
 1. **Check TodoWrite tool status** - Review all pending/in-progress tasks
-2. **If TodoWrite tool is empty** - IMMEDIATELY restore from PROJECT_TODO.md using TodoWrite tool
+2. **If TodoWrite tool is empty** - IMMEDIATELY restore from docs/PROJECT_TODO.md using TodoWrite tool
 3. **Mark current task as in_progress** before beginning work
 4. **Estimate actual complexity** - If >30 lines, break down immediately
 
@@ -624,7 +626,7 @@ The project todo list is maintained using the TodoWrite tool and must always ref
 **When ending a session:**
 1. **Document any in_progress tasks** with specific resumption notes
 2. **Add follow-up tasks** for the next session
-3. **Update PROJECT_TODO.md** with current status summary
+3. **Update docs/PROJECT_TODO.md** with current status summary
 4. **Commit all changes to git** with descriptive commit message
 
 ### **Task Breakdown Rules**
@@ -658,9 +660,9 @@ The project todo list is maintained using the TodoWrite tool and must always ref
 **The todo list drives ALL development activities:**
 - **No code changes** without corresponding todo items
 - **No completed tasks** without marking them complete in TodoWrite
-- **No session ends** without updating PROJECT_TODO.md
+- **No session ends** without updating docs/PROJECT_TODO.md
 - **No complex tasks** without breaking them down first
-- **No new sessions** without restoring TodoWrite from PROJECT_TODO.md if empty
+- **No new sessions** without restoring TodoWrite from docs/PROJECT_TODO.md if empty
 
 ### **CRITICAL SESSION START PROTOCOL**
 
@@ -668,7 +670,7 @@ The project todo list is maintained using the TodoWrite tool and must always ref
 ```
 1. Read CLAUDE.md (this file) completely
 2. Check TodoWrite tool - if empty, restore immediately:
-   - Copy all tasks from PROJECT_TODO.md 
+   - Copy all tasks from docs/PROJECT_TODO.md 
    - Use TodoWrite tool to recreate the exact todo list
    - Verify all task IDs, priorities, and statuses match
 3. Only then proceed with development work
