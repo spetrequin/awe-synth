@@ -22,16 +22,19 @@ WORKDIR /app
 COPY . .
 
 # Build the application
-RUN chmod +x build-production.sh && ./build-production.sh
+WORKDIR /app/web
+RUN npm install
+WORKDIR /app
+RUN chmod +x web/build-vite.sh && cd web && ./build-vite.sh
 
 # Production stage
 FROM nginx:alpine
 
 # Copy build output
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/web/dist /usr/share/nginx/html
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY web/nginx.conf /etc/nginx/nginx.conf
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

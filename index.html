@@ -3,582 +3,776 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AWE Player - EMU8000 Emulator</title>
+    <title>AWE Player - EMU8000 Synthesizer Emulator</title>
+    <meta name="description" content="AWE Player - High-fidelity EMU8000 chip emulator for SoundFont synthesis in the browser. Experience authentic Creative Sound Blaster AWE32/64 sound.">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
             color: white;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .hero-section {
             min-height: 100vh;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
+            position: relative;
+            background: radial-gradient(circle at center, rgba(42, 82, 152, 0.1) 0%, transparent 70%);
+        }
+
+        .hero-content {
+            max-width: 800px;
+            padding: 40px 20px;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: 4rem;
+            font-weight: 300;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #00d4ff, #87ceeb, #4682b4);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .hero-subtitle {
+            font-size: 1.5rem;
+            color: #87ceeb;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+
+        .hero-description {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.8);
             margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .header h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        .header .subtitle {
-            font-size: 1.2em;
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }
-        .version-info {
-            background: rgba(255,255,255,0.1);
-            padding: 10px 20px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-bottom: 20px;
-        }
-        .status-bar {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .status-item {
-            display: flex;
-            align-items: center;
-            margin: 5px;
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-dot.green { background: #28a745; }
-        .status-dot.red { background: #dc3545; }
-        .status-dot.yellow { background: #ffc107; }
-        .main-interface {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-        }
-        .controls-section {
-            margin-bottom: 30px;
-        }
-        .controls-section h3 {
-            margin-bottom: 15px;
-            color: #87ceeb;
-        }
-        .button-group {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-        }
-        .btn-primary {
-            background: #007bff;
-            color: white;
-        }
-        .btn-primary:hover {
-            background: #0056b3;
-            transform: translateY(-2px);
-        }
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-        .btn-success:hover {
-            background: #1e7e34;
-            transform: translateY(-2px);
-        }
-        .btn-info {
-            background: #17a2b8;
-            color: white;
-        }
-        .btn-info:hover {
-            background: #117a8b;
-            transform: translateY(-2px);
-        }
-        .btn-warning {
-            background: #ffc107;
-            color: #212529;
-        }
-        .btn-warning:hover {
-            background: #e0a800;
-            transform: translateY(-2px);
-        }
-        .file-drop-area {
-            border: 2px dashed rgba(255,255,255,0.3);
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-        }
-        .file-drop-area:hover,
-        .file-drop-area.dragover {
-            border-color: #87ceeb;
-            background: rgba(135,206,235,0.1);
-        }
-        .debug-section {
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 30px;
-        }
-        .debug-log {
-            background: #1a1a1a;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            padding: 15px;
-            border-radius: 5px;
-            height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-size: 12px;
-            border: 1px solid #333;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            opacity: 0.7;
-        }
-        .footer a {
-            color: #87ceeb;
-            text-decoration: none;
-        }
-        .nav-header {
-            background: rgba(0,0,0,0.3);
-            padding: 10px 0;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .nav-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        }
-        .nav-brand {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #87ceeb;
-            text-decoration: none;
-        }
-        .nav-links {
+
+        .cta-buttons {
             display: flex;
             gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 60px;
+        }
+
+        .btn {
+            display: inline-flex;
             align-items: center;
-        }
-        .nav-links a {
-            color: #e0e0e0;
+            gap: 10px;
+            padding: 15px 30px;
             text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 5px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.1rem;
             transition: all 0.3s ease;
-            font-size: 14px;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
         }
-        .nav-links a:hover {
-            background: rgba(135,206,235,0.2);
+
+        .btn-primary {
+            background: linear-gradient(45deg, #0066cc, #4682b4);
+            color: white;
+            box-shadow: 0 8px 25px rgba(70, 130, 180, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(70, 130, 180, 0.6);
+            background: linear-gradient(45deg, #0052a3, #4169e1);
+        }
+
+        .btn-secondary {
+            background: transparent;
             color: #87ceeb;
+            border: 2px solid #87ceeb;
         }
-        .nav-links a.active {
-            background: rgba(135,206,235,0.3);
-            color: #87ceeb;
-            font-weight: 500;
+
+        .btn-secondary:hover {
+            background: rgba(135, 206, 235, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(135, 206, 235, 0.2);
         }
-        .loading {
-            display: none;
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
             text-align: center;
-            margin: 20px 0;
+            transition: all 0.3s ease;
         }
-        .spinner {
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid #87ceeb;
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(135, 206, 235, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .feature-title {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: #87ceeb;
+        }
+
+        .feature-description {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.95rem;
+        }
+
+        .tech-specs {
+            background: rgba(0, 0, 0, 0.3);
+            margin: 80px 0;
+            padding: 60px 20px;
+        }
+
+        .tech-specs-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .tech-specs h2 {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            color: #87ceeb;
+        }
+
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .spec-item {
+            padding: 20px;
+        }
+
+        .spec-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .spec-label {
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        .quick-links {
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .quick-links h2 {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            color: #87ceeb;
+        }
+
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .link-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .link-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .link-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .link-title {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            color: #87ceeb;
+        }
+
+        .link-description {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .footer {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 40px 20px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+        }
+
+        /* Animated background elements */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-circle {
+            position: absolute;
+            border: 1px solid rgba(135, 206, 235, 0.1);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            animation: float 6s ease-in-out infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+
+        .bg-circle:nth-child(1) {
+            width: 200px;
+            height: 200px;
+            top: 20%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+
+        .bg-circle:nth-child(2) {
+            width: 150px;
+            height: 150px;
+            top: 60%;
+            right: 15%;
+            animation-delay: 2s;
+        }
+
+        .bg-circle:nth-child(3) {
+            width: 100px;
+            height: 100px;
+            bottom: 20%;
+            left: 20%;
+            animation-delay: 4s;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px) rotate(0deg);
+                opacity: 0.3;
+            }
+            50% {
+                transform: translateY(-20px) rotate(180deg);
+                opacity: 0.6;
+            }
         }
     </style>
 </head>
 <body>
-    <nav class="nav-header">
-        <div class="nav-content">
-            <a href="index.html" class="nav-brand">🎵 AWE Player</a>
-            <div class="nav-links">
-                <a href="index.html" class="active">🏠 Main Interface</a>
-                <a href="architecture_test.html">🧪 Testing Suite</a>
-                <a href="debug_version_info.html">🔍 Debug Tools</a>
-                <a href="web/index.html">🖥️ Full Web App</a>
-                <a href="web/test-comprehensive-integration.html">⚙️ Integration Tests</a>
+    <div class="bg-animation">
+        <div class="bg-circle"></div>
+        <div class="bg-circle"></div>
+        <div class="bg-circle"></div>
+    </div>
+
+    <!-- Include Shared Navigation -->
+    <style>
+    /* Shared Navigation Styles */
+    .awe-nav {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-bottom: 2px solid rgba(255,255,255,0.1);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .awe-nav-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        min-height: 60px;
+    }
+
+    .awe-nav-brand {
+        font-size: 1.5em;
+        font-weight: bold;
+        margin-right: auto;
+    }
+
+    .awe-nav-brand a {
+        color: white;
+        text-decoration: none;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .awe-nav-menu {
+        display: flex;
+        gap: 25px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .awe-nav-group {
+        position: relative;
+    }
+
+    .awe-nav-group-title {
+        color: rgba(255,255,255,0.8);
+        font-size: 0.9em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+    }
+
+    .awe-nav-group-title:hover {
+        background: rgba(255,255,255,0.1);
+    }
+
+    .awe-nav-group:hover .awe-nav-dropdown {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .awe-nav-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: rgba(30, 60, 114, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 10px 0;
+        min-width: 220px;
+        max-width: 280px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.1);
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .awe-nav-item {
+        color: white;
+        text-decoration: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        transition: all 0.2s ease;
+        display: block;
+        font-size: 0.85em;
+        white-space: nowrap;
+        margin: 2px 8px;
+    }
+
+    .awe-nav-item:hover {
+        background: rgba(255,255,255,0.15);
+        transform: translateX(3px);
+    }
+
+    .awe-nav-item.active {
+        background: rgba(255,255,255,0.25);
+        font-weight: bold;
+        border-left: 3px solid #87ceeb;
+    }
+
+    .awe-nav-toggle {
+        display: none;
+        color: white;
+        font-size: 1.5em;
+        cursor: pointer;
+        padding: 10px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+    }
+
+    .awe-nav-toggle:hover {
+        background: rgba(255,255,255,0.1);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 1024px) {
+        .awe-nav-menu {
+            gap: 15px;
+        }
+        
+        .awe-nav-dropdown {
+            min-width: 200px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .awe-nav-toggle {
+            display: block;
+        }
+        
+        .awe-nav-menu {
+            display: none;
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            background: rgba(30, 60, 114, 0.98);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .awe-nav-menu.mobile-open {
+            display: flex;
+        }
+        
+        .awe-nav-group {
+            width: 100%;
+        }
+        
+        .awe-nav-dropdown {
+            position: static;
+            opacity: 1;
+            visibility: visible;
+            transform: none;
+            background: rgba(255,255,255,0.05);
+            margin-top: 8px;
+            max-height: none;
+        }
+        
+        .awe-nav-item {
+            padding: 10px 15px;
+            margin: 2px 0;
+        }
+    }
+    </style>
+
+    <nav class="awe-nav">
+        <div class="awe-nav-container">
+            <div class="awe-nav-brand">
+                <a href="/">🎹 AWE Player</a>
             </div>
+            <div class="awe-nav-menu" id="awe-nav-menu">
+                
+                <!-- Main Application -->
+                <div class="awe-nav-group">
+                    <span class="awe-nav-group-title">Main</span>
+                    <div class="awe-nav-dropdown">
+                        <a href="/" class="awe-nav-item active">🏠 Home</a>
+                        <a href="/web/" class="awe-nav-item">🖥️ Player App</a>
+                    </div>
+                </div>
+
+                <!-- Core Tests -->
+                <div class="awe-nav-group">
+                    <span class="awe-nav-group-title">Core Tests</span>
+                    <div class="awe-nav-dropdown">
+                        <a href="/web/tests/interactive/test-comprehensive-integration.html" class="awe-nav-item">🧪 Integration Suite</a>
+                        <a href="/web/tests/interactive/test-build.html" class="awe-nav-item">🔧 Build Test</a>
+                        <a href="/web/tests/interactive/test-pipeline.html" class="awe-nav-item">⚡ Pipeline Test</a>
+                    </div>
+                </div>
+
+                <!-- Performance & Compatibility -->
+                <div class="awe-nav-group">
+                    <span class="awe-nav-group-title">Performance</span>
+                    <div class="awe-nav-dropdown">
+                        <a href="/web/tests/interactive/test-performance-dashboard.html" class="awe-nav-item">📊 Performance Dashboard</a>
+                        <a href="/web/tests/interactive/performance-dashboard.html" class="awe-nav-item">📈 Performance Monitor</a>
+                        <a href="/web/tests/interactive/test-polyphonic-performance.html" class="awe-nav-item">🎵 Polyphonic Test</a>
+                        <a href="/web/tests/interactive/browser-compatibility-test.html" class="awe-nav-item">🌐 Browser Compatibility</a>
+                    </div>
+                </div>
+
+                <!-- MIDI Features -->
+                <div class="awe-nav-group">
+                    <span class="awe-nav-group-title">MIDI</span>
+                    <div class="awe-nav-dropdown">
+                        <a href="/web/tests/interactive/midi-device-tester.html" class="awe-nav-item">🎹 MIDI Devices</a>
+                        <a href="/web/tests/interactive/test-midi-drag-drop.html" class="awe-nav-item">📁 MIDI Drag & Drop</a>
+                        <a href="/web/tests/interactive/test-multitrack-midi.html" class="awe-nav-item">🎼 Multitrack MIDI</a>
+                        <a href="/web/tests/interactive/test-tempo-changes.html" class="awe-nav-item">⏱️ Tempo Changes</a>
+                        <a href="/web/tests/interactive/test-complex-timing.html" class="awe-nav-item">⚙️ Complex Timing</a>
+                    </div>
+                </div>
+
+                <!-- Audio Controls -->
+                <div class="awe-nav-group">
+                    <span class="awe-nav-group-title">Controls</span>
+                    <div class="awe-nav-dropdown">
+                        <a href="/web/tests/interactive/test-virtual-keyboard-88keys.html" class="awe-nav-item">⌨️ Virtual Piano</a>
+                        <a href="/web/tests/interactive/test-cc-controls.html" class="awe-nav-item">🎛️ CC Controls</a>
+                        <a href="/web/tests/interactive/test-effects-cc.html" class="awe-nav-item">✨ Effects Controls</a>
+                        <a href="/web/tests/interactive/test-pitch-bend.html" class="awe-nav-item">🎵 Pitch Bend</a>
+                        <a href="/web/tests/interactive/test-velocity-response.html" class="awe-nav-item">💨 Velocity Response</a>
+                        <a href="/web/tests/interactive/test-velocity-sensitivity.html" class="awe-nav-item">🎯 Velocity Sensitivity</a>
+                    </div>
+                </div>
+
+                <!-- Instruments & SoundFonts -->
+                <div class="awe-nav-group">
+                    <span class="awe-nav-group-title">Instruments</span>
+                    <div class="awe-nav-dropdown">
+                        <a href="/web/tests/interactive/soundfont-compatibility-tester.html" class="awe-nav-item">🎼 SoundFont Tester</a>
+                        <a href="/web/tests/interactive/test-soundfont.html" class="awe-nav-item">🎶 SoundFont Test</a>
+                        <a href="/web/tests/interactive/test-large-soundfont-loading.html" class="awe-nav-item">📦 Large SoundFont</a>
+                        <a href="/web/tests/interactive/test-gm-instruments.html" class="awe-nav-item">🎸 GM Instruments</a>
+                        <a href="/web/tests/interactive/test-program-change.html" class="awe-nav-item">🔄 Program Change</a>
+                    </div>
+                </div>
+
+            </div>
+            <div class="awe-nav-toggle" id="awe-nav-toggle" onclick="toggleAweNav()">☰</div>
         </div>
     </nav>
 
-    <div class="container">
-        <header class="header">
-            <h1>🎵 AWE Player</h1>
-            <div class="subtitle">WebAssembly EMU8000 Emulator with SoundFont 2.0 Support</div>
-            <div class="version-info" id="version-info">
-                Loading version info...
-            </div>
-        </header>
-
-        <div class="status-bar" id="status-bar">
-            <div class="status-item">
-                <div class="status-dot red" id="wasm-status"></div>
-                <span>WASM Module</span>
-            </div>
-            <div class="status-item">
-                <div class="status-dot red" id="audio-status"></div>
-                <span>Audio System</span>
-            </div>
-            <div class="status-item">
-                <div class="status-dot red" id="midi-status"></div>
-                <span>MIDI System</span>
-            </div>
-            <div class="status-item">
-                <div class="status-dot red" id="sf-status"></div>
-                <span>SoundFont</span>
-            </div>
-        </div>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Initializing AWE Player...</p>
-        </div>
-
-        <main class="main-interface" id="main-interface" style="display: none;">
-            <div class="controls-section">
-                <h3>🎹 Quick Start</h3>
-                <div class="button-group">
-                    <button class="btn btn-primary" onclick="initializeAudio()">🔊 Initialize Audio</button>
-                    <button class="btn btn-success" onclick="playTestTone()">🎵 Test Tone</button>
-                    <button class="btn btn-info" onclick="runQuickTest()">⚡ Quick MIDI Test</button>
+    <main>
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title">AWE Player</h1>
+                <p class="hero-subtitle">EMU8000 Synthesizer Emulator</p>
+                <p class="hero-description">
+                    Experience authentic Creative Sound Blaster AWE32/64 sound synthesis in your browser. 
+                    High-fidelity SoundFont playbook with WebAssembly performance and EMU8000 accuracy.
+                </p>
+                <div class="cta-buttons">
+                    <a href="/web/" class="btn btn-primary">
+                        🎹 Launch Player
+                    </a>
+                    <a href="/web/tests/interactive/test-comprehensive-integration.html" class="btn btn-secondary">
+                        🧪 Run Tests
+                    </a>
                 </div>
-            </div>
-
-            <div class="controls-section">
-                <h3>📁 File Management</h3>
-                <div class="file-drop-area" id="file-drop-area">
-                    <p>📂 Drop SoundFont (.sf2) or MIDI (.mid) files here</p>
-                    <p>or</p>
-                    <input type="file" id="file-input" accept=".sf2,.mid,.midi" style="display: none;" multiple>
-                    <button class="btn btn-info" onclick="document.getElementById('file-input').click()">Choose Files</button>
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-warning" onclick="loadDefaultSoundFont()">🎼 Load Default SoundFont</button>
-                    <button class="btn btn-info" onclick="loadDemoMIDI()">🎵 Load Demo MIDI</button>
-                </div>
-            </div>
-
-            <div class="controls-section">
-                <h3>🎛️ Playback Controls</h3>
-                <div class="button-group">
-                    <button class="btn btn-success" onclick="playMIDI()">▶️ Play</button>
-                    <button class="btn btn-warning" onclick="pauseMIDI()">⏸️ Pause</button>
-                    <button class="btn btn-info" onclick="stopMIDI()">⏹️ Stop</button>
-                    <button class="btn btn-primary" onclick="resetAll()">🔄 Reset</button>
-                </div>
-            </div>
-
-            <div class="controls-section">
-                <h3>🔧 Advanced Features</h3>
-                <div class="button-group">
-                    <a href="web/index.html" class="btn btn-primary">🖥️ Full Web Interface</a>
-                    <a href="architecture_test.html" class="btn btn-info">🧪 Testing Suite</a>
-                    <a href="web/test-comprehensive-integration.html" class="btn btn-warning">⚙️ Integration Tests</a>
-                </div>
-            </div>
-        </main>
-
-        <div class="debug-section">
-            <h3>🐛 Debug Console</h3>
-            <div class="button-group">
-                <button class="btn btn-info" onclick="updateDebugLog()">🔄 Refresh Log</button>
-                <button class="btn btn-success" onclick="copyDebugLog()">📋 Copy Log</button>
-                <button class="btn btn-warning" onclick="clearDebugLog()">🧹 Clear Log</button>
-            </div>
-            <div class="debug-log" id="debug-log">AWE Player Debug Console\nWaiting for initialization...</div>
-        </div>
-
-        <footer class="footer">
-            <p>🎵 AWE Player - Authentic EMU8000 Emulation | 
-            <a href="https://github.com/your-repo/awe-synth" target="_blank">GitHub</a> | 
-            <a href="CLAUDE.md">Documentation</a></p>
-        </footer>
-    </div>
-
-    <script type="module">
-        let wasmModule = null;
-        let audioInitialized = false;
-        let midiPlayer = null;
-
-        // Status management
-        function updateStatus(elementId, success, message = '') {
-            const element = document.getElementById(elementId);
-            element.className = `status-dot ${success ? 'green' : 'red'}`;
-            if (message) {
-                element.parentElement.title = message;
-            }
-        }
-
-        // Debug logging
-        function debugLog(message, type = 'info') {
-            const logElement = document.getElementById('debug-log');
-            const timestamp = new Date().toLocaleTimeString();
-            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
-            logElement.textContent += `\n[${timestamp}] ${prefix} ${message}`;
-            logElement.scrollTop = logElement.scrollHeight;
-        }
-
-        // Initialize WASM module
-        async function initializeWASM() {
-            try {
-                document.getElementById('loading').style.display = 'block';
-                debugLog('Loading WASM module...');
                 
-                wasmModule = await import('./pkg/awe_synth.js');
-                await wasmModule.default();
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">🎼</span>
+                        <h3 class="feature-title">SoundFont 2.0</h3>
+                        <p class="feature-description">Complete SF2 compatibility with all 58 generators supported</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🎵</span>
+                        <h3 class="feature-title">32-Voice Polyphony</h3>
+                        <p class="feature-description">Hardware-accurate voice allocation and management</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">⚡</span>
+                        <h3 class="feature-title">WebAssembly</h3>
+                        <p class="feature-description">High-performance Rust-based audio synthesis engine</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Specifications -->
+        <section class="tech-specs">
+            <div class="tech-specs-content">
+                <h2>Technical Specifications</h2>
+                <p>Built for accuracy and performance, matching original EMU8000 hardware specifications.</p>
                 
-                // Initialize systems
-                const initSuccess = wasmModule.init_all_systems(44100);
-                if (initSuccess) {
-                    updateStatus('wasm-status', true, 'WASM module loaded and initialized');
-                    debugLog('WASM module initialized successfully', 'success');
-                    
-                    // Get version info
-                    const versionInfo = JSON.parse(wasmModule.get_version_info());
-                    document.getElementById('version-info').textContent = 
-                        `${versionInfo.name} v${versionInfo.version} (${versionInfo.phase})`;
-                    
-                    // Initialize MIDI player
-                    midiPlayer = new wasmModule.MidiPlayer();
-                    updateStatus('midi-status', true, 'MIDI system ready');
-                    debugLog('MIDI player created', 'success');
-                    
-                    // Show main interface
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('main-interface').style.display = 'block';
-                    
-                } else {
-                    throw new Error('Failed to initialize systems');
-                }
+                <div class="specs-grid">
+                    <div class="spec-item">
+                        <div class="spec-number">32</div>
+                        <div class="spec-label">Voice Polyphony</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-number">58</div>
+                        <div class="spec-label">SF2 Generators</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-number">44.1</div>
+                        <div class="spec-label">kHz Sample Rate</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-number">100%</div>
+                        <div class="spec-label">EMU8000 Compatible</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Links -->
+        <section class="quick-links">
+            <h2>Explore Features</h2>
+            <div class="links-grid">
+                <a href="/web/tests/interactive/test-virtual-keyboard-88keys.html" class="link-card">
+                    <div class="link-icon">⌨️</div>
+                    <div class="link-title">Virtual Piano</div>
+                    <div class="link-description">88-key piano interface with velocity sensitivity</div>
+                </a>
                 
-            } catch (error) {
-                debugLog(`WASM initialization failed: ${error.message}`, 'error');
-                updateStatus('wasm-status', false, error.message);
-                document.getElementById('loading').innerHTML = 
-                    '<p style="color: #dc3545;">❌ Failed to load AWE Player. Please refresh and try again.</p>';
-            }
-        }
+                <a href="/web/tests/interactive/midi-device-tester.html" class="link-card">
+                    <div class="link-icon">🎹</div>
+                    <div class="link-title">MIDI Devices</div>
+                    <div class="link-description">Test and validate MIDI hardware compatibility</div>
+                </a>
+                
+                <a href="/web/tests/interactive/soundfont-compatibility-tester.html" class="link-card">
+                    <div class="link-icon">🎼</div>
+                    <div class="link-title">SoundFont Tester</div>
+                    <div class="link-description">Validate and analyze SoundFont files</div>
+                </a>
+                
+                <a href="/web/tests/interactive/test-performance-dashboard.html" class="link-card">
+                    <div class="link-icon">📊</div>
+                    <div class="link-title">Performance</div>
+                    <div class="link-description">Real-time performance monitoring and analysis</div>
+                </a>
+                
+                <a href="/web/tests/interactive/test-effects-cc.html" class="link-card">
+                    <div class="link-icon">✨</div>
+                    <div class="link-title">Effects Engine</div>
+                    <div class="link-description">Reverb, chorus, and filter control interface</div>
+                </a>
+                
+                <a href="/web/docs/guides/USER_GUIDE.md" class="link-card">
+                    <div class="link-icon">📖</div>
+                    <div class="link-title">Documentation</div>
+                    <div class="link-description">Complete user guide and API documentation</div>
+                </a>
+            </div>
+        </section>
+    </main>
 
-        // Audio initialization
-        window.initializeAudio = async function() {
-            try {
-                debugLog('Initializing Web Audio...');
-                // This would integrate with the web/ folder audio system
-                updateStatus('audio-status', true, 'Audio system ready');
-                audioInitialized = true;
-                debugLog('Audio system initialized', 'success');
-            } catch (error) {
-                debugLog(`Audio initialization failed: ${error.message}`, 'error');
-                updateStatus('audio-status', false, error.message);
-            }
-        };
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2025 AWE Player Project. Built with WebAssembly, Rust, and passion for authentic EMU8000 sound.</p>
+            <p>Open source project - <a href="https://github.com/spetrequin/awe-synth" style="color: #87ceeb;">View on GitHub</a></p>
+        </div>
+    </footer>
 
-        // Test functions
-        window.playTestTone = function() {
-            if (!midiPlayer) {
-                debugLog('MIDI player not initialized', 'error');
-                return;
-            }
-            try {
-                const result = midiPlayer.play_test_tone();
-                debugLog(`Test tone played: ${result}`, 'success');
-            } catch (error) {
-                debugLog(`Test tone failed: ${error.message}`, 'error');
-            }
-        };
-
-        window.runQuickTest = function() {
-            if (!wasmModule) {
-                debugLog('WASM module not loaded', 'error');
-                return;
-            }
-            try {
-                const result = wasmModule.quick_c_major_test();
-                debugLog(`Quick test result: ${result}`, 'success');
-            } catch (error) {
-                debugLog(`Quick test failed: ${error.message}`, 'error');
-            }
-        };
-
-        // File handling
-        const fileDropArea = document.getElementById('file-drop-area');
-        const fileInput = document.getElementById('file-input');
-
-        fileDropArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileDropArea.classList.add('dragover');
-        });
-
-        fileDropArea.addEventListener('dragleave', () => {
-            fileDropArea.classList.remove('dragover');
-        });
-
-        fileDropArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileDropArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
-
-        function handleFiles(files) {
-            Array.from(files).forEach(file => {
-                const extension = file.name.toLowerCase().split('.').pop();
-                if (extension === 'sf2') {
-                    loadSoundFont(file);
-                } else if (extension === 'mid' || extension === 'midi') {
-                    loadMIDIFile(file);
-                } else {
-                    debugLog(`Unsupported file type: ${file.name}`, 'warning');
-                }
-            });
-        }
-
-        function loadSoundFont(file) {
-            debugLog(`Loading SoundFont: ${file.name}`);
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    // This would integrate with the SoundFont system
-                    updateStatus('sf-status', true, `Loaded: ${file.name}`);
-                    debugLog(`SoundFont loaded: ${file.name}`, 'success');
-                } catch (error) {
-                    debugLog(`SoundFont load failed: ${error.message}`, 'error');
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function loadMIDIFile(file) {
-            debugLog(`Loading MIDI file: ${file.name}`);
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    if (midiPlayer) {
-                        const data = new Uint8Array(e.target.result);
-                        const success = midiPlayer.load_midi_file(data);
-                        if (success) {
-                            debugLog(`MIDI file loaded: ${file.name}`, 'success');
-                        } else {
-                            debugLog(`MIDI file load failed: ${file.name}`, 'error');
-                        }
+    <script>
+        // Smooth scrolling for anchor links
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add subtle entrance animations
+            const cards = document.querySelectorAll('.feature-card, .link-card');
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
                     }
-                } catch (error) {
-                    debugLog(`MIDI load failed: ${error.message}`, 'error');
-                }
-            };
-            reader.readAsArrayBuffer(file);
+                });
+            });
+
+            cards.forEach(card => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(card);
+            });
+        });
+
+        // Preload the main application
+        const preloadLink = document.createElement('link');
+        preloadLink.rel = 'prefetch';
+        preloadLink.href = '/web/';
+        document.head.appendChild(preloadLink);
+        
+        // Shared Navigation JavaScript
+        function toggleAweNav() {
+            const navMenu = document.getElementById('awe-nav-menu');
+            navMenu.classList.toggle('mobile-open');
         }
 
-        // Playback controls
-        window.playMIDI = function() {
-            if (midiPlayer) {
-                midiPlayer.play();
-                debugLog('MIDI playback started', 'success');
+        // Auto-highlight current page
+        const currentPath = window.location.pathname;
+        const navItems = document.querySelectorAll('.awe-nav-item');
+        
+        navItems.forEach(item => {
+            const itemPath = item.getAttribute('href');
+            if (itemPath && (currentPath === itemPath || 
+                (itemPath !== '/' && currentPath.includes(itemPath)))) {
+                item.classList.add('active');
             }
-        };
+        });
 
-        window.pauseMIDI = function() {
-            if (midiPlayer) {
-                midiPlayer.pause();
-                debugLog('MIDI playback paused', 'warning');
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navMenu = document.getElementById('awe-nav-menu');
+            const navToggle = document.getElementById('awe-nav-toggle');
+            const nav = document.querySelector('.awe-nav');
+            
+            if (!nav.contains(event.target) && navMenu.classList.contains('mobile-open')) {
+                navMenu.classList.remove('mobile-open');
             }
-        };
-
-        window.stopMIDI = function() {
-            if (midiPlayer) {
-                midiPlayer.stop();
-                debugLog('MIDI playback stopped', 'warning');
-            }
-        };
-
-        window.resetAll = function() {
-            if (wasmModule) {
-                wasmModule.reset_audio_state_global();
-                debugLog('All systems reset', 'success');
-            }
-        };
-
-        // Demo functions
-        window.loadDefaultSoundFont = function() {
-            debugLog('Loading default SoundFont (feature coming soon)', 'warning');
-        };
-
-        window.loadDemoMIDI = function() {
-            debugLog('Loading demo MIDI (feature coming soon)', 'warning');
-        };
-
-        // Debug log management
-        window.updateDebugLog = function() {
-            if (midiPlayer) {
-                const log = midiPlayer.get_debug_log();
-                if (log) {
-                    document.getElementById('debug-log').textContent += '\n' + log;
-                }
-            }
-        };
-
-        window.copyDebugLog = async function() {
-            const debugLog = document.getElementById('debug-log');
-            try {
-                await navigator.clipboard.writeText(debugLog.textContent);
-                debugLog('Debug log copied to clipboard', 'success');
-            } catch (err) {
-                debugLog.select();
-                document.execCommand('copy');
-                debugLog('Debug log copied to clipboard (fallback)', 'success');
-            }
-        };
-
-        window.clearDebugLog = function() {
-            document.getElementById('debug-log').textContent = 'AWE Player Debug Console\n';
-        };
-
-        // Initialize on page load
-        initializeWASM();
+        });
     </script>
 </body>
 </html>

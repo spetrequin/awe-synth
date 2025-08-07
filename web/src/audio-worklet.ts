@@ -61,8 +61,8 @@ class AwePlayerProcessor extends AudioWorkletProcessor {
      */
     private async initializeWasm(): Promise<void> {
         try {
-            // Import WASM module dynamically
-            this.wasmModule = await import('../wasm-pkg/awe_synth.js');
+            // Import WASM module dynamically (corrected path for AudioWorklet context)
+            this.wasmModule = await import('../awe_synth.js');
             
             // Initialize WASM
             await this.wasmModule.default();
