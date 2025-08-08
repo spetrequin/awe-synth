@@ -7,7 +7,7 @@
  */
 
 use awe_synth::synth::voice_manager::VoiceManager;
-use awe_synth::synth::voice::Voice;
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
 use awe_synth::soundfont::types::*;
 use awe_synth::soundfont::parser::SoundFontParser;
 use std::fs;

@@ -10,7 +10,7 @@
  */
 
 use awe_synth::effects::filter::LowPassFilter;
-use awe_synth::synth::voice::Voice;
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
 use awe_synth::synth::voice_manager::VoiceManager;
 use std::time::Instant;
 
@@ -184,23 +184,20 @@ fn test_realtime_cutoff_changes() {
 fn test_filter_voice_integration() {
     println!("=== Testing Filter Integration with Voice Synthesis Pipeline ===");
     
-    let mut voice = Voice::new();
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
-    // Test filter integration with sine wave synthesis
-    voice.start_note(60, 64); // Middle C at moderate velocity
+    // Test filter integration with MultiZoneSampleVoice
+    let soundfont = awe_synth::soundfont::types::SoundFont::default();
+    let preset = awe_synth::soundfont::types::SoundFontPreset::default();
+    voice.start_note(60, 64, 0, &soundfont, &preset).unwrap(); // Middle C at moderate velocity
     
-    // Generate samples and verify filter is processing
-    let mut filtered_samples = Vec::new();
-    let mut unfiltered_comparison = Vec::new();
+    // Generate samples and verify voice is processing
+    let mut audio_samples = Vec::new();
     
     for _ in 0..128 {
-        let filtered_sample = voice.generate_sample(SAMPLE_RATE);
-        filtered_samples.push(filtered_sample);
-        
-        // Generate unfiltered comparison (direct oscillator output)
-        let unfiltered_sample = voice.oscillator.generate_sample(SAMPLE_RATE);
-        let envelope_amplitude = voice.get_envelope_amplitude();
-        unfiltered_comparison.push(unfiltered_sample * envelope_amplitude);
+        let (left, right) = voice.process();
+        let sample = (left + right) / 2.0; // Mono for testing
+        audio_samples.push(sample);
     }
     
     // Analyze filtered vs unfiltered output

@@ -1,29 +1,29 @@
 # AWE Player Testing Architecture
 
-**⚠️ CRITICAL PRINCIPLE: Clean separation with production code access. Tests can use production modules but stay external.**
+**⚠️ CRITICAL PRINCIPLE: Clean Separation - Test code stays external, but can access and test production functionality.**
 
 ## 🎯 Testing Philosophy
 
-### **Updated Separation Requirements:**
-- **No test code in production files** - All testing external in tests/ directory
-- **No #[cfg(test)] blocks** - Production code stays clean  
-- **No mock interfaces in main code** - Testing handles mocking externally
-- **Production code access allowed** - Tests can import and use production modules
+### **Core Testing Strategy:**
+- **No test code in production files** - All test code lives in tests/ directory
+- **No #[cfg(test)] blocks in src/** - Production code stays completely clean
+- **No mock interfaces in production** - Testing handles all mocking externally
+- **Tests can access production code** - Tests import and use actual production modules
 - **Public module exports** - Production modules are public for test access
-- **Dual crate types** - Main crate builds as both "cdylib" and "rlib" for WASM and testing
+- **Dual crate types** - Main crate builds as both "cdylib" (WASM) and "rlib" (for testing)
 
-### **Updated Testing Approach Benefits:**
-- **Real Integration Testing**: Tests use actual production code, not mocks of core logic
-- **Authentic Behavior Validation**: Tests verify real component interactions
+### **Testing Approach Benefits:**
+- **Real Behavior Testing**: Tests validate actual production code, not theoretical mocks
+- **Authentic Integration Testing**: Tests verify real component interactions and workflows
 - **Improved Test Reliability**: Tests catch actual bugs in production code paths
-- **Simplified Test Maintenance**: No need to keep mocks in sync with production changes
-- **Better Debugging**: Test failures point to actual production code issues
+- **Simplified Maintenance**: No mock drift - tests automatically use latest production code
+- **Better Debugging**: Test failures point directly to production code issues
 
-### **What Changed from Zero Penetration:**
-- **Before**: Tests used only mocks and theoretical calculations
-- **Now**: Tests import production modules but stay in separate tests/ directory
-- **Maintained**: Clean separation, no test code in src/, independent builds
-- **Enhanced**: More realistic testing with actual component behavior
+### **Clear Boundaries:**
+- **Production Code (src/)**: Clean implementation without any test-specific code
+- **Test Code (tests/)**: All test functions, utilities, and mocks live here
+- **Test Access**: Tests can import from src/ to test real functionality
+- **No Contamination**: Production builds contain zero test code or overhead
 
 ### **Coverage Goals:**
 - **100% Unit Testing**: Every function, struct, and component tested in isolation

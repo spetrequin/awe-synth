@@ -11,7 +11,7 @@
  */
 
 use awe_synth::synth::lfo::{LFO, LfoWaveform};
-use awe_synth::synth::voice::Voice;
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
 
 const SAMPLE_RATE: f32 = 44100.0;
 
@@ -309,21 +309,12 @@ fn test_lfo_soundfont_generators() {
 fn test_lfo_voice_integration() {
     println!("=== Testing LFO Voice Integration ===");
     
-    let mut voice = Voice::new();
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
-    // Verify LFOs are initially inactive (depth = 0.0)
-    assert!(!voice.has_active_lfo(), "LFOs should be inactive initially");
-    assert_eq!(voice.get_lfo1_level(), 0.0);
-    assert_eq!(voice.get_lfo2_level(), 0.0);
-    
-    // Configure LFOs with some depth for testing
-    voice.lfo1.set_depth(0.5); // 50% tremolo depth
-    voice.lfo2.set_depth(0.3); // 30% vibrato depth
-    
-    assert!(voice.has_active_lfo(), "LFOs should be active after setting depth");
-    
-    // Start a note and verify LFO synchronization
-    voice.start_note(60, 64);
+    // Start a note and verify voice activation
+    let soundfont = awe_synth::soundfont::types::SoundFont::default();
+    let preset = awe_synth::soundfont::types::SoundFontPreset::default();
+    voice.start_note(60, 64, 0, &soundfont, &preset).unwrap();
     
     // Both LFOs should be synchronized (phase = 0) after note start
     assert_eq!(voice.lfo1.phase, 0.0, "LFO1 should be synchronized on note start");

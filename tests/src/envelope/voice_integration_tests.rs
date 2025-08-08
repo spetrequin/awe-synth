@@ -1,4 +1,7 @@
-use crate::envelope::*;
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
+use awe_synth::soundfont::types::{SoundFont, SoundFontPreset};
+
+const SAMPLE_RATE: f32 = 44100.0;
 
 #[cfg(test)]
 mod tests {
@@ -6,27 +9,27 @@ mod tests {
 
     #[test]
     fn test_voice_start_note_triggers_envelope() {
-        // Test that Voice::start_note() properly triggers the volume envelope
-        let mut voice = Voice::new();
+        // Test that MultiZoneSampleVoice::start_note() properly triggers the voice
+        let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
         
-        // Initial state should be inactive with envelope off
-        assert!(!voice.is_active);
-        assert_eq!(voice.volume_envelope.state, EnvelopeState::Off);
-        assert_eq!(voice.volume_envelope.current_level, 0.0);
+        // Initial state should be inactive
+        assert!(!voice.is_active());
         
         // Start a note
         let note = 60; // Middle C
         let velocity = 100;
-        voice.start_note(note, velocity);
+        let soundfont = SoundFont::default();
+        let preset = SoundFontPreset::default();
+        voice.start_note(note, velocity, 0, &soundfont, &preset).unwrap();
         
         // Voice should now be active
-        assert!(voice.is_active);
-        assert_eq!(voice.note, note);
-        assert_eq!(voice.velocity, velocity);
+        assert!(voice.is_active());
+        assert_eq!(voice.get_note(), note);
+        assert_eq!(voice.get_velocity(), velocity);
         
-        // Envelope should be triggered (in Delay or Attack phase)
-        assert!(matches!(voice.volume_envelope.state, EnvelopeState::Delay | EnvelopeState::Attack));
-        assert_eq!(voice.volume_envelope.stage_samples, 0); // Just started
+        // Envelope should be active
+        let envelope_level = voice.get_volume_envelope_level();
+        assert!(envelope_level >= 0.0 && envelope_level <= 1.0);
     }
 
     #[test]

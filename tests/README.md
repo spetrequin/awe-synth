@@ -4,10 +4,10 @@ This directory contains comprehensive integration tests for the AWE Synth EMU800
 
 ## Testing Architecture
 
-Following the **Zero Penetration Policy** from TESTING_ARCHITECTURE.md:
+TESTING_ARCHITECTURE.md:
 - **NO test code in src/** - All testing stays in tests/
 - **NO #[cfg(test)] blocks** - Production code stays clean
-- **External mocking only** - Tests handle mocking independently
+- **Real implementation testing** - Tests focus on actual codebase functionality
 
 ## Directory Structure
 
@@ -18,7 +18,6 @@ tests/
 ├── integration/                # Cross-component testing
 ├── timing/                     # Sequencer and sample-accurate timing
 ├── stress/                     # Voice allocation and polyphony limits
-├── mocks/                      # External mock implementations
 ├── reference/                  # Golden files and reference data
 └── utils/                      # Test utilities and helpers
 ```
@@ -32,9 +31,10 @@ tests/
 - Error handling verification
 
 ### Integration Tests (tests/integration/)
-- TypeScript ↔ WASM bridge testing
-- MIDI router → synthesis pipeline
-- End-to-end event flow validation
+- Real component integration testing
+- EMU8000 parameter validation
+- Multi-zone sample layering
+- Voice system pipeline testing
 
 ### Timing Tests (tests/timing/)
 - Sample-accurate event processing (44.1kHz)

@@ -338,7 +338,7 @@ useEffect(() => {
 3. WASM memory limitations
 4. Single-threaded JavaScript execution
 
-**Medium Impact Constraints (Affect Feature Scope):**
+**Medium Impact Constraints (Affect Feature Scope):**ne
 1. Web MIDI API browser support
 2. CORS restrictions
 3. File system access limitations
@@ -351,15 +351,36 @@ useEffect(() => {
 
 **DESIGN PHILOSOPHY:** Accept browser constraints and design within them rather than fighting against them. Document all constraint-driven decisions for future reference and potential re-evaluation as web standards evolve.
 
-## 🧪 **TESTING ARCHITECTURE - ZERO PENETRATION POLICY**
+## 🧪 **TESTING ARCHITECTURE - CLEAN SEPARATION POLICY**
 
-### **⚠️ CRITICAL RULE: No Test Code in Production**
+### **⚠️ CRITICAL RULE: Test Code Stays External**
 
-**MANDATORY SEPARATION:**
-- **NO test code in src/** - All testing stays in tests/ directory
-- **NO #[cfg(test)] blocks** - Production code stays completely clean
-- **NO mock interfaces in main code** - Testing handles mocking externally
-- **Independent builds** - Tests compile separately from production
+**TESTING STRATEGY:**
+- **NO test code in src/** - All test code lives in tests/ directory
+- **NO #[cfg(test)] blocks in production** - src/ code stays completely clean
+- **NO mock interfaces in production** - All mocks stay in tests/mocks/
+- **Tests CAN access production code** - Tests import and use src/ modules
+- **Clean separation** - Production builds contain zero test overhead
+
+**WHY THIS APPROACH:**
+- Tests validate real production behavior, not mocked approximations
+- Production code remains focused and uncluttered
+- Tests can comprehensively exercise all functionality
+- No test artifacts or conditional compilation in production builds
+
+**DIRECTORY STRUCTURE:**
+```
+tests/                    # All test code lives here
+├── unit/                # Unit tests that import src/ modules
+├── integration/         # Integration tests using real components
+├── mocks/              # Mock implementations for external APIs
+└── utils/              # Test utilities and helpers
+
+src/                     # Production code - NO test code here
+├── synth/              # Clean production implementation
+├── effects/            # No #[cfg(test)] blocks
+└── midi/               # No test utilities or mocks
+```
 
 **Testing Coverage Requirements:**
 - **100% Unit Testing**: Every function and component tested in isolation

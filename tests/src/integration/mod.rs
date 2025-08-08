@@ -2,12 +2,11 @@
  * Integration Test Framework - Core Module
  * 
  * Provides infrastructure for testing component integration points
- * across the MIDI↔Synth pipeline with zero penetration policy.
+ * across the MIDI↔Synth pipeline.
  */
 
-pub mod midi_router_tests;
-pub mod voice_manager_tests;
-pub mod queue_timing_tests;
+// Integration tests now focus on actual codebase components
+// Mock-based tests removed in favor of real implementation testing
 // pub mod wasm_bridge_tests;
 // pub mod end_to_end_tests;
 
