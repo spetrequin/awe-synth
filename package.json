@@ -3,11 +3,12 @@
 	"version": "0.1.0",
 	"description": "WebAssembly-based EMU8000 emulator with SoundFont 2.0 synthesis",
 	"scripts": {
-		"dev": "serve -l 3000 .",
-		"serve": "serve -l 3000 .",
-		"start": "serve -l 3000 .",
-		"build": "./web/build-production.sh",
-		"build:staging": "./web/build-staging.sh",
+		"dev": "cd web && pnpm run dev",
+		"serve": "cd web && pnpm run serve",
+		"start": "cd web && pnpm run dev",
+		"serve-dist": "cd web && pnpm run serve-dist",
+		"build": "./web/scripts/build-production.sh",
+		"build:staging": "./web/scripts/build-staging.sh",
 		"build:wasm": "wasm-pack build --target web",
 		"test": "serve -l 3000 web/test-build.html",
 		"test:integration": "serve -l 3000 web/test-comprehensive-integration.html"

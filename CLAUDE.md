@@ -2,7 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**⚠️ CRITICAL INSTRUCTION: Always read BOTH this file (CLAUDE.md) AND the docs/ARCHITECTURE.md file completely before starting any work on this project.**
+**🚨 MANDATORY REQUIREMENT: MUST READ ALL PROJECT DOCUMENTATION BEFORE ANY WORK 🚨**
+
+**📚 REQUIRED READING - NO EXCEPTIONS:**
+- **CLAUDE.md** (this file) - Project guidelines and development principles  
+- **docs/ARCHITECTURE.md** - Complete system design and component architecture
+- **docs/PROJECT_TODO.md** - Current project status and phase planning
+- **docs/EMU8000_REFERENCE.md** - Hardware specifications and SoundFont 2.0 details
+
+**❌ ABSOLUTELY FORBIDDEN: Starting work without reading ALL documentation above**
+**❌ ABSOLUTELY FORBIDDEN: Skipping documentation because "I understand the project"**
+**❌ ABSOLUTELY FORBIDDEN: Making architectural decisions without consulting docs/ARCHITECTURE.md**
+
+**✅ MANDATORY WORKFLOW:** Read ALL docs → Understand current phase → Update TodoWrite → Begin work
 
 ## 🎯 **PROJECT INTENT**
 
@@ -144,6 +156,200 @@ SoundFont Sample → Pitch Modulation → Low-Pass Filter → ADSR Envelope → 
 - **Audio synthesis priority**: Debug output must never interrupt real-time synthesis or cause audio dropouts
 
 **This rule is MANDATORY and must NEVER be violated.**
+
+### **🔊 CRITICAL WEB AUDIO API CONSTRAINT: USER GESTURE REQUIREMENT**
+
+**FUNDAMENTAL BROWSER LIMITATION: AudioContext requires user gesture to start.**
+
+**⚠️ MANDATORY UNDERSTANDING:**
+- **AudioContext.state = 'suspended'** on page load - this is NORMAL browser behavior
+- **Audio CANNOT start automatically** without user interaction (click, keydown, touchstart)
+- **This is a browser security policy** - not a bug in our code
+- **DO NOT attempt to bypass** this requirement - it's impossible
+
+**✅ CORRECT IMPLEMENTATION PATTERN:**
+```javascript
+// Resume AudioContext on first user interaction
+useEffect(() => {
+  const resumeAudioOnInteraction = async () => {
+    if (audioContext && audioContext.state === 'suspended') {
+      await audioContext.resume()
+      updateDebugLog('🔊 AudioContext resumed automatically')
+    }
+  }
+  
+  const events = ['click', 'keydown', 'touchstart']
+  events.forEach(event => {
+    document.addEventListener(event, resumeAudioOnInteraction, { once: true })
+  })
+
+  return () => {
+    events.forEach(event => {
+      document.removeEventListener(event, resumeAudioOnInteraction)
+    })
+  }
+}, [audioContext])
+```
+
+**❌ COMMON DEBUGGING MISTAKES:**
+- Assuming AudioContext should start immediately on page load
+- Thinking 'suspended' state indicates an error
+- Trying to debug "why audio won't initialize automatically"
+- Attempting to call audioContext.resume() without user gesture
+
+**DEBUG IDENTIFICATION:**
+- **Status shows "System Ready"** but audio doesn't work until button press
+- **AudioContext.state === 'suspended'** - this is expected, not an error
+- **Audio works perfectly after first user interaction** - this confirms correct implementation
+
+**This constraint is FUNDAMENTAL to web browsers and must be immediately recognized in any audio debugging session.**
+
+## 🌐 **WEB BROWSER CONSTRAINTS & LIMITATIONS**
+
+### **CRITICAL UNDERSTANDING: Browser Security & Performance Constraints**
+
+**These constraints are IMMUTABLE browser behaviors that affect EMU8000 emulation design decisions.**
+
+### **🔊 Audio System Constraints**
+
+**1. AudioContext User Gesture Requirement**
+- **Constraint**: AudioContext requires user interaction to start (documented above)
+- **Impact**: No automatic audio playback on page load
+- **Solution**: Event listeners for first user interaction
+- **Decision Point**: Accept manual initialization vs. implement user-friendly activation prompts
+
+**2. Audio Buffer Size Limitations**
+- **Constraint**: ScriptProcessorNode limited buffer sizes (256, 512, 1024, 2048, 4096, 8192, 16384)
+- **Impact**: Cannot use arbitrary buffer sizes for optimal EMU8000 matching
+- **Current Solution**: Using 1024 samples (23.2ms at 44.1kHz)
+- **Decision Point**: Trade-off between latency and processing efficiency
+
+**3. ScriptProcessorNode Deprecation**
+- **Constraint**: ScriptProcessorNode is deprecated, AudioWorklet is preferred
+- **Impact**: Current implementation may become obsolete
+- **Current Status**: Using ScriptProcessorNode due to CORS issues with AudioWorklet
+- **Decision Point**: When to migrate to AudioWorklet despite development complexity
+
+**4. Web Audio API Thread Limitations**
+- **Constraint**: Main thread audio processing causes performance issues
+- **Impact**: Audio processing competes with UI rendering
+- **Current Mitigation**: WASM processing with minimal JavaScript overhead
+- **Decision Point**: AudioWorklet migration priority vs. current functionality
+
+### **🔒 Security & CORS Constraints**
+
+**5. CORS (Cross-Origin Resource Sharing) Restrictions**
+- **Constraint**: AudioWorklet requires same-origin or proper CORS headers
+- **Impact**: Development server configuration affects audio implementation choices
+- **Current Status**: Preview server CORS issues block AudioWorklet
+- **Decision Point**: Development workflow vs. production-ready audio implementation
+
+**6. File System Access Limitations**
+- **Constraint**: No direct file system access, requires File API user interaction
+- **Impact**: SoundFont loading requires drag-and-drop or file picker
+- **Solution**: File API with user gesture requirement
+- **Decision Point**: UX convenience vs. security constraint acceptance
+
+**7. Clipboard API Restrictions**
+- **Constraint**: Clipboard access requires HTTPS and user interaction
+- **Impact**: Debug log copying functionality has limited availability
+- **Current Implementation**: Graceful fallback with error handling
+- **Decision Point**: Feature degradation in non-HTTPS environments
+
+### **⚡ Performance & Memory Constraints**
+
+**8. WebAssembly Memory Limitations**
+- **Constraint**: WASM linear memory has growth limitations and performance implications
+- **Impact**: Large SoundFont files may cause memory pressure
+- **Current Status**: Not yet stress-tested with large SoundFonts
+- **Decision Point**: Memory optimization vs. SoundFont compatibility
+
+**9. Garbage Collection Interference**
+- **Constraint**: JavaScript GC can cause audio dropouts
+- **Impact**: Real-time audio synthesis susceptible to GC pauses
+- **Current Mitigation**: Minimize JavaScript allocations, use Rust for audio processing
+- **Decision Point**: Language choice and memory management strategies
+
+**10. Single-Threaded JavaScript Execution**
+- **Constraint**: Main JavaScript thread handles UI, file I/O, and coordination
+- **Impact**: Heavy UI operations can affect audio coordination
+- **Current Mitigation**: Minimal JavaScript, heavy processing in WASM
+- **Decision Point**: Architecture complexity vs. thread separation
+
+### **🎮 MIDI & Input Constraints**
+
+**11. Web MIDI API Browser Support**
+- **Constraint**: Not supported in all browsers (Firefox requires flag, Safari limited)
+- **Impact**: Hardware MIDI input availability varies by browser
+- **Current Status**: Graceful detection and fallback to virtual keyboard
+- **Decision Point**: Browser support requirements vs. feature completeness
+
+**12. MIDI SysEx Permission Requirements**
+- **Constraint**: SysEx messages require explicit user permission
+- **Impact**: Advanced MIDI features may require additional user consent
+- **Current Status**: Not yet implemented
+- **Decision Point**: Feature scope vs. permission complexity
+
+### **📱 Mobile & Touch Device Constraints**
+
+**13. iOS Audio Session Management**
+- **Constraint**: iOS has complex audio session handling and background limitations
+- **Impact**: Audio may not work as expected on iOS devices
+- **Current Status**: Not tested on iOS
+- **Decision Point**: iOS compatibility priority vs. desktop focus
+
+**14. Touch Event Differences**
+- **Constraint**: Touch events have different timing and pressure characteristics
+- **Impact**: Virtual keyboard velocity sensitivity varies across devices
+- **Current Implementation**: Basic touch support
+- **Decision Point**: Advanced touch features vs. development complexity
+
+**15. Mobile Performance Limitations**
+- **Constraint**: Mobile devices have lower CPU/memory capacity
+- **Impact**: 32-voice polyphony may not be achievable on all mobile devices
+- **Current Status**: Not performance-tested on mobile
+- **Decision Point**: Performance scaling vs. hardware requirements
+
+### **🔧 Development & Deployment Constraints**
+
+**16. Build Tool and Module System Complexity**
+- **Constraint**: WASM + TypeScript + React build chain has many failure points
+- **Impact**: Development environment setup is complex and fragile
+- **Current Solution**: Vite with specific WASM configuration
+- **Decision Point**: Build system complexity vs. developer experience
+
+**17. Browser Developer Tools Limitations**
+- **Constraint**: WASM debugging tools are limited compared to native development
+- **Impact**: Debugging WASM audio processing is challenging
+- **Current Mitigation**: Extensive logging to in-app debug system
+- **Decision Point**: Development debugging vs. production performance
+
+**18. Hot Reload Incompatibility**
+- **Constraint**: WASM modules don't hot reload, requiring full page refresh
+- **Impact**: Slower development iteration cycles
+- **Current Status**: Manual page refresh required for WASM changes
+- **Decision Point**: Development speed vs. technology constraints
+
+### **⚖️ CONSTRAINT IMPACT ON PROJECT DECISIONS**
+
+**High Impact Constraints (Affect Core Architecture):**
+1. AudioContext user gesture requirement
+2. ScriptProcessorNode deprecation
+3. WASM memory limitations
+4. Single-threaded JavaScript execution
+
+**Medium Impact Constraints (Affect Feature Scope):**
+1. Web MIDI API browser support
+2. CORS restrictions
+3. File system access limitations
+4. Mobile performance limitations
+
+**Low Impact Constraints (Affect Development Experience):**
+1. Build tool complexity
+2. WASM debugging limitations
+3. Hot reload incompatibility
+
+**DESIGN PHILOSOPHY:** Accept browser constraints and design within them rather than fighting against them. Document all constraint-driven decisions for future reference and potential re-evaluation as web standards evolve.
 
 ## 🧪 **TESTING ARCHITECTURE - ZERO PENETRATION POLICY**
 

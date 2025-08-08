@@ -1,22 +1,82 @@
 # AWE Player Project TODO - Updated Status
 
-**Last Updated:** August 2025 (Phase 18 PRODUCTION DEPLOYMENT COMPLETE)
-**Status:** Phase 18: Testing and Polish ✅ **MAJOR MILESTONE ACHIEVED**  
-**Current Branch:** main (Phases 9A+9B+10B+15A+15B+15C+16+17+18 production-ready)
+**Last Updated:** August 2025 (Phase 20 COMPLETE VOICE SYSTEM REBUILD)
+**Status:** 🔄 **MAJOR ARCHITECTURAL REBUILD IN PROGRESS** 🔄  
+**Current Branch:** main (Complete voice system redesign and implementation)
 
-## 🎯 Project Status: Phase 18 Production Deployment Complete ✅
+## 🔄 Project Status: COMPLETE VOICE SYSTEM REBUILD 🔄
 
-**CURRENT PHASE:** Phase 18 Testing and Polish has **production deployment completed**. 
+**CURRENT PHASE:** Phase 20: MultiZoneSampleVoice Complete Rebuild (CRITICAL PRIORITY)
 
-**Phase 18 Progress Summary:**
-- ✅ **18/28 micro-tasks completed (64%)**
-- ✅ **UI Component Testing (18.1) - COMPLETE (4/4 tasks)**
-- ✅ **MIDI Functionality Testing (18.2) - COMPLETE (4/4 tasks)**
-- ✅ **MIDI/Synthesis Integration (18.3) - COMPLETE (4/4 tasks)**
-- ⏳ **Hardware MIDI Testing (18.4) - PENDING (0/4 tasks)** - DEFERRED
-- ✅ **Performance Optimization (18.5) - COMPLETE (4/4 tasks)**
-- ⏳ **Browser Compatibility (18.6) - PENDING (0/4 tasks)** - DEFERRED
-- ✅ **Production Deployment (18.7) - COMPLETE (2/4 tasks)** ⭐️ NEW MILESTONE
+### 🎯 **ARCHITECTURAL DECISION: COMPLETE VOICE SYSTEM REBUILD**
+
+Phase 19 audit revealed that a **complete voice system rebuild** is the optimal solution:
+- **Complete rewrite**: Build MultiZoneSampleVoice from scratch with all EMU8000 effects
+- **Not a consolidation**: This is a fresh implementation, not merging broken code
+- **Delete all existing voices**: Remove Voice, SampleVoice, and current broken MultiZoneSampleVoice
+- **Effects built-in from start**: All EMU8000 effects integrated properly from the beginning
+- **Test-driven development**: Write tests first, then implement correctly 
+
+### **Root Cause Analysis:**
+
+**The Three Voice Systems Problem:**
+1. **`Voice` (Legacy)** - Oscillator-based with full effects processing (reverb, chorus, ADSR, LFO)
+2. **`SampleVoice` (Intermediate)** - Sample playback but **missing effects processing**
+3. **`MultiZoneSampleVoice` (Preferred)** - Multi-zone layering but **missing effects processing**
+
+**Failure in Micro-Task Planning:**
+- ❌ Built three separate voice systems instead of one complete system
+- ❌ No cross-system integration testing  
+- ❌ Incremental additions instead of proper architectural design
+- ❌ Missing validation that all voice paths produce consistent results
+
+## 🎯 **PHASE 20: MultiZoneSampleVoice Complete Rebuild**
+
+**Status:** 0/10 micro-tasks completed (0%)
+**Priority:** CRITICAL - complete voice system rebuild
+**Goal:** Build new MultiZoneSampleVoice from scratch with complete EMU8000 effects chain
+
+### **Phase 20 Implementation Tasks:**
+
+**20.1 Architecture and Documentation** ✅ **COMPLETED**
+- ✅ **20.1.1** Update ARCHITECTURE.md to specify MultiZoneSampleVoice as the voice system
+- ✅ **20.1.2** Update PROJECT_TODO.md with complete rebuild plan
+- ✅ **20.1.3** Update TODO.md with Phase 19 completion and Phase 20 details
+- ✅ **20.1.4** Design complete MultiZoneSampleVoice specification with all effects
+
+**20.2 Voice System Implementation (CRITICAL)**
+- ⏳ **20.2.1** Implement new MultiZoneSampleVoice struct with complete effects chain
+- ⏳ **20.2.2** Add volume envelope (6-stage DAHDSR) with exponential curves
+- ⏳ **20.2.3** Add modulation envelope (6-stage DAHDSR) for filter/pitch control
+- ⏳ **20.2.4** Add dual LFO system (LFO1 tremolo, LFO2 vibrato)
+- ⏳ **20.2.5** Add low-pass filter with resonance (100Hz-8kHz EMU8000 range)
+- ⏳ **20.2.6** Add modulation router for complex modulation routing
+- ⏳ **20.2.7** Add reverb/chorus send levels (per-voice effects sends)
+
+**20.3 Testing Implementation (CRITICAL)**
+- ⏳ **20.3.1** Create comprehensive MultiZoneSampleVoice unit tests
+- ⏳ **20.3.2** Create effects processing integration tests
+- ⏳ **20.3.3** Create multi-zone sample layering tests
+- ⏳ **20.3.4** Create EMU8000 parameter range validation tests
+
+**20.4 Integration and Cleanup (CRITICAL)**
+- ⏳ **20.4.1** Update VoiceManager to use only new MultiZoneSampleVoice
+- ⏳ **20.4.2** Delete all three old voice systems (Voice, SampleVoice, old MultiZoneSampleVoice)
+- ⏳ **20.4.3** Integration test complete voice system pipeline
+- ⏳ **20.4.4** Validate audio comparison tests pass with new system
+
+**Expected Completion:** 3-4 development sessions
+**Success Criteria:** One properly-built voice system, all effects working, audio tests pass, clean architecture
+
+---
+
+## 📚 **COMPLETED PHASES - ARCHIVED**
+
+**✅ Phase 19: Voice System Architectural Analysis (COMPLETED)**
+- ✅ **19.1.1** Audit MultiZoneSampleVoice - identified missing effects processing
+- ✅ **19.1.2** Architecture document review - confirmed single voice system design  
+- ✅ **19.1.3** Decision to rebuild rather than patch existing systems
+- ✅ **19.1.4** Updated ARCHITECTURE.md to specify MultiZoneSampleVoice as canonical system
 
 **Completed Phase 18 Tasks:**
 - ✅ **18.1.1** Virtual keyboard testing (88 keys)

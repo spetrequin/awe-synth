@@ -23,6 +23,7 @@ AWE Player is a WebAssembly-based EMU8000 chip emulator that provides authentic 
 - Sound better than original EMU8000 while maintaining full compatibility
 - Per-voice effects processing (not modern send/return buses)
 - 32-voice polyphonic synthesis with proper voice stealing
+- Multi-zone sample layering with velocity crossfading (authentic EMU8000 implementation)
 
 ### 2. **Real-Time Audio Requirements**
 - **Zero Garbage Collection**: Rust ensures no GC pauses that cause audio dropouts
@@ -56,8 +57,9 @@ Debug Display    Audio Routing      EMU8000 Effects
 
 ### EMU8000 Authentic Signal Flow
 ```
-MIDI Events → Voice Allocation → Sample Playback → Pitch Modulation → 
-Low-Pass Filter → ADSR Envelope → Effects Chain → Stereo Pan → Audio Output
+MIDI Events → Voice Allocation → Multi-Zone Sample Selection → Sample Layering/Crossfading → 
+Pitch Modulation → Low-Pass Filter → ADSR Envelope → LFO Modulation → 
+Reverb/Chorus Sends → Stereo Pan → Audio Output
 ```
 
 ### Detailed System Architecture
@@ -100,25 +102,28 @@ Low-Pass Filter → ADSR Envelope → Effects Chain → Stereo Pan → Audio Out
 │  ┌─────────────────▼───────────────────────────────────────┐   │
 │  │              VoiceManager                               │   │
 │  │  - 32-voice polyphonic synthesis                       │   │
-│  │  - Voice allocation and stealing                       │   │
-│  │  - Velocity layering and crossfading                   │   │
-│  │  - Sample management integration                       │   │
+│  │  - Voice allocation and stealing (EMU8000 priority)    │   │
+│  │  - Multi-zone sample selection and layering           │   │
+│  │  - Velocity crossfading and round-robin selection     │   │
 │  └─────────────────┬───────────────────────────────────────┘   │
 │                    │                                           │
 │  ┌─────────────────▼───────────────────────────────────────┐   │
-│  │                Voice (×32)                              │   │
-│  │  - Individual voice synthesis                          │   │
-│  │  - ADSR envelope processing                            │   │
-│  │  - Per-voice effects chain                             │   │
-│  │  - Sample playback with interpolation                  │   │
+│  │         MultiZoneSampleVoice (×32)                     │   │
+│  │  - Multi-sample layer synthesis with crossfading      │   │
+│  │  - Complete EMU8000 effects chain per voice           │   │
+│  │  - ADSR volume envelope + modulation envelope         │   │
+│  │  - Dual LFO system (tremolo + vibrato)                │   │
+│  │  - Low-pass filter with resonance (100Hz-8kHz)       │   │
+│  │  - Reverb/chorus send levels (per-voice)              │   │
+│  │  - High-quality sample interpolation                  │   │
 │  └─────────────────┬───────────────────────────────────────┘   │
 │                    │                                           │
 │  ┌─────────────────▼───────────────────────────────────────┐   │
-│  │             EffectsChain                                │   │
-│  │  - LFO modulation (tremolo/vibrato)                    │   │
-│  │  - Low-pass filter with resonance                      │   │
-│  │  - Per-voice reverb and chorus                         │   │
-│  │  - Stereo panning                                      │   │
+│  │            Global Effects Bus                           │   │
+│  │  - Reverb processor (multi-tap delay algorithm)       │   │
+│  │  - Chorus processor (pitch-modulated delay)           │   │
+│  │  - Send/return mixing from all 32 voices              │   │
+│  │  - Final stereo output mixing                         │   │
 │  └─────────────────┬───────────────────────────────────────┘   │
 │                    │                                           │
 │  ┌─────────────────▼───────────────────────────────────────┐   │
@@ -657,9 +662,12 @@ src/                          # Rust/WASM Core
 │   └── types.rs             # MIDI data structures
 ├── synth/
 │   ├── mod.rs               # Synthesis module exports
-│   ├── voice_manager.rs     # 32-voice polyphony
-│   ├── voice.rs             # Individual voice synthesis
-│   └── envelope.rs          # ADSR envelope generators
+│   ├── voice_manager.rs     # 32-voice polyphony with multi-zone selection
+│   ├── voice.rs             # MultiZoneSampleVoice with complete effects
+│   ├── envelope.rs          # DAHDSR envelope generators (volume + modulation)
+│   ├── lfo.rs               # Dual LFO system (tremolo + vibrato)
+│   ├── sample_player.rs     # High-quality sample interpolation engine
+│   └── modulation.rs        # Modulation routing and processing
 ├── effects/
 │   ├── mod.rs               # Effects module exports
 │   ├── chain.rs             # Per-voice effects processing
@@ -775,27 +783,38 @@ JavaScript UI → ScriptProcessorNode.onaudioprocess() → Loop: midiPlayer.proc
 2. If none, find releasing voice
 3. If none, steal lowest velocity voice
 
-### 5. **Voice** (`src/synth/voice.rs`)
-**Purpose**: Individual voice synthesis and effects
+### 5. **MultiZoneSampleVoice** (`src/synth/voice.rs`)
+**Purpose**: EMU8000-authentic multi-zone sample synthesis with complete effects chain
 
 **Key Features:**
-- **Sample Playback**: High-quality interpolation (better than EMU8000)
-- **ADSR Envelopes**: Volume and modulation envelopes
-- **Effects Chain**: Per-voice filter, LFO, reverb, chorus
-- **Pitch Control**: Real-time pitch shifting
+- **Multi-Zone Sampling**: Layer multiple samples per note with velocity/key splitting
+- **Velocity Crossfading**: Smooth transitions between velocity layers (authentic EMU8000)
+- **Complete Effects Chain**: All EMU8000 effects processing per voice
+- **High-Quality Interpolation**: 4-point interpolation (better than original hardware)
 
-**EMU8000 Signal Flow:**
+**EMU8000 Multi-Zone Architecture:**
 ```
-Sample → Pitch Mod → Filter → Amplifier → Effects → Pan → Output
+MIDI Note → Zone Selection → Sample Layering → Crossfading → 
+Pitch Modulation (LFO2 + Envelope) → Low-Pass Filter (LFO1 + Envelope) → 
+Volume Envelope → LFO1 Tremolo → Reverb/Chorus Sends → Stereo Pan → Output
 ```
 
-### 6. **EffectsChain** (`src/effects/chain.rs`)
-**Purpose**: Authentic EMU8000 effects processing with send/return architecture
+**Complete Effects Per Voice:**
+- **Volume Envelope**: 6-stage DAHDSR with exponential curves
+- **Modulation Envelope**: 6-stage DAHDSR for filter/pitch control
+- **Dual LFO System**: LFO1 (tremolo/filter), LFO2 (vibrato/pitch)
+- **Low-Pass Filter**: 2-pole resonant filter (100Hz-8kHz range)
+- **Modulation Router**: Complex modulation routing system
+- **Send/Return Effects**: Individual reverb/chorus send levels
 
-**EMU8000 Effects Architecture:**
-- **Per-Voice Effects**: Low-pass filter, modulation envelope, dual LFOs
-- **Per-Voice Send Levels**: Individual reverb/chorus send amounts (MIDI controllable)
-- **Global Effects Bus**: Shared reverb and chorus processors
+### 6. **Global Effects Bus** (`src/effects/`)
+**Purpose**: EMU8000-authentic global effects processing
+
+**EMU8000 Send/Return Architecture:**
+- **Reverb Bus**: Multi-tap delay algorithm with room size scaling
+- **Chorus Bus**: Pitch-modulated delay line with feedback
+- **Send/Return Mixing**: Each voice contributes via individual send levels
+- **MIDI Control**: Real-time effects send control via CC91 (reverb) and CC93 (chorus)
 - **MIDI Channel Effects**: Per-channel effect send control (16-part multitimbral)
 
 **Key Components:**

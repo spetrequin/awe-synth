@@ -1,4 +1,4 @@
-use super::voice::{Voice, SampleVoice, MultiZoneSampleVoice};
+use super::multizone_voice::MultiZoneSampleVoice;
 use crate::soundfont::types::*;
 use crate::effects::reverb::ReverbBus;
 use crate::effects::chorus::ChorusBus;
@@ -45,17 +45,12 @@ pub struct ZoneDetail {
 }
 
 pub struct VoiceManager {
-    voices: [Voice; 32],              // Legacy oscillator-based voices (fallback)
-    sample_voices: [SampleVoice; 32], // Modern sample-based voices 
-    multi_zone_voices: [MultiZoneSampleVoice; 32], // EMU8000 multi-zone voices (preferred)
+    voices: [MultiZoneSampleVoice; 32], // EMU8000-authentic multi-zone voices (Phase 20.4 - single voice system)
     sample_rate: f32,
     // SoundFont integration
     loaded_soundfont: Option<SoundFont>,
     preset_map: HashMap<(u16, u8), usize>, // (bank, program) -> preset_index
     current_preset: Option<usize>, // Currently selected preset index
-    // Voice allocation strategy
-    prefer_sample_voices: bool,       // True = use SampleVoice first, False = use Voice first
-    enable_multi_zone: bool,          // True = use MultiZoneSampleVoice for layering
     // Round-robin and advanced zone selection
     round_robin_counters: HashMap<String, usize>, // Per-instrument round-robin state
     enable_round_robin: bool,         // True = use round-robin sample selection
@@ -70,25 +65,22 @@ pub struct VoiceManager {
 impl VoiceManager {
     pub fn new(sample_rate: f32) -> Self {
         let mut voice_manager = VoiceManager {
-            voices: core::array::from_fn(|_| Voice::new()),
-            sample_voices: core::array::from_fn(|_| SampleVoice::new()),
-            multi_zone_voices: core::array::from_fn(|_| MultiZoneSampleVoice::new()),
+            voices: core::array::from_fn(|i| MultiZoneSampleVoice::new(i, sample_rate)),
             sample_rate,
             loaded_soundfont: None,
             preset_map: HashMap::new(),
             current_preset: None,
-            prefer_sample_voices: true, // Default to modern sample-based synthesis
-            enable_multi_zone: true,    // Default to EMU8000 multi-zone layering
-            round_robin_counters: HashMap::new(), // Initialize round-robin state
+            round_robin_counters: HashMap::new(),
             enable_round_robin: false,  // Default to all matching zones (EMU8000 authentic)
             zone_selection_strategy: ZoneSelectionStrategy::AllMatching, // Default EMU8000 behavior
-            reverb_bus: ReverbBus::new(sample_rate), // Initialize global reverb
-            chorus_bus: ChorusBus::new(sample_rate), // Initialize global chorus
-            midi_effects: MidiEffectsController::new(), // Initialize MIDI effects control
+            reverb_bus: ReverbBus::new(sample_rate),
+            chorus_bus: ChorusBus::new(sample_rate),
+            midi_effects: MidiEffectsController::new(),
         };
         
         // Initialize effects buses with default MIDI send levels
         voice_manager.update_effects_from_midi();
+        log(&format!("VoiceManager initialized with 32 MultiZoneSampleVoices at {} Hz", sample_rate));
         voice_manager
     }
     
@@ -100,12 +92,53 @@ impl VoiceManager {
         
         // Build preset mapping for fast lookup
         let mut preset_map = HashMap::new();
+        
+        // First pass: collect all presets that are NOT terminators
+        log("🔍 First pass: mapping real presets");
         for (i, preset) in soundfont.presets.iter().enumerate() {
             let key = (preset.bank, preset.program);
+            
+            // Skip terminator records in first pass
+            if preset.name.trim() == "EOP" || preset.name.trim() == "EOI" || 
+               preset.name.trim() == "End of Presets" {
+                log(&format!("🔍 Skipping terminator: Preset {}: '{}'", i, preset.name));
+                continue;
+            }
+            
+            log(&format!("🔍 Processing real preset: Preset {}: '{}'", i, preset.name));
+            
+            if preset_map.contains_key(&key) {
+                // Both are real presets - warn about duplicate and keep first one
+                log(&format!("Warning: Duplicate Bank {}, Program {} - '{}' conflicts with existing preset, keeping first", 
+                           preset.bank, preset.program, preset.name));
+                continue;
+            }
+            
             preset_map.insert(key, i);
             log(&format!("Preset {}: '{}' mapped to Bank {}, Program {}", 
                        i, preset.name, preset.bank, preset.program));
         }
+        
+        // Second pass: add terminators only if no real preset exists for that bank/program
+        log("🔍 Second pass: checking terminators");
+        for (i, preset) in soundfont.presets.iter().enumerate() {
+            let key = (preset.bank, preset.program);
+            
+            // Only process terminator records in second pass
+            if preset.name.trim() == "EOP" || preset.name.trim() == "EOI" || 
+               preset.name.trim() == "End of Presets" {
+                if !preset_map.contains_key(&key) {
+                    preset_map.insert(key, i);
+                    log(&format!("🔍 Preset {}: '{}' mapped to Bank {}, Program {} (no real preset found)", 
+                               i, preset.name, preset.bank, preset.program));
+                } else {
+                    log(&format!("🔍 Preset {}: '{}' skipped (terminator, real preset exists for Bank {}, Program {})", 
+                               i, preset.name, preset.bank, preset.program));
+                }
+            }
+        }
+        
+        log(&format!("🔍 Final preset_map has {} entries", preset_map.len()));
         
         self.preset_map = preset_map;
         self.loaded_soundfont = Some(soundfont);
@@ -121,22 +154,6 @@ impl VoiceManager {
         Ok(())
     }
     
-    /// Enable sample-based voice allocation (preferred for EMU8000 authenticity)
-    pub fn enable_sample_voices(&mut self) {
-        self.prefer_sample_voices = true;
-        log("VoiceManager: Sample-based voice allocation enabled");
-    }
-    
-    /// Enable legacy oscillator-based voice allocation (fallback mode)
-    pub fn enable_legacy_voices(&mut self) {
-        self.prefer_sample_voices = false;
-        log("VoiceManager: Legacy oscillator voice allocation enabled");
-    }
-    
-    /// Check if sample-based voices are preferred
-    pub fn is_using_sample_voices(&self) -> bool {
-        self.prefer_sample_voices
-    }
     
     /// Select a SoundFont preset by bank and program number
     pub fn select_preset(&mut self, bank: u16, program: u8) {
@@ -152,22 +169,6 @@ impl VoiceManager {
         }
     }
     
-    /// Enable EMU8000 multi-zone sample layering (preferred for authenticity)
-    pub fn enable_multi_zone(&mut self) {
-        self.enable_multi_zone = true;
-        log("VoiceManager: Multi-zone sample layering enabled");
-    }
-    
-    /// Disable multi-zone layering (single sample per voice)
-    pub fn disable_multi_zone(&mut self) {
-        self.enable_multi_zone = false;
-        log("VoiceManager: Multi-zone layering disabled");
-    }
-    
-    /// Check if multi-zone layering is enabled
-    pub fn is_multi_zone_enabled(&self) -> bool {
-        self.enable_multi_zone
-    }
     
     /// Enable round-robin sample selection for variation
     pub fn enable_round_robin(&mut self) {
@@ -687,47 +688,37 @@ impl VoiceManager {
         self.loaded_soundfont.is_some()
     }
     
-    pub fn note_on(&mut self, note: u8, velocity: u8) -> Option<usize> {
-        // Use EMU8000 multi-zone layering if enabled
-        if self.enable_multi_zone {
-            // Try multi-zone sample layering first (most authentic EMU8000)
-            if let Some(voice_id) = self.note_on_multi_zone(note, velocity) {
-                return Some(voice_id);
-            }
-        }
-        
-        // Use the preferred voice allocation strategy
-        if self.prefer_sample_voices {
-            // Try SampleVoice-based note triggering (modern approach)
-            if let Some(voice_id) = self.note_on_sample_voice(note, velocity) {
-                return Some(voice_id);
-            }
-            
-            // Fallback to legacy Voice system if SampleVoice fails
-            if let Some(voice_id) = self.note_on_soundfont(note, velocity) {
-                return Some(voice_id);
-            }
-            
-            // Final fallback to sine wave synthesis
-            self.note_on_legacy_fallback(note, velocity)
-        } else {
-            // Legacy mode: use original Voice system first
-            if let Some(voice_id) = self.note_on_soundfont(note, velocity) {
-                return Some(voice_id);
-            }
-            
-            // Fallback to sine wave synthesis
-            self.note_on_legacy_fallback(note, velocity)
-        }
+    pub fn note_on(&mut self, note: u8, velocity: u8, channel: u8) -> Option<usize> {
+        // Phase 20.4.1: Use only MultiZoneSampleVoice system
+        self.note_on_multi_zone(note, velocity, channel)
     }
     
-    /// EMU8000 Multi-Zone note triggering (most authentic approach)
-    fn note_on_multi_zone(&mut self, note: u8, velocity: u8) -> Option<usize> {
-        // First, find an available MultiZoneSampleVoice
+    /// EMU8000 Multi-Zone note triggering (Phase 20.4.1 - single voice system)
+    fn note_on_multi_zone(&mut self, note: u8, velocity: u8, channel: u8) -> Option<usize> {
+        // Check if SoundFont and preset are available
+        let soundfont = match &self.loaded_soundfont {
+            Some(sf) => sf,
+            None => {
+                log(&format!("No SoundFont loaded for note {} velocity {}", note, velocity));
+                return None;
+            }
+        };
+        
+        let preset_index = match self.current_preset {
+            Some(idx) => idx,
+            None => {
+                log(&format!("No preset selected for note {} velocity {}", note, velocity));
+                return None;
+            }
+        };
+        
+        let preset = &soundfont.presets[preset_index];
+        
+        // Find an available voice
         let available_voice_index = {
             let mut found_index = None;
-            for (i, multi_voice) in self.multi_zone_voices.iter().enumerate() {
-                if multi_voice.is_available() {
+            for (i, voice) in self.voices.iter().enumerate() {
+                if !voice.is_active() {
                     found_index = Some(i);
                     break;
                 }
@@ -738,205 +729,63 @@ impl VoiceManager {
         let voice_index = match available_voice_index {
             Some(index) => index,
             None => {
-                log(&format!("No available MultiZoneSampleVoices for note {} velocity {}", note, velocity));
-                return None;
-            }
-        };
-        
-        // Now get the multi-zone samples (separate borrow)
-        let multi_zone_sample_refs = self.select_multi_zone_samples(note, velocity, None, None);
-        
-        if multi_zone_sample_refs.is_empty() {
-            log(&format!("No multi-zone samples found for note {} velocity {}", note, velocity));
-            return None;
-        }
-        
-        // Convert references to owned values for MultiZoneSampleVoice
-        let multi_zone_samples: Vec<(SoundFontSample, f32, String, String)> = 
-            multi_zone_sample_refs.into_iter()
-                .map(|(sample_ref, weight, preset_name, instrument_name)| {
-                    (sample_ref.clone(), weight, preset_name, instrument_name)
-                })
-                .collect();
-        
-        let sample_rate = self.sample_rate;
-        
-        // Finally, start the multi-zone note
-        self.multi_zone_voices[voice_index].start_multi_zone_note(note, velocity, multi_zone_samples, sample_rate);
-        
-        log(&format!("Multi-zone note triggered: Note {} Vel {} -> MultiZoneVoice {} with {} layers",
-                   note, velocity, voice_index, self.multi_zone_voices[voice_index].get_layer_count()));
-        
-        Some(voice_index)
-    }
-    
-    /// Modern SampleVoice-based note triggering (single sample approach)
-    fn note_on_sample_voice(&mut self, note: u8, velocity: u8) -> Option<usize> {
-        // Use the sample selection utility to find the appropriate sample
-        let sample_info = self.select_sample(note, velocity, None, None)?;
-        let (sample, preset_name, instrument_name) = sample_info;
-        
-        // Clone sample data to avoid borrow checker issues
-        let sample_clone = sample.clone();
-        let preset_name_clone = preset_name.clone();
-        let instrument_name_clone = instrument_name.clone();
-        let sample_rate = self.sample_rate;
-        
-        // Find available SampleVoice and configure it
-        for (i, sample_voice) in self.sample_voices.iter_mut().enumerate() {
-            if sample_voice.is_available() {
-                // Configure SampleVoice with selected SoundFont sample
-                sample_voice.start_note(note, velocity, &sample_clone, sample_rate);
+                // Voice stealing: find oldest releasing voice or lowest priority
+                let mut best_candidate: Option<(usize, f32)> = None;
                 
-                log(&format!("SampleVoice triggered: Note {} Vel {} -> SampleVoice {} using sample '{}' from instrument '{}' in preset '{}'",
-                           note, velocity, i, sample_clone.name, instrument_name_clone, preset_name_clone));
-                
-                return Some(i);
-            }
-        }
-        
-        log(&format!("No available SampleVoices for note {} velocity {}", note, velocity));
-        None
-    }
-    
-    /// Legacy fallback to sine wave synthesis
-    fn note_on_legacy_fallback(&mut self, note: u8, velocity: u8) -> Option<usize> {
-        for (i, voice) in self.voices.iter_mut().enumerate() {
-            if !voice.is_active {
-                voice.start_note(note, velocity);
-                log(&format!("Legacy fallback: Note {} on Voice {} (sine wave)", note, i));
-                return Some(i);
-            }
-        }
-        
-        log(&format!("No available voices for note {} (all voice types exhausted)", note));
-        None
-    }
-    
-    /// SoundFont-based note triggering
-    fn note_on_soundfont(&mut self, note: u8, velocity: u8) -> Option<usize> {
-        // Check if SoundFont is loaded and preset is selected
-        let (soundfont, preset_index) = match (&self.loaded_soundfont, self.current_preset) {
-            (Some(sf), Some(preset_idx)) => (sf, preset_idx),
-            _ => {
-                log("No SoundFont loaded or preset selected");
-                return None;
-            }
-        };
-        
-        let preset = &soundfont.presets[preset_index];
-        
-        // Find matching preset zone for this note/velocity
-        let matching_zone = preset.preset_zones.iter().find(|zone| {
-            let key_match = zone.key_range.as_ref()
-                .map(|range| range.contains(note))
-                .unwrap_or(true);
-            let vel_match = zone.velocity_range.as_ref()
-                .map(|range| range.contains(velocity))
-                .unwrap_or(true);
-            key_match && vel_match
-        });
-        
-        let zone = match matching_zone {
-            Some(z) => z,
-            None => {
-                log(&format!("No matching preset zone for note {} velocity {} in preset '{}'", 
-                           note, velocity, preset.name));
-                return None;
-            }
-        };
-        
-        // Get instrument from zone
-        let instrument = match zone.instrument_id {
-            Some(inst_id) => {
-                if let Some(inst) = soundfont.instruments.get(inst_id as usize) {
-                    inst
-                } else {
-                    log(&format!("Invalid instrument ID {} in preset zone", inst_id));
-                    return None;
+                for (i, voice) in self.voices.iter().enumerate() {
+                    let priority = voice.get_steal_priority();
+                    
+                    match best_candidate {
+                        None => best_candidate = Some((i, priority)),
+                        Some((_, best_priority)) => {
+                            if priority < best_priority {
+                                best_candidate = Some((i, priority));
+                            }
+                        }
+                    }
                 }
-            },
-            None => {
-                log("Preset zone has no instrument ID");
-                return None;
-            }
-        };
-        
-        // Find matching instrument zone for this note/velocity
-        let matching_inst_zone = instrument.instrument_zones.iter().find(|zone| {
-            let key_match = zone.key_range.as_ref()
-                .map(|range| range.contains(note))
-                .unwrap_or(true);
-            let vel_match = zone.velocity_range.as_ref()
-                .map(|range| range.contains(velocity))
-                .unwrap_or(true);
-            key_match && vel_match
-        });
-        
-        let inst_zone = match matching_inst_zone {
-            Some(z) => z,
-            None => {
-                log(&format!("No matching instrument zone for note {} velocity {} in instrument '{}'", 
-                           note, velocity, instrument.name));
-                return None;
-            }
-        };
-        
-        // Get sample from instrument zone
-        let sample = match inst_zone.sample_id {
-            Some(sample_id) => {
-                if let Some(smp) = soundfont.samples.get(sample_id as usize) {
-                    smp
-                } else {
-                    log(&format!("Invalid sample ID {} in instrument zone", sample_id));
-                    return None;
+                
+                match best_candidate {
+                    Some((voice_index, _)) => {
+                        log(&format!("Voice {} selected for stealing", voice_index));
+                        voice_index
+                    },
+                    None => {
+                        log(&format!("No available voices for note {} velocity {} (all 32 voices busy)", note, velocity));
+                        return None;
+                    }
                 }
-            },
-            None => {
-                log("Instrument zone has no sample ID");
-                return None;
             }
         };
         
-        // Find available voice and configure it for SoundFont playback
-        for (i, voice) in self.voices.iter_mut().enumerate() {
-            if !voice.is_active {
-                // Configure voice with SoundFont sample data
-                voice.start_soundfont_note(note, velocity, sample);
-                
-                log(&format!("SoundFont note triggered: Note {} Vel {} -> Voice {} using sample '{}' from instrument '{}' in preset '{}'",
-                           note, velocity, i, sample.name, instrument.name, preset.name));
-                
-                return Some(i);
-            }
+        // Prepare voice for stealing if it was not available
+        if available_voice_index.is_none() {
+            self.voices[voice_index].prepare_for_steal();
         }
         
-        log(&format!("No available voices for SoundFont note {} velocity {}", note, velocity));
-        None
+        // Start the note on the selected voice
+        match self.voices[voice_index].start_note(note, velocity, channel, soundfont, preset) {
+            Ok(_) => {
+                log(&format!("MultiZoneSampleVoice triggered: Note {} Vel {} Ch {} -> Voice {}",
+                           note, velocity, channel, voice_index));
+                Some(voice_index)
+            },
+            Err(e) => {
+                log(&format!("Failed to start note {} velocity {} on voice {}: {}", note, velocity, voice_index, e));
+                None
+            }
+        }
     }
+    
+    
+    
     
     pub fn note_off(&mut self, note: u8) {
         let mut released_count = 0;
         
-        // Release matching MultiZoneSampleVoices first (most authentic EMU8000)
-        for multi_voice in self.multi_zone_voices.iter_mut() {
-            if multi_voice.is_active && multi_voice.note == note {
-                multi_voice.stop_note();
-                released_count += 1;
-            }
-        }
-        
-        // Release matching SampleVoices (modern approach)
-        for sample_voice in self.sample_voices.iter_mut() {
-            if sample_voice.is_active && sample_voice.note == note {
-                sample_voice.stop_note();
-                released_count += 1;
-            }
-        }
-        
-        // Release matching legacy Voices (fallback voice type)
+        // Release matching voices
         for voice in self.voices.iter_mut() {
-            if voice.is_active && voice.note == note {
+            if voice.is_active() && voice.get_note() == note {
                 voice.stop_note();
                 released_count += 1;
             }
@@ -947,41 +796,24 @@ impl VoiceManager {
         }
     }
     
-    /// Process all active voices and return mixed audio sample
+    /// Process all active voices and return mixed stereo audio sample
     /// This is the main audio processing method - call once per sample
-    pub fn process(&mut self) -> f32 {
-        let mut dry_mixed_output = 0.0;
+    pub fn process(&mut self) -> (f32, f32) {
+        let mut dry_left = 0.0;
+        let mut dry_right = 0.0;
         
-        // Process MultiZoneSampleVoices (most authentic EMU8000 with layering)
-        for multi_voice in self.multi_zone_voices.iter_mut() {
-            if multi_voice.is_processing {
-                let voice_sample = multi_voice.generate_sample();
-                dry_mixed_output += voice_sample;
-                // Note: MultiZoneSampleVoice doesn't have reverb send yet (future enhancement)
-            }
-        }
-        
-        // Process SampleVoices (modern sample-based synthesis)
-        for sample_voice in self.sample_voices.iter_mut() {
-            if sample_voice.is_processing {
-                let voice_sample = sample_voice.generate_sample();
-                dry_mixed_output += voice_sample;
-                // Note: SampleVoice doesn't have reverb send yet (future enhancement)
-            }
-        }
-        
-        // Process legacy Voices (oscillator-based fallback with reverb send)
+        // Process all MultiZoneSampleVoices
         for voice in self.voices.iter_mut() {
-            if voice.is_processing {
-                let voice_sample = voice.generate_sample(self.sample_rate);
-                dry_mixed_output += voice_sample;
+            if voice.is_active() {
+                let (left, right) = voice.process();
+                dry_left += left;
+                dry_right += right;
                 
-                // Add to reverb send bus
-                let reverb_send = voice.get_reverb_send();
-                let chorus_send = voice.get_chorus_send();
-                let channel = voice.get_midi_channel();
-                self.reverb_bus.add_voice_send(voice_sample, reverb_send, channel);
-                self.chorus_bus.add_voice_send(voice_sample, chorus_send, channel);
+                // Add to effects sends
+                let (reverb_send, chorus_send) = voice.get_effects_sends();
+                let channel = voice.get_channel();
+                self.reverb_bus.add_voice_send((left + right) * 0.5, reverb_send, channel);
+                self.chorus_bus.add_voice_send((left + right) * 0.5, chorus_send, channel);
             }
         }
         
@@ -991,10 +823,11 @@ impl VoiceManager {
         
         // Mix dry and wet signals (EMU8000 style)
         let dry_level = 0.7; // 70% dry signal  
-        let final_output = (dry_mixed_output * dry_level) + reverb_wet + chorus_wet;
+        let final_left = (dry_left * dry_level) + reverb_wet + chorus_wet;
+        let final_right = (dry_right * dry_level) + reverb_wet + chorus_wet;
         
         // Simple mixing - divide by max voices to prevent clipping
-        final_output / 32.0
+        (final_left / 32.0, final_right / 32.0)
     }
     
     /// Process envelopes for all processing voices (call once per audio sample)
@@ -1002,147 +835,54 @@ impl VoiceManager {
     pub fn process_envelopes(&mut self) -> u32 {
         let mut processing_count = 0;
         
-        // Process MultiZoneSampleVoice envelopes
-        for multi_voice in self.multi_zone_voices.iter_mut() {
-            if multi_voice.is_processing {
-                let _amplitude = multi_voice.get_envelope_amplitude();
-                
-                // MultiZoneSampleVoice automatically updates is_processing in get_envelope_amplitude()
-                if multi_voice.is_processing {
-                    processing_count += 1;
-                }
-            }
-        }
-        
-        // Process SampleVoice envelopes
-        for sample_voice in self.sample_voices.iter_mut() {
-            if sample_voice.is_processing {
-                let _amplitude = sample_voice.get_envelope_amplitude();
-                
-                // SampleVoice automatically updates is_processing in get_envelope_amplitude()
-                if sample_voice.is_processing {
-                    processing_count += 1;
-                }
-            }
-        }
-        
-        // Process legacy Voice envelopes
+        // Process all voice envelopes
         for voice in self.voices.iter_mut() {
-            if voice.is_processing {
-                let _amplitude = voice.get_envelope_amplitude();
-                
-                // Voice automatically updates is_processing in get_envelope_amplitude()
-                if voice.is_processing {
-                    processing_count += 1;
-                }
+            if voice.is_active() {
+                // Processing happens inside voice.process(), just count active voices
+                processing_count += 1;
             }
         }
         
         processing_count
     }
     
-    /// Get the number of active voices (multi-zone, sample, and legacy combined)
+    /// Get the number of active voices
     pub fn get_active_voice_count(&self) -> usize {
-        let mut active_count = 0;
-        
-        // Count active multi-zone voices
-        for voice in self.multi_zone_voices.iter() {
-            if voice.is_active {
-                active_count += 1;
-            }
-        }
-        
-        // Count active sample voices
-        for voice in self.sample_voices.iter() {
-            if voice.is_active {
-                active_count += 1;
-            }
-        }
-        
-        // Count active legacy voices
-        for voice in self.voices.iter() {
-            if voice.is_active {
-                active_count += 1;
-            }
-        }
-        
-        active_count
+        self.voices.iter().filter(|voice| voice.is_active()).count()
     }
     
-    /// Apply pitch bend to all active voices
+    /// Apply pitch bend to all active voices on a specific channel
     /// 
     /// # Arguments
-    /// * `bend_value` - 14-bit pitch bend value (-8192 to 8191)
-    /// * `bend_range_semitones` - Pitch bend range in semitones (default 2.0 for EMU8000)
-    pub fn apply_pitch_bend(&mut self, bend_value: i16, bend_range_semitones: f32) {
-        // Convert 14-bit bend value to cents
-        let bend_cents = (bend_value as f32 / 8192.0) * (bend_range_semitones * 100.0);
+    /// * `channel` - MIDI channel (0-15)
+    /// * `bend_value` - Pitch bend value in semitones (-2.0 to +2.0 for EMU8000)
+    pub fn apply_pitch_bend(&mut self, channel: u8, bend_value: f32) {
+        log(&format!("Applying pitch bend: channel={} bend={:.2} semitones", channel, bend_value));
         
-        log(&format!("Applying pitch bend: value={} cents={:.1} range={:.1} semitones", 
-                   bend_value, bend_cents, bend_range_semitones));
-        
-        // Apply to all active multi-zone voices
-        for voice in self.multi_zone_voices.iter_mut() {
-            if voice.is_active || voice.is_processing {
-                // Multi-zone voices need pitch bend applied to all sample layers
-                for layer in voice.sample_layers.iter_mut() {
-                    apply_pitch_bend_to_sample_player(&mut layer.sample_player, bend_cents);
-                }
-            }
-        }
-        
-        // Apply to all active sample voices
-        for voice in self.sample_voices.iter_mut() {
-            if voice.is_active || voice.is_processing {
-                apply_pitch_bend_to_sample_player(&mut voice.sample_player, bend_cents);
-            }
-        }
-        
-        // Apply to all active legacy voices
+        // Apply to all active voices on the specified channel
         for voice in self.voices.iter_mut() {
-            if voice.is_active || voice.is_processing {
-                apply_pitch_bend_to_legacy_voice(voice, bend_cents);
+            if voice.is_active() && voice.get_channel() == channel {
+                voice.set_pitch_bend(bend_value);
             }
         }
     }
     
-}
-
-/// Apply pitch bend to a sample player by adjusting playback rate
-fn apply_pitch_bend_to_sample_player(sample_player: &mut crate::synth::sample_player::SamplePlayer, bend_cents: f32) {
-    // Convert cents to frequency ratio: freq_ratio = 2^(cents/1200)
-    let pitch_ratio = (2.0_f32).powf(bend_cents / 1200.0);
-    
-    // Apply pitch ratio to playback rate
-    let current_rate = sample_player.playback_rate;
-    let base_rate = current_rate / sample_player.pitch_bend_ratio.unwrap_or(1.0);
-    sample_player.playback_rate = base_rate * pitch_ratio as f64;
-    sample_player.pitch_bend_ratio = Some(pitch_ratio as f64);
-    
-    if bend_cents.abs() > 1.0 {
-        log(&format!("Sample player pitch bend: {:.1} cents -> rate {:.6} (ratio {:.6})", 
-                   bend_cents, sample_player.playback_rate, pitch_ratio));
-    }
-}
-
-/// Apply pitch bend to a legacy voice by adjusting sample rate ratio
-fn apply_pitch_bend_to_legacy_voice(voice: &mut Voice, bend_cents: f32) {
-    // Convert cents to frequency ratio
-    let pitch_ratio = (2.0_f32).powf(bend_cents / 1200.0);
-    
-    if voice.is_soundfont_voice {
-        // For SoundFont voices, adjust sample rate ratio
-        let base_ratio = voice.sample_rate_ratio / voice.pitch_bend_ratio.unwrap_or(1.0);
-        voice.sample_rate_ratio = base_ratio * pitch_ratio as f64;
-        voice.pitch_bend_ratio = Some(pitch_ratio as f64);
-    } else {
-        // For oscillator voices, adjust frequency
-        let base_frequency = crate::synth::oscillator::midi_note_to_frequency(voice.note);
-        voice.oscillator.frequency = base_frequency * pitch_ratio;
+    /// Apply modulation wheel to all active voices on a specific channel
+    pub fn apply_modulation(&mut self, channel: u8, modulation_value: f32) {
+        for voice in self.voices.iter_mut() {
+            if voice.is_active() && voice.get_channel() == channel {
+                voice.set_modulation(modulation_value);
+            }
+        }
     }
     
-    if bend_cents.abs() > 1.0 {
-        log(&format!("Voice {} pitch bend: {:.1} cents -> ratio {:.6}", 
-                   voice.note, bend_cents, pitch_ratio));
+    /// Apply pan control to all active voices on a specific channel  
+    pub fn apply_pan(&mut self, channel: u8, pan_value: f32) {
+        for voice in self.voices.iter_mut() {
+            if voice.is_active() && voice.get_channel() == channel {
+                voice.set_pan(pan_value);
+            }
+        }
     }
+    
 }

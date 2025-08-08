@@ -13,6 +13,7 @@ pub mod audio;
 use midi::sequencer::{MidiSequencer, PlaybackState};
 use midi::constants::*;
 use synth::voice_manager::VoiceManager;
+use soundfont::SoundFont;
 
 static DEBUG_LOG: OnceLock<Mutex<VecDeque<String>>> = OnceLock::new();
 static MIDI_EVENT_QUEUE: OnceLock<Mutex<VecDeque<MidiEvent>>> = OnceLock::new();
@@ -136,7 +137,7 @@ impl MidiPlayer {
         let note = 60; // Middle C
         let velocity = 100;
         
-        if let Some(voice_id) = self.voice_manager.note_on(note, velocity) {
+        if let Some(voice_id) = self.voice_manager.note_on(note, velocity, 0) {
             log(&format!("Test: Note {} triggered on voice {}", note, voice_id));
             
             // Process 10 samples and collect envelope values
@@ -281,7 +282,7 @@ impl MidiPlayer {
             MIDI_EVENT_NOTE_ON => {
                 // Note On (check velocity > 0, otherwise treat as Note Off)
                 if event.data2 > MIDI_VELOCITY_MIN {
-                    match self.voice_manager.note_on(event.data1, event.data2) {
+                    match self.voice_manager.note_on(event.data1, event.data2, event.channel) {
                         Some(voice_id) => {
                             log(&format!("VoiceManager: Note On - Note {} Vel {} assigned to Voice {}", 
                                 event.data1, event.data2, voice_id));
@@ -344,7 +345,8 @@ impl MidiPlayer {
                 log(&format!("VoiceManager: Pitch Bend {} -> {} (Ch {})", pitch_value, signed_bend, event.channel));
                 
                 // Apply pitch bend with standard EMU8000 range (±2 semitones)
-                self.voice_manager.apply_pitch_bend(signed_bend, 2.0);
+                let bend_semitones = (signed_bend as f32 / 8192.0) * 2.0;
+                self.voice_manager.apply_pitch_bend(event.channel, bend_semitones);
             },
             _ => {
                 log(&format!("VoiceManager: Unhandled MIDI message type 0x{:02X}", message_type));
@@ -359,13 +361,14 @@ impl MidiPlayer {
         // Process any pending MIDI events for current sample
         self.process_midi_events(self.current_sample);
         
-        // Generate audio sample from voice manager
-        let audio_sample = self.voice_manager.process();
+        // Generate stereo audio sample from voice manager
+        let (left, right) = self.voice_manager.process();
         
         // Advance sample counter
         self.current_sample += 1;
         
-        audio_sample
+        // Return mono mix for now (left + right) / 2
+        (left + right) * 0.5
     }
     
     /// Test complete synthesis pipeline: MIDI → Voice → Oscillator → Envelope → Audio
@@ -378,7 +381,7 @@ impl MidiPlayer {
         let note = 60; // Middle C (261.63 Hz)
         let velocity = 100;
         
-        if let Some(voice_id) = self.voice_manager.note_on(note, velocity) {
+        if let Some(voice_id) = self.voice_manager.note_on(note, velocity, 0) {
             log(&format!("✅ Note {} started on voice {}", note, voice_id));
             
             // Test 2: Generate 10 audio samples and verify non-zero output
@@ -386,14 +389,15 @@ impl MidiPlayer {
             let mut non_zero_samples = 0;
             
             for i in 0..10 {
-                let audio_sample = self.voice_manager.process();
-                sample_outputs.push(format!("{:.6}", audio_sample));
+                let (left, right) = self.voice_manager.process();
+                let mono_sample = (left + right) * 0.5;
+                sample_outputs.push(format!("{:.6}", mono_sample));
                 
-                if audio_sample.abs() > 0.001 {
+                if mono_sample.abs() > 0.001 {
                     non_zero_samples += 1;
                 }
                 
-                log(&format!("Sample {}: {:.6}", i, audio_sample));
+                log(&format!("Sample {}: L={:.6} R={:.6} Mono={:.6}", i, left, right, mono_sample));
             }
             
             // Test 3: Release note and verify envelope release
@@ -402,9 +406,10 @@ impl MidiPlayer {
             
             let mut release_samples = Vec::new();
             for i in 0..5 {
-                let audio_sample = self.voice_manager.process();
-                release_samples.push(format!("{:.6}", audio_sample));
-                log(&format!("Release sample {}: {:.6}", i, audio_sample));
+                let (left, right) = self.voice_manager.process();
+                let mono_sample = (left + right) * 0.5;
+                release_samples.push(format!("{:.6}", mono_sample));
+                log(&format!("Release sample {}: L={:.6} R={:.6} Mono={:.6}", i, left, right, mono_sample));
             }
             
             // Create test results
@@ -458,6 +463,28 @@ impl MidiPlayer {
                    status_byte, data1, data2, message_type, channel));
         
         Ok(())
+    }
+    
+    /// Load SoundFont into VoiceManager for synthesis (internal method)
+    pub(crate) fn load_soundfont(&mut self, soundfont: SoundFont) -> Result<(), String> {
+        log("MidiPlayer::load_soundfont() - Loading SoundFont into voice manager");
+        self.voice_manager.load_soundfont(soundfont)
+    }
+    
+    /// Select preset by bank and program number (internal method)
+    pub(crate) fn select_preset(&mut self, bank: u16, program: u8) {
+        log(&format!("MidiPlayer::select_preset() - Bank {}, Program {}", bank, program));
+        self.voice_manager.select_preset(bank, program);
+    }
+    
+    /// Check if SoundFont is loaded in voice manager (internal method)
+    pub(crate) fn is_soundfont_loaded(&self) -> bool {
+        self.voice_manager.is_soundfont_loaded()
+    }
+    
+    /// Get current preset information from voice manager (internal method)
+    pub(crate) fn get_current_preset_info(&self) -> Option<String> {
+        self.voice_manager.get_current_preset_info()
     }
 }
 

@@ -199,50 +199,64 @@ impl AudioWorkletBridge {
     
     /// Load SoundFont into the synthesis engine (internal method)
     pub(crate) fn load_soundfont_internal(&mut self, soundfont: SoundFont) -> Result<(), String> {
-        log(&format!("Loading SoundFont into AudioWorklet bridge: '{}'", soundfont.header.name));
+        log(&format!("Loading SoundFont into synthesis engine: '{}'", soundfont.header.name));
         
-        // Note: This is a simplified integration for Phase 9A.7
-        // In a full implementation, we would need to modify MidiPlayer to expose VoiceManager
-        // For now, we'll store basic SoundFont info and return success
+        // Get mutable access to VoiceManager through MidiPlayer
+        let result = {
+            // Create a temporary reference to avoid borrow conflicts
+            let voice_manager = &mut self.midi_player.voice_manager;
+            voice_manager.load_soundfont(soundfont)
+        };
         
-        log(&format!("SoundFont integration placeholder: {} presets, {} instruments, {} samples", 
-                   soundfont.presets.len(), soundfont.instruments.len(), soundfont.samples.len()));
-        
-        // TODO: In full implementation:
-        // 1. Pass soundfont to midi_player.voice_manager.load_soundfont(soundfont)
-        // 2. Configure default preset
-        // 3. Update preset mapping
-        
-        log("SoundFont loaded successfully (placeholder implementation)");
-        Ok(())
+        match result {
+            Ok(()) => {
+                log("SoundFont loaded successfully into VoiceManager");
+                
+                // Configure default preset (Bank 0, Program 0)
+                self.midi_player.voice_manager.select_preset(0, 0);
+                
+                // Phase 20.4.1: VoiceManager now uses only MultiZoneSampleVoices
+                
+                Ok(())
+            }
+            Err(e) => {
+                log(&format!("Failed to load SoundFont into VoiceManager: {}", e));
+                Err(e)
+            }
+        }
     }
     
     /// Select preset by bank and program (internal method)
     pub(crate) fn select_preset_internal(&mut self, bank: u16, program: u8) -> Result<String, String> {
         log(&format!("Selecting preset: Bank {}, Program {}", bank, program));
         
-        // TODO: Interface with VoiceManager's preset selection
-        // midi_player.voice_manager.select_preset(bank, program)
+        // Use VoiceManager to select the preset
+        self.midi_player.voice_manager.select_preset(bank, program);
         
-        let preset_info = format!("Bank {}, Program {} (placeholder)", bank, program);
-        log(&format!("Preset selected: {}", preset_info));
-        Ok(preset_info)
+        // Get the actual preset information
+        match self.midi_player.voice_manager.get_current_preset_info() {
+            Some(info) => {
+                log(&format!("Preset selected: {}", info));
+                Ok(info)
+            }
+            None => {
+                let error = format!("Preset not found: Bank {}, Program {}", bank, program);
+                log(&format!("Preset selection failed: {}", error));
+                Err(error)
+            }
+        }
     }
     
     /// Get current preset information (internal method)
     pub(crate) fn get_current_preset_info_internal(&self) -> Option<String> {
-        // TODO: Return actual preset information from VoiceManager
-        // self.midi_player.voice_manager.get_current_preset_info()
-        
-        Some("No preset selected (placeholder implementation)".to_string())
+        // Return actual preset information from VoiceManager
+        self.midi_player.voice_manager.get_current_preset_info()
     }
     
     /// Check if SoundFont is loaded (internal method)
     pub(crate) fn is_soundfont_loaded_internal(&self) -> bool {
-        // TODO: Check VoiceManager's SoundFont status
-        // self.midi_player.voice_manager.is_soundfont_loaded()
-        
-        false // Placeholder - always return false for now
+        // Check VoiceManager's SoundFont status
+        self.midi_player.voice_manager.is_soundfont_loaded()
     }
     
     /// Process audio buffer - main AudioWorklet processing method
