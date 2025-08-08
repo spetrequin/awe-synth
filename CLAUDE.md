@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **docs/ARCHITECTURE.md** - Complete system design and component architecture
 - **docs/PROJECT_TODO.md** - Current project status and phase planning
 - **docs/EMU8000_REFERENCE.md** - Hardware specifications and SoundFont 2.0 details
+- **docs/UNIFIED_DEBUG_SYSTEM.md** - Unified debug system architecture and usage
 
 **❌ ABSOLUTELY FORBIDDEN: Starting work without reading ALL documentation above**
 **❌ ABSOLUTELY FORBIDDEN: Skipping documentation because "I understand the project"**
@@ -130,32 +131,63 @@ SoundFont Sample → Pitch Modulation → Low-Pass Filter → ADSR Envelope → 
 - **Memory allocation discipline** - Minimize allocations in audio processing loops (pre-allocate buffers)
 - **Zero-copy operations** - Avoid unnecessary data copying in hot audio paths
 
-## 🚨 **CRITICAL DEBUG ARCHITECTURE**
+## 🚨 **CRITICAL DEBUG ARCHITECTURE - UNIFIED SYSTEM**
 
-### **ABSOLUTELY NO BROWSER CONSOLE LOGGING**
+### **🎯 NEW UNIFIED DEBUG SYSTEM (MANDATORY)**
 
-**NEVER use `console.log()`, `console.error()`, `console.warn()`, or ANY browser console methods.**
+**As of latest development, AWE Player uses a UNIFIED DEBUG SYSTEM that completely replaces the old text-logging approach.**
 
-**✅ CORRECT DEBUG APPROACH:**
-- **Rust code**: Use `crate::log()` function which routes to the debug textarea
-- **JavaScript code**: Append directly to `document.getElementById('debug-log').value`
-- **All debug information**: Must appear in the in-page debug log textarea ONLY
+**📚 COMPLETE DOCUMENTATION:** See `docs/UNIFIED_DEBUG_SYSTEM.md` for full architecture details.
 
-**❌ FORBIDDEN:**
-- `console.log()` - NEVER
-- `console.error()` - NEVER  
-- `console.warn()` - NEVER
-- `console.debug()` - NEVER
-- ANY browser console methods - NEVER
+### **✅ CORRECT DEBUG APPROACH - STRUCTURED DIAGNOSTICS**
 
-**Why this rule exists:**
-- **Real-time audio synthesis requirement**: Console logging causes interruptions and jank in WASM audio processing
-- **Performance-critical timing**: EMU8000 emulation requires precise 44.1kHz sample-rate processing without interruptions
-- **Browser console interference**: Console methods can cause garbage collection pauses and thread blocking
-- **Dedicated in-app debug system**: Our `crate::log()` → textarea system doesn't interfere with audio thread timing
-- **Audio synthesis priority**: Debug output must never interrupt real-time synthesis or cause audio dropouts
+**For TypeScript/JavaScript:**
+```typescript
+import { debugManager } from '../utils/DebugManager'
 
-**This rule is MANDATORY and must NEVER be violated.**
+// User actions (automatically captures WASM diagnostics)
+debugManager.logUserAction('Button clicked', { buttonId: 'test-audio' })
+
+// System events
+debugManager.logSystemEvent('Component initialized')
+
+// Errors (includes comprehensive diagnostics)
+debugManager.logError('Operation failed', { error: errorMessage })
+```
+
+**For Rust/WASM:**
+```rust
+// NO logging in audio processing loops - use diagnostic functions instead
+#[wasm_bindgen]
+pub fn diagnose_audio_pipeline() -> String {
+    // Return structured JSON diagnostics
+}
+```
+
+### **❌ COMPLETELY FORBIDDEN:**
+- **`console.log()` and all console methods** - NEVER use browser console
+- **`crate::log()` in audio processing loops** - Causes performance issues 
+- **Continuous text logging** - Replaced with on-demand structured diagnostics
+- **Debug text flooding** - Memory usage and performance problems
+
+### **🏗️ UNIFIED SYSTEM ARCHITECTURE:**
+
+1. **DebugManager (TypeScript)** - Centralized debug entry management
+2. **WASM Diagnostic Functions** - Structured JSON system state capture  
+3. **UnifiedDebugDisplay (React)** - Rich UI for debug data visualization
+4. **Category-based Organization** - user/system/audio/midi/error filtering
+5. **Memory Bounded** - 100 entry limit prevents memory accumulation
+6. **Zero Audio Impact** - No interference with real-time synthesis
+
+### **🎯 KEY BENEFITS:**
+
+- **No performance impact** - Zero logging during audio processing
+- **Rich diagnostics** - Comprehensive system state on user actions
+- **Memory efficient** - Bounded storage with automatic cleanup  
+- **Developer friendly** - Structured JSON data with filtering
+- **Export capabilities** - Full debug session analysis
+
+**This unified system is MANDATORY for all debug output and must NEVER be bypassed.**
 
 ### **🔊 CRITICAL WEB AUDIO API CONSTRAINT: USER GESTURE REQUIREMENT**
 
