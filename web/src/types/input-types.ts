@@ -30,10 +30,13 @@ export interface EnhancedTouchEvent extends TouchEvent {
 }
 
 // Re-export unified MIDI types and constructors
-export {
+export type {
     MIDINoteNumber,
     MIDIVelocity,
     MIDIChannel,
+} from './midi-types'
+
+export {
     createMIDINoteNumber,
     createMIDIVelocity,
     createMIDIChannel,

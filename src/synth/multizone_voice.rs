@@ -19,7 +19,7 @@ use crate::synth::envelope::{DAHDSREnvelope, EnvelopeState};
 use crate::synth::lfo::{LFO, LfoWaveform};
 use crate::effects::filter::LowPassFilter;
 use crate::effects::modulation::{ModulationRouter, ModulationSource, ModulationDestination};
-use crate::soundfont::types::{SoundFont, SoundFontPreset, SoundFontInstrument, SoundFontSample};
+use crate::soundfont::types::{SoundFont, SoundFontPreset};
 use crate::error::AweError;
 
 /// Complete EMU8000-authentic multi-zone sample voice with all effects
@@ -318,6 +318,10 @@ impl MultiZoneSampleVoice {
             priority -= 50.0; // Releasing voices are good candidates
         }
         
+        if self.state == VoiceState::Stealing {
+            priority -= 75.0; // Stealing voices have very low priority
+        }
+        
         if self.state == VoiceState::Idle {
             priority -= 100.0; // Idle voices are best candidates
         }
@@ -344,31 +348,184 @@ impl MultiZoneSampleVoice {
     ) -> Result<(), AweError> {
         self.zones.clear();
         
-        // TODO: Implement proper zone selection from SoundFont
-        // For now, create a placeholder zone
-        // This will be properly implemented when we integrate with SoundFont
+        // Find matching preset zones for this note/velocity
+        for (zone_id, preset_zone) in preset.preset_zones.iter().enumerate() {
+            // Check if this preset zone matches our note/velocity
+            let key_match = preset_zone.key_range.as_ref()
+                .map(|range| range.contains(note))
+                .unwrap_or(true);
+            let vel_match = preset_zone.velocity_range.as_ref()
+                .map(|range| range.contains(velocity))
+                .unwrap_or(true);
+            
+            if !key_match || !vel_match {
+                continue;
+            }
+            
+            // Get instrument from preset zone
+            if let Some(instrument_id) = preset_zone.instrument_id {
+                if let Some(instrument) = soundfont.instruments.get(instrument_id as usize) {
+                    // Find matching instrument zones
+                    for instrument_zone in &instrument.instrument_zones {
+                        let inst_key_match = instrument_zone.key_range.as_ref()
+                            .map(|range| range.contains(note))
+                            .unwrap_or(true);
+                        let inst_vel_match = instrument_zone.velocity_range.as_ref()
+                            .map(|range| range.contains(velocity))
+                            .unwrap_or(true);
+                        
+                        if !inst_key_match || !inst_vel_match {
+                            continue;
+                        }
+                        
+                        // Get sample from instrument zone
+                        if let Some(sample_id) = instrument_zone.sample_id {
+                            if let Some(sample) = soundfont.samples.get(sample_id as usize) {
+                                // Calculate velocity-based crossfade weight
+                                let zone_amplitude = self.calculate_zone_amplitude(
+                                    velocity, 
+                                    &preset_zone.velocity_range, 
+                                    &instrument_zone.velocity_range
+                                );
+                                
+                                // Create active zone with real sample data
+                                let active_zone = ActiveZone {
+                                    zone_id,
+                                    sample_id: sample_id as usize,
+                                    sample_data: sample.sample_data.clone(), // FIXED: Use real sample data
+                                    sample_rate: sample.sample_rate as f32,
+                                    position: 0.0,
+                                    playback_rate: 1.0, // Will be calculated based on pitch
+                                    loop_start: if sample.loop_start > 0 { Some(sample.loop_start as usize) } else { None },
+                                    loop_end: if sample.loop_end > sample.loop_start { Some(sample.loop_end as usize) } else { None },
+                                    loop_active: false,
+                                    zone_amplitude,
+                                    is_active: true,
+                                    key_range: (
+                                        instrument_zone.key_range.as_ref()
+                                            .map(|r| r.low).unwrap_or(0),
+                                        instrument_zone.key_range.as_ref()
+                                            .map(|r| r.high).unwrap_or(127)
+                                    ),
+                                    velocity_range: (
+                                        instrument_zone.velocity_range.as_ref()
+                                            .map(|r| r.low).unwrap_or(0),
+                                        instrument_zone.velocity_range.as_ref()
+                                            .map(|r| r.high).unwrap_or(127)
+                                    ),
+                                    root_key: sample.original_pitch,
+                                };
+                                
+                                self.zones.push(active_zone);
+                                
+                                crate::log(&format!(
+                                    "Zone activated: Sample '{}' (ID {}) for Note {} Vel {} - {} samples, root={}",
+                                    sample.name, sample_id, note, velocity, 
+                                    sample.sample_data.len(), sample.original_pitch
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
-        // Placeholder: Create single zone for testing
+        // If no zones were found, create a fallback test tone
+        if self.zones.is_empty() {
+            crate::log(&format!("No SoundFont zones found for Note {} Vel {} - creating test tone", note, velocity));
+            self.create_fallback_test_tone(note, velocity);
+        }
+        
+        Ok(())
+    }
+    
+    /// Create a fallback sine wave test tone when no SoundFont zones are available
+    fn create_fallback_test_tone(&mut self, note: u8, velocity: u8) {
+        // Generate a short sine wave at the appropriate frequency
+        let sample_rate = 44100.0;
+        let frequency = 440.0 * 2.0_f32.powf((note as f32 - 69.0) / 12.0); // A4 = 440Hz
+        let duration = 1.0; // 1 second
+        let sample_count = (sample_rate * duration) as usize;
+        
+        let mut sample_data = Vec::with_capacity(sample_count);
+        for i in 0..sample_count {
+            let t = i as f32 / sample_rate;
+            let amplitude = (velocity as f32 / 127.0) * 0.5; // Scale by velocity
+            let sample = (2.0 * std::f32::consts::PI * frequency * t).sin() * amplitude;
+            sample_data.push((sample * 32767.0) as i16); // Convert to 16-bit
+        }
+        
         let zone = ActiveZone {
             zone_id: 0,
             sample_id: 0,
-            sample_data: vec![0; 1000], // Placeholder
-            sample_rate: 44100.0,
+            sample_data,
+            sample_rate,
             position: 0.0,
             playback_rate: 1.0,
-            loop_start: None,
-            loop_end: None,
+            loop_start: Some(sample_count / 4), // Loop after 25%
+            loop_end: Some(sample_count * 3 / 4), // Loop before 75%
             loop_active: false,
             zone_amplitude: 1.0,
             is_active: true,
             key_range: (0, 127),
             velocity_range: (0, 127),
-            root_key: 60, // Middle C
+            root_key: note,
         };
         
         self.zones.push(zone);
         
-        Ok(())
+        crate::log(&format!(
+            "Fallback test tone created: {}Hz, {} samples for Note {} Vel {}",
+            frequency, sample_count, note, velocity
+        ));
+    }
+    
+    /// Calculate zone amplitude for velocity crossfading
+    fn calculate_zone_amplitude(
+        &self,
+        velocity: u8,
+        preset_vel_range: &Option<crate::soundfont::types::VelocityRange>,
+        instrument_vel_range: &Option<crate::soundfont::types::VelocityRange>
+    ) -> f32 {
+        let mut amplitude = 1.0;
+        
+        // Apply preset velocity range weighting
+        if let Some(range) = preset_vel_range {
+            amplitude *= self.calculate_velocity_weight(velocity, range.low, range.high);
+        }
+        
+        // Apply instrument velocity range weighting  
+        if let Some(range) = instrument_vel_range {
+            amplitude *= self.calculate_velocity_weight(velocity, range.low, range.high);
+        }
+        
+        amplitude
+    }
+    
+    /// Calculate velocity-based weight for crossfading
+    fn calculate_velocity_weight(&self, velocity: u8, range_low: u8, range_high: u8) -> f32 {
+        if velocity < range_low || velocity > range_high {
+            return 0.0;
+        }
+        
+        let range_size = range_high - range_low;
+        if range_size <= 4 {
+            return 1.0; // Small range, no crossfading
+        }
+        
+        let crossfade_size = (range_size / 4).max(1); // 25% crossfade zones
+        let velocity_pos = velocity - range_low;
+        
+        if velocity_pos < crossfade_size {
+            // Fade in at start
+            velocity_pos as f32 / crossfade_size as f32
+        } else if velocity_pos > range_size - crossfade_size {
+            // Fade out at end
+            (range_size - velocity_pos) as f32 / crossfade_size as f32
+        } else {
+            // Full weight in middle
+            1.0
+        }
     }
     
     /// Generate mixed sample from all active zones

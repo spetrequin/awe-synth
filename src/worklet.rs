@@ -302,11 +302,11 @@ impl AudioWorkletBridge {
         let mono_length = buffer_length / 2;
         let mut output_buffer = Vec::with_capacity(buffer_length);
         
-        // Generate mono samples and duplicate to stereo
+        // Generate true stereo samples
         for _ in 0..mono_length {
-            let sample = self.midi_player.process();
-            output_buffer.push(sample); // Left channel
-            output_buffer.push(sample); // Right channel
+            let (left, right) = self.midi_player.process_stereo();
+            output_buffer.push(left);  // Left channel
+            output_buffer.push(right); // Right channel
         }
         
         output_buffer
@@ -319,11 +319,11 @@ impl AudioWorkletBridge {
         let mut left_buffer = Vec::with_capacity(buffer_length);
         let mut right_buffer = Vec::with_capacity(buffer_length);
         
-        // Generate mono samples and duplicate to both channels
+        // Generate true stereo samples
         for _ in 0..buffer_length {
-            let sample = self.midi_player.process();
-            left_buffer.push(sample);
-            right_buffer.push(sample);
+            let (left, right) = self.midi_player.process_stereo();
+            left_buffer.push(left);
+            right_buffer.push(right);
         }
         
         // Convert to JavaScript arrays

@@ -303,4 +303,4 @@ export class MidiCCControls {
 }
 
 // Re-export for compatibility
-export { CCControl } from './midi-cc-definitions.js';
+export type { CCControl } from './midi-cc-definitions.js';

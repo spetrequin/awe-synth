@@ -371,6 +371,20 @@ impl MidiPlayer {
         (left + right) * 0.5
     }
     
+    /// Process one stereo sample (for proper stereo output) - internal use only
+    pub(crate) fn process_stereo(&mut self) -> (f32, f32) {
+        // Process any pending MIDI events for current sample
+        self.process_midi_events(self.current_sample);
+        
+        // Generate stereo audio sample from voice manager
+        let (left, right) = self.voice_manager.process();
+        
+        // Advance sample counter
+        self.current_sample += 1;
+        
+        (left, right)
+    }
+    
     /// Test complete synthesis pipeline: MIDI → Voice → Oscillator → Envelope → Audio
     /// Returns test results as JSON string for verification
     #[wasm_bindgen]
@@ -536,10 +550,10 @@ pub fn get_sample_rate() -> f32 {
 /// Queue MIDI event through global AudioWorklet bridge
 /// Optimized for real-time MIDI input from AudioWorklet
 #[wasm_bindgen]
-pub fn queue_midi_event_global(timestamp: u64, channel: u8, message_type: u8, data1: u8, data2: u8) {
+pub fn queue_midi_event_global(timestamp: u32, channel: u8, message_type: u8, data1: u8, data2: u8) {
     unsafe {
         if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
-            bridge.queue_midi_event(timestamp, channel, message_type, data1, data2);
+            bridge.queue_midi_event(timestamp as u64, channel, message_type, data1, data2);
         } else {
             log("Error: AudioWorklet bridge not initialized - MIDI event dropped");
         }

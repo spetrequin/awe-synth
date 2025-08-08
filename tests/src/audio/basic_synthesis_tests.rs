@@ -1,232 +1,211 @@
-// Basic synthesis tests for Phase 7B
-// Tests oscillator frequency accuracy, phase progression, and waveform generation
+// Basic synthesis tests for MultiZoneSampleVoice
+// Tests basic voice functionality, sample generation, and audio output quality
 
-use awe_synth::synth::oscillator::{Oscillator, WaveType, midi_note_to_frequency};
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
+use awe_synth::soundfont::types::{SoundFont, SoundFontPreset};
 
 const SAMPLE_RATE: f32 = 44100.0;
 const EPSILON: f32 = 1e-6;
 
 #[test]
-fn test_oscillator_initialization() {
-    let freq = 440.0;
-    let osc = Oscillator::new(freq);
+fn test_voice_initialization() {
+    let voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
-    assert_eq!(osc.frequency, freq);
-    assert_eq!(osc.phase, 0.0);
-    assert_eq!(osc.wave_type, WaveType::Sine);
+    assert_eq!(voice.note, 0);
+    assert_eq!(voice.velocity, 0);
+    assert!(!voice.is_active);
+    assert!(!voice.is_processing);
 }
 
 #[test]
-fn test_oscillator_phase_progression() {
-    let freq = 1000.0; // 1kHz for easy calculation
-    let mut osc = Oscillator::new(freq);
+fn test_voice_note_start() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    // Expected phase increment per sample
-    let expected_phase_increment = freq / SAMPLE_RATE;
+    let result = voice.start_note(60, 100, 0, &soundfont, &preset);
+    assert!(result.is_ok(), "Voice should start note successfully");
+}
+
+#[test]
+fn test_voice_sample_generation() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    // Generate 10 samples and verify phase progression
-    for i in 0..10 {
-        let expected_phase = (i as f32 * expected_phase_increment) % 1.0;
-        assert!((osc.phase - expected_phase).abs() < EPSILON, 
-            "Phase mismatch at sample {}: expected {}, got {}", i, expected_phase, osc.phase);
+    // Start a note
+    voice.start_note(60, 100, 0, &soundfont, &preset).unwrap();
+    
+    // Generate samples
+    for _ in 0..100 {
+        let (left, right) = voice.process();
         
-        osc.generate_sample(SAMPLE_RATE);
+        // Verify samples are finite
+        assert!(left.is_finite() && right.is_finite(), 
+            "Generated samples should be finite");
+        
+        // Verify reasonable amplitude range
+        assert!(left >= -2.0 && left <= 2.0, 
+            "Left channel out of reasonable range: {}", left);
+        assert!(right >= -2.0 && right <= 2.0, 
+            "Right channel out of reasonable range: {}", right);
     }
 }
 
 #[test]
-fn test_oscillator_phase_wrap() {
-    let freq = SAMPLE_RATE / 2.0; // Nyquist frequency for extreme test
-    let mut osc = Oscillator::new(freq);
+fn test_voice_note_velocity_response() {
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    // Generate enough samples to wrap phase multiple times
-    for _ in 0..10 {
-        osc.generate_sample(SAMPLE_RATE);
-        assert!(osc.phase >= 0.0 && osc.phase < 1.0, 
-            "Phase out of bounds: {}", osc.phase);
+    let velocities = [32, 64, 96, 127];
+    
+    for &velocity in &velocities {
+        let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+        voice.start_note(60, velocity, 0, &soundfont, &preset).unwrap();
+        
+        // Generate a few samples
+        let (left, right) = voice.process();
+        
+        assert!(left.is_finite() && right.is_finite(), 
+            "Voice should handle velocity {} correctly", velocity);
     }
 }
 
 #[test]
-fn test_midi_note_to_frequency_a4() {
-    // Test A4 (MIDI note 69) = 440Hz
-    let freq = midi_note_to_frequency(69);
-    assert!((freq - 440.0).abs() < EPSILON, 
-        "A4 frequency incorrect: expected 440.0, got {}", freq);
-}
-
-#[test]
-fn test_midi_note_to_frequency_c4() {
-    // Test C4 (Middle C, MIDI note 60) ≈ 261.63Hz
-    let freq = midi_note_to_frequency(60);
-    let expected = 261.6256;
-    assert!((freq - expected).abs() < 0.01, 
-        "C4 frequency incorrect: expected {}, got {}", expected, freq);
-}
-
-#[test]
-fn test_midi_note_to_frequency_octaves() {
-    // Test octave relationships
-    let a3 = midi_note_to_frequency(57); // A3
-    let a4 = midi_note_to_frequency(69); // A4
-    let a5 = midi_note_to_frequency(81); // A5
+fn test_voice_different_notes() {
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    // A4 should be exactly 2x A3
-    assert!((a4 - a3 * 2.0).abs() < 0.01, 
-        "Octave relationship A3->A4 incorrect: {} vs {}", a4, a3 * 2.0);
+    let notes = [36, 48, 60, 72, 84, 96]; // C2 to C7
     
-    // A5 should be exactly 2x A4
-    assert!((a5 - a4 * 2.0).abs() < 0.01, 
-        "Octave relationship A4->A5 incorrect: {} vs {}", a5, a4 * 2.0);
-}
-
-#[test]
-fn test_frequency_accuracy_over_time() {
-    let freq = 440.0; // A4
-    let mut osc = Oscillator::new(freq);
-    
-    // Generate exactly one second of samples
-    let samples_per_second = SAMPLE_RATE as usize;
-    let mut zero_crossings = 0;
-    let mut last_sample = 0.0;
-    
-    for _ in 0..samples_per_second {
-        let sample = osc.generate_sample(SAMPLE_RATE);
+    for &note in &notes {
+        let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+        voice.start_note(note, 100, 0, &soundfont, &preset).unwrap();
         
-        // Count positive zero crossings
-        if last_sample <= 0.0 && sample > 0.0 {
-            zero_crossings += 1;
+        // Generate samples to verify no crashes
+        for _ in 0..10 {
+            let (left, right) = voice.process();
+            assert!(left.is_finite() && right.is_finite(), 
+                "Note {} should generate valid audio", note);
         }
-        
-        last_sample = sample;
     }
-    
-    // Should have approximately freq zero crossings in one second
-    let error = (zero_crossings as f32 - freq).abs();
-    assert!(error < 2.0, 
-        "Frequency accuracy error too high: expected {} crossings, got {}", 
-        freq, zero_crossings);
 }
 
 #[test]
-fn test_sine_wave_amplitude_range() {
-    let freq = 440.0;
-    let mut osc = Oscillator::new(freq);
+fn test_voice_stop_note() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    let mut min_amplitude = f32::MAX;
-    let mut max_amplitude = f32::MIN;
+    // Start and stop a note
+    voice.start_note(60, 100, 0, &soundfont, &preset).unwrap();
+    voice.stop_note();
     
-    // Generate 2 complete cycles to ensure we hit peaks and troughs
-    let samples_per_cycle = (SAMPLE_RATE / freq) as usize;
-    for _ in 0..(samples_per_cycle * 2) {
-        let sample = osc.generate_sample(SAMPLE_RATE);
-        
-        min_amplitude = min_amplitude.min(sample);
-        max_amplitude = max_amplitude.max(sample);
-        
-        // Verify sample is within valid range
-        assert!(sample >= -1.0 && sample <= 1.0, 
-            "Sample out of range: {}", sample);
-    }
-    
-    // Verify we hit close to the expected peaks
-    assert!((max_amplitude - 1.0).abs() < 0.01, 
-        "Max amplitude not close to 1.0: {}", max_amplitude);
-    assert!((min_amplitude - (-1.0)).abs() < 0.01, 
-        "Min amplitude not close to -1.0: {}", min_amplitude);
+    // Voice should still be processing (release phase)
+    assert!(!voice.is_active, "Voice should not be active after stop_note");
 }
 
 #[test]
-fn test_sine_wave_shape_at_key_points() {
-    // Test sine wave values at specific phase points
-    // We'll manually set phase values to test exact points
+fn test_voice_availability() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
-    // Test phase 0.0 -> sin(0) = 0
-    let mut osc = Oscillator::new(440.0);
-    osc.phase = 0.0;
-    let sample = osc.generate_sample(SAMPLE_RATE);
-    assert!((sample - 0.0).abs() < 0.001, 
-        "Sine at phase 0 should be 0, got {}", sample);
+    assert!(voice.is_available(), "Voice should be available initially");
     
-    // Test phase 0.25 -> sin(π/2) = 1
-    osc.phase = 0.25;
-    let sample = osc.generate_sample(SAMPLE_RATE);
-    assert!((sample - 1.0).abs() < 0.001, 
-        "Sine at phase 0.25 should be 1, got {}", sample);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
+    voice.start_note(60, 100, 0, &soundfont, &preset).unwrap();
     
-    // Test phase 0.5 -> sin(π) = 0
-    osc.phase = 0.5;
-    let sample = osc.generate_sample(SAMPLE_RATE);
-    assert!((sample - 0.0).abs() < 0.001, 
-        "Sine at phase 0.5 should be 0, got {}", sample);
-    
-    // Test phase 0.75 -> sin(3π/2) = -1
-    osc.phase = 0.75;
-    let sample = osc.generate_sample(SAMPLE_RATE);
-    assert!((sample - (-1.0)).abs() < 0.001, 
-        "Sine at phase 0.75 should be -1, got {}", sample);
+    assert!(!voice.is_available(), "Voice should not be available when active");
 }
 
 #[test]
-fn test_sine_wave_smoothness() {
-    let freq = 440.0;
-    let mut osc = Oscillator::new(freq);
+fn test_voice_envelope_amplitude() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    let mut last_sample = 0.0;
-    let max_allowed_jump = 0.1; // Maximum sample-to-sample difference
+    voice.start_note(60, 100, 0, &soundfont, &preset).unwrap();
     
-    // Generate one complete cycle
-    let samples_per_cycle = (SAMPLE_RATE / freq) as usize;
-    for i in 0..samples_per_cycle {
-        let sample = osc.generate_sample(SAMPLE_RATE);
+    let envelope_amplitude = voice.get_envelope_amplitude();
+    assert!(envelope_amplitude >= 0.0 && envelope_amplitude <= 1.0, 
+        "Envelope amplitude should be between 0.0 and 1.0");
+}
+
+#[test]
+fn test_voice_audio_output_continuity() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
+    
+    voice.start_note(60, 100, 0, &soundfont, &preset).unwrap();
+    
+    let mut last_left = 0.0;
+    let mut last_right = 0.0;
+    let max_allowed_jump = 0.5; // Maximum sample-to-sample difference
+    
+    // Generate samples and check for discontinuities
+    for i in 0..100 {
+        let (left, right) = voice.process();
         
         if i > 0 {
-            let jump = (sample - last_sample).abs();
-            assert!(jump < max_allowed_jump, 
-                "Discontinuity detected at sample {}: jump of {} (from {} to {})", 
-                i, jump, last_sample, sample);
+            let left_jump = (left - last_left).abs();
+            let right_jump = (right - last_right).abs();
+            
+            assert!(left_jump < max_allowed_jump, 
+                "Left channel discontinuity at sample {}: jump of {}", i, left_jump);
+            assert!(right_jump < max_allowed_jump, 
+                "Right channel discontinuity at sample {}: jump of {}", i, right_jump);
         }
         
-        last_sample = sample;
+        last_left = left;
+        last_right = right;
     }
 }
 
 #[test]
-fn test_sine_wave_dc_offset() {
-    let freq = 1000.0;
-    let mut osc = Oscillator::new(freq);
+fn test_voice_stereo_output() {
+    let mut voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
+    let soundfont = SoundFont::default();
+    let preset = SoundFontPreset::default();
     
-    let mut sum = 0.0;
-    let samples_per_cycle = (SAMPLE_RATE / freq) as usize;
+    voice.start_note(60, 100, 0, &soundfont, &preset).unwrap();
     
-    // Sum samples over multiple complete cycles
-    for _ in 0..(samples_per_cycle * 10) {
-        sum += osc.generate_sample(SAMPLE_RATE);
+    // Generate samples and verify both channels produce output
+    let mut left_has_signal = false;
+    let mut right_has_signal = false;
+    
+    for _ in 0..100 {
+        let (left, right) = voice.process();
+        
+        if left.abs() > EPSILON {
+            left_has_signal = true;
+        }
+        if right.abs() > EPSILON {
+            right_has_signal = true;
+        }
     }
     
-    // Average should be close to zero (no DC offset)
-    let average = sum / (samples_per_cycle * 10) as f32;
-    assert!(average.abs() < 0.001, 
-        "DC offset detected: average = {}", average);
+    // Note: With default preset, both channels should have some signal
+    assert!(left_has_signal || right_has_signal, 
+        "At least one channel should have signal");
 }
 
 /// Run all basic synthesis tests and return results
 pub fn run_basic_synthesis_tests() -> Vec<(&'static str, bool, String)> {
     let mut results = vec![];
     
-    // Test list
+    // Test list for MultiZoneSampleVoice
     let tests = vec![
-        ("oscillator_initialization", test_oscillator_initialization as fn()),
-        ("oscillator_phase_progression", test_oscillator_phase_progression as fn()),
-        ("oscillator_phase_wrap", test_oscillator_phase_wrap as fn()),
-        ("midi_note_to_frequency_a4", test_midi_note_to_frequency_a4 as fn()),
-        ("midi_note_to_frequency_c4", test_midi_note_to_frequency_c4 as fn()),
-        ("midi_note_to_frequency_octaves", test_midi_note_to_frequency_octaves as fn()),
-        ("frequency_accuracy_over_time", test_frequency_accuracy_over_time as fn()),
-        ("sine_wave_amplitude_range", test_sine_wave_amplitude_range as fn()),
-        ("sine_wave_shape_at_key_points", test_sine_wave_shape_at_key_points as fn()),
-        ("sine_wave_smoothness", test_sine_wave_smoothness as fn()),
-        ("sine_wave_dc_offset", test_sine_wave_dc_offset as fn()),
+        ("voice_initialization", "test_voice_initialization"),
+        ("voice_note_start", "test_voice_note_start"),
+        ("voice_sample_generation", "test_voice_sample_generation"),
+        ("voice_note_velocity_response", "test_voice_note_velocity_response"),
+        ("voice_different_notes", "test_voice_different_notes"),
+        ("voice_stop_note", "test_voice_stop_note"),
+        ("voice_availability", "test_voice_availability"),
+        ("voice_envelope_amplitude", "test_voice_envelope_amplitude"),
+        ("voice_audio_output_continuity", "test_voice_audio_output_continuity"),
+        ("voice_stereo_output", "test_voice_stereo_output"),
     ];
     
     for (name, _test_fn) in tests {

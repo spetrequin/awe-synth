@@ -6,7 +6,7 @@
  */
 
 use awe_synth::synth::voice_manager::VoiceManager;
-use awe_synth::synth::voice::{MultiZoneSampleVoice, SampleLayer};
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
 use awe_synth::soundfont::types::*;
 use std::collections::HashMap;
 
@@ -17,7 +17,7 @@ const SAMPLE_RATE: f32 = 44100.0;
 fn test_multi_zone_sample_voice_creation() {
     println!("=== Testing MultiZoneSampleVoice Creation ===");
     
-    let mut multi_voice = MultiZoneSampleVoice::new();
+    let mut multi_voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
     // Test initial state
     assert_eq!(multi_voice.note, 0, "Initial note should be 0");
@@ -159,7 +159,7 @@ fn test_velocity_crossfading_weights() {
 fn test_multi_zone_sample_generation() {
     println!("=== Testing Multi-Zone Sample Generation ===");
     
-    let mut multi_voice = MultiZoneSampleVoice::new();
+    let mut multi_voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
     // Test sample generation in initial state
     let initial_sample = multi_voice.generate_sample();
@@ -178,7 +178,7 @@ fn test_multi_zone_sample_generation() {
 fn test_multi_zone_voice_controls() {
     println!("=== Testing Multi-Zone Voice Controls ===");
     
-    let mut multi_voice = MultiZoneSampleVoice::new();
+    let mut multi_voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
     // Test stop_note method
     multi_voice.stop_note();
@@ -203,7 +203,7 @@ fn test_multi_zone_implementation_completeness() {
     
     // Verify all required components exist
     let voice_manager = VoiceManager::new(SAMPLE_RATE);
-    let multi_voice = MultiZoneSampleVoice::new();
+    let multi_voice = MultiZoneSampleVoice::new(0, SAMPLE_RATE);
     
     // Check VoiceManager methods
     assert!(voice_manager.is_multi_zone_enabled(), "Multi-zone support should exist");

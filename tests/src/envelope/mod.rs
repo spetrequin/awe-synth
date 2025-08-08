@@ -12,7 +12,7 @@ pub mod performance_benchmarks;
 
 // Re-export envelope types for testing
 pub use awe_synth::synth::envelope::{DAHDSREnvelope, EnvelopeState, timecents_to_seconds, centibels_to_linear};
-pub use awe_synth::synth::voice::Voice;
+pub use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
 pub use awe_synth::synth::voice_manager::VoiceManager;
 
 // Common test utilities for envelope testing

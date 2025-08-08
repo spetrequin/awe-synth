@@ -5,12 +5,9 @@
 //!
 //! Phase 20.3.1: Complete MultiZoneSampleVoice unit testing
 
-use std::collections::HashMap;
-
 // Import the actual production code for testing
-use awe_synth::synth::multizone_voice::{MultiZoneSampleVoice, VoiceState};
+use awe_synth::synth::multizone_voice::MultiZoneSampleVoice;
 use awe_synth::soundfont::types::{SoundFont, SoundFontPreset};
-use awe_synth::error::AweError;
 
 /// Test data structures and helpers
 mod test_helpers {
@@ -199,7 +196,7 @@ mod envelope_tests {
         voice.start_note(60, 127, 0, &soundfont, &preset).unwrap();
         
         // Process samples and verify envelope progression
-        let samples = process_voice_samples(&mut voice, 100);
+        let _samples = process_voice_samples(&mut voice, 100);
         
         // Volume envelope should start at 0 and increase
         let initial_level = voice.get_volume_envelope_level();
@@ -587,43 +584,4 @@ mod performance_tests {
     }
 }
 
-/// Main test runner
-#[cfg(test)]
-mod test_runner {
-    use super::*;
-    
-    #[test]
-    fn run_comprehensive_multizone_voice_tests() {
-        println!("🧪 Starting comprehensive MultiZoneSampleVoice unit tests...\n");
-        
-        // Run all test modules
-        voice_lifecycle_tests::test_voice_creation();
-        voice_lifecycle_tests::test_note_start_stop_cycle();
-        voice_lifecycle_tests::test_voice_stealing_preparation();
-        
-        envelope_tests::test_volume_envelope_progression();
-        envelope_tests::test_modulation_envelope_behavior();
-        envelope_tests::test_envelope_release_behavior();
-        
-        lfo_tests::test_lfo1_tremolo_operation();
-        lfo_tests::test_lfo2_vibrato_operation();
-        lfo_tests::test_modulation_wheel_control();
-        
-        filter_tests::test_filter_parameter_ranges();
-        filter_tests::test_filter_modulation_response();
-        
-        effects_send_tests::test_effects_send_velocity_response();
-        effects_send_tests::test_effects_send_note_response();
-        effects_send_tests::test_effects_send_direct_control();
-        
-        realtime_control_tests::test_pitch_bend_control();
-        realtime_control_tests::test_pan_control();
-        
-        performance_tests::test_rapid_note_cycling();
-        performance_tests::test_extreme_parameter_values();
-        performance_tests::test_long_duration_processing();
-        
-        println!("\n🎉 All MultiZoneSampleVoice unit tests completed successfully!");
-        println!("📊 Test coverage: Voice lifecycle, envelopes, LFOs, filter, effects sends, real-time controls, performance");
-    }
-}
+// Main test runner removed - individual tests will run independently via cargo test
