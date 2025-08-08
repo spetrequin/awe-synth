@@ -1492,11 +1492,9 @@ pub fn get_system_diagnostics() -> String {
                     "pipelineReady": {},
                     "soundfontLoaded": {},
                     "sampleRate": {},
-                    "bufferSize": {},
-                    "timestamp": {}
+                    "bufferSize": {}
                 }}
-            }}"#, pipeline_ready, soundfont_loaded, sample_rate, buffer_size,
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis())
+            }}"#, pipeline_ready, soundfont_loaded, sample_rate, buffer_size)
         } else {
             r#"{"success": false, "error": "Bridge not available", "system": {"bridgeAvailable": false}}"#.to_string()
         }

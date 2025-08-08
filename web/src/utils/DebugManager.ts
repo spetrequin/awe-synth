@@ -47,13 +47,40 @@ class DebugManager {
     // Capture WASM diagnostics if requested and available
     if (includeWasmDiagnostics && this.wasmModule) {
       try {
-        entry.wasmDiagnostics = {
-          audioPipeline: this.parseJSON(this.wasmModule.diagnose_audio_pipeline()),
-          soundfontData: this.parseJSON(this.wasmModule.diagnose_soundfont_data()),
-          midiProcessing: this.parseJSON(this.wasmModule.diagnose_midi_processing()),
-          systemDiagnostics: this.parseJSON(this.wasmModule.get_system_diagnostics()),
-          audioTest: this.parseJSON(this.wasmModule.run_audio_test())
+        // Test one function at a time to isolate the crash
+        const diagnostics: any = {}
+        
+        try {
+          diagnostics.audioPipeline = this.parseJSON(this.wasmModule.diagnose_audio_pipeline())
+        } catch (e) {
+          diagnostics.audioPipeline = { error: `diagnose_audio_pipeline failed: ${e}` }
         }
+        
+        try {
+          diagnostics.soundfontData = this.parseJSON(this.wasmModule.diagnose_soundfont_data())
+        } catch (e) {
+          diagnostics.soundfontData = { error: `diagnose_soundfont_data failed: ${e}` }
+        }
+        
+        try {
+          diagnostics.midiProcessing = this.parseJSON(this.wasmModule.diagnose_midi_processing())
+        } catch (e) {
+          diagnostics.midiProcessing = { error: `diagnose_midi_processing failed: ${e}` }
+        }
+        
+        try {
+          diagnostics.systemDiagnostics = this.parseJSON(this.wasmModule.get_system_diagnostics())
+        } catch (e) {
+          diagnostics.systemDiagnostics = { error: `get_system_diagnostics failed: ${e}` }
+        }
+        
+        try {
+          diagnostics.audioTest = this.parseJSON(this.wasmModule.run_audio_test())
+        } catch (e) {
+          diagnostics.audioTest = { error: `run_audio_test failed: ${e}` }
+        }
+        
+        entry.wasmDiagnostics = diagnostics
       } catch (error) {
         entry.wasmDiagnostics = { error: `WASM diagnostics failed: ${error}` }
       }
