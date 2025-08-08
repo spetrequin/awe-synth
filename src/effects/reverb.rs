@@ -92,8 +92,7 @@ impl ReverbProcessor {
     /// * `damping` - High-frequency damping (0.0 = bright, 1.0 = dark)
     /// * `diffusion` - Echo density (0.0 = sparse, 1.0 = dense)
     pub fn new(sample_rate: f32, room_size: f32, damping: f32, diffusion: f32) -> Self {
-        log(&format!("ReverbProcessor created: room_size={:.2} damping={:.2} diffusion={:.2} @{:.0}Hz", 
-                   room_size, damping, diffusion, sample_rate));
+        // ReverbProcessor creation debug removed
         
         let mut reverb = ReverbProcessor {
             sample_rate,
@@ -157,8 +156,7 @@ impl ReverbProcessor {
             self.comb_filters.push(comb);
         }
         
-        log(&format!("Reverb structure: {} delays, {} allpass, {} combs", 
-                   self.delay_lines.len(), self.allpass_filters.len(), self.comb_filters.len()));
+        // Reverb structure debug removed
     }
     
     /// Process reverb for one audio sample using EMU8000 algorithm
@@ -197,7 +195,7 @@ impl ReverbProcessor {
     pub fn set_room_size(&mut self, room_size: f32) {
         self.room_size = room_size.clamp(0.0, 1.0);
         self.initialize_reverb_structure(); // Rebuild with new delays
-        log(&format!("Reverb room size set to {:.2}", self.room_size));
+        // Reverb room size debug removed
     }
     
     /// Set damping parameter (affects high-frequency decay)
@@ -207,7 +205,7 @@ impl ReverbProcessor {
         for comb in self.comb_filters.iter_mut() {
             comb.set_damping(self.damping);
         }
-        log(&format!("Reverb damping set to {:.2}", self.damping));
+        // Reverb damping debug removed
     }
     
     /// Set diffusion parameter (affects echo density)
@@ -217,13 +215,13 @@ impl ReverbProcessor {
         for allpass in self.allpass_filters.iter_mut() {
             allpass.set_gain(0.7 * self.diffusion);
         }
-        log(&format!("Reverb diffusion set to {:.2}", self.diffusion));
+        // Reverb diffusion debug removed
     }
     
     /// Set wet signal level
     pub fn set_wet_level(&mut self, wet_level: f32) {
         self.wet_level = wet_level.clamp(0.0, 1.0);
-        log(&format!("Reverb wet level set to {:.2}", self.wet_level));
+        // Reverb wet level debug removed
     }
 }
 
@@ -278,19 +276,19 @@ impl ReverbBus {
     pub fn set_channel_send(&mut self, channel: u8, send_level: f32) {
         let channel_idx = (channel as usize).min(15);
         self.channel_send_levels[channel_idx] = send_level.clamp(0.0, 1.0);
-        log(&format!("Channel {} reverb send set to {:.2}", channel, send_level));
+        // Channel reverb send debug removed
     }
     
     /// Set master reverb send level
     pub fn set_master_send(&mut self, send_level: f32) {
         self.master_send_level = send_level.clamp(0.0, 1.0);
-        log(&format!("Master reverb send set to {:.2}", self.master_send_level));
+        // Master reverb send debug removed
     }
     
     /// Set reverb return level (wet signal mixing)
     pub fn set_return_level(&mut self, return_level: f32) {
         self.return_level = return_level.clamp(0.0, 1.0);
-        log(&format!("Reverb return level set to {:.2}", self.return_level));
+        // Reverb return level debug removed
     }
     
     /// Configure reverb parameters

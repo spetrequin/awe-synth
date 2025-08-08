@@ -74,12 +74,12 @@ impl RiffParser {
             });
         }
         
-        log(&format!("RIFF header parsed - file size: {} bytes, format: sfbk", file_size));
+        // RIFF header parsing debug removed
         
         // Parse all chunks starting after main header
         let chunks = Self::parse_chunks(&data[12..])?;
         
-        log(&format!("RIFF parsing completed - {} chunks found", chunks.len()));
+        // RIFF parsing completion debug removed
         
         Ok(SoundFontRiff {
             file_size,
@@ -174,15 +174,15 @@ impl RiffParser {
         
         // Check for sample data chunk (sdta)
         if Self::find_chunk(chunks, b"sdta").is_none() {
-            log("Warning: No sample data (sdta) chunk found - SoundFont may be empty");
+            // No sample data warning debug removed
         }
         
         // Check for preset data chunk (pdta)
         if Self::find_chunk(chunks, b"pdta").is_none() {
-            log("Warning: No preset data (pdta) chunk found - SoundFont may be empty");
+            // No preset data warning debug removed
         }
         
-        log("SoundFont RIFF structure validation passed");
+        // RIFF structure validation debug removed
         Ok(())
     }
 }

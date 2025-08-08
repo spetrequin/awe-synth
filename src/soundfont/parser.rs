@@ -64,7 +64,7 @@ impl SoundFontParser {
                 let pdta_data = &pdta_chunk.data[4..]; // Skip "pdta" identifier
                 Self::parse_sample_headers(pdta_data, raw_sample_data)?
             } else {
-                log("No preset data (pdta) chunk found - using raw sample data");
+                // No preset data debug removed
                 raw_samples
             }
         } else {
@@ -90,16 +90,14 @@ impl SoundFontParser {
         soundfont.header.instrument_count = soundfont.instruments.len();
         soundfont.header.preset_count = soundfont.presets.len();
         
-        log(&format!("SoundFont parsing completed: '{}' v{} - {} presets, {} instruments, {} samples", 
-                   soundfont.header.name, soundfont.header.version, 
-                   soundfont.presets.len(), soundfont.instruments.len(), soundfont.samples.len()));
+        // SoundFont parsing completion debug removed
         
         Ok(soundfont)
     }
     
     /// Parse INFO chunk to extract header information
     fn parse_info_chunk(&mut self, chunks: &[RiffChunk]) -> SoundFontResult<SoundFontHeader> {
-        log("Parsing INFO chunk for SoundFont header...");
+        // INFO chunk parsing debug removed
         
         // Find LIST chunk containing INFO
         let list_chunks = RiffParser::find_chunks(chunks, b"LIST");
@@ -119,7 +117,7 @@ impl SoundFontParser {
             }
         })?;
         
-        log("INFO chunk found, parsing sub-chunks...");
+        // INFO chunk found debug removed
         
         // Parse INFO sub-chunks (skip first 4 bytes which contain "INFO")
         let info_data = &info_chunk.data[4..];
@@ -131,7 +129,7 @@ impl SoundFontParser {
             let chunk_data = String::from_utf8_lossy(&subchunk.data).trim_end_matches('\0').to_string();
             
             self.info_chunks.insert(chunk_id.clone(), chunk_data.clone());
-            log(&format!("INFO sub-chunk '{}': '{}'", chunk_id, chunk_data));
+            // INFO sub-chunk debug removed
         }
         
         // Build SoundFont header from INFO chunks
@@ -152,7 +150,7 @@ impl SoundFontParser {
                 let major = u16::from_le_bytes([version_bytes[0], version_bytes[1]]);
                 let minor = u16::from_le_bytes([version_bytes[2], version_bytes[3]]);
                 header.version = SoundFontVersion::new(major, minor);
-                log(&format!("SoundFont version: {}.{}", major, minor));
+                // Version debug removed
             }
         } else {
             return Err(SoundFontError::InvalidFormat {
@@ -164,7 +162,7 @@ impl SoundFontParser {
         // isng - Target sound engine (required)
         if let Some(engine) = self.info_chunks.get("isng") {
             header.engine = engine.clone();
-            log(&format!("Target sound engine: '{}'", engine));
+            // Engine debug removed
         } else {
             return Err(SoundFontError::InvalidFormat {
                 message: "Missing required 'isng' (sound engine) chunk in INFO section".to_string(),
@@ -175,7 +173,7 @@ impl SoundFontParser {
         // INAM - SoundFont name (required)
         if let Some(name) = self.info_chunks.get("INAM") {
             header.name = name.clone();
-            log(&format!("SoundFont name: '{}'", name));
+            // Name debug removed
         } else {
             return Err(SoundFontError::InvalidFormat {
                 message: "Missing required 'INAM' (name) chunk in INFO section".to_string(),
@@ -187,61 +185,60 @@ impl SoundFontParser {
         
         // irom - ROM version
         if let Some(rom_version) = self.info_chunks.get("irom") {
-            log(&format!("ROM version: '{}'", rom_version));
+            // ROM version debug removed
         }
         
         // iver - ROM revision
         if let Some(rom_revision) = self.info_chunks.get("iver") {
-            log(&format!("ROM revision: '{}'", rom_revision));
+            // ROM revision debug removed
         }
         
         // ICRD - Creation date
         if let Some(creation_date) = self.info_chunks.get("ICRD") {
             header.creation_date = creation_date.clone();
-            log(&format!("Creation date: '{}'", creation_date));
+            // Creation date debug removed
         }
         
         // IENG - Sound engine
         if let Some(tools) = self.info_chunks.get("IENG") {
             header.tools = tools.clone();
-            log(&format!("Creation tools: '{}'", tools));
+            // Creation tools debug removed
         }
         
         // IPRD - Product
         if let Some(product) = self.info_chunks.get("IPRD") {
             header.product = product.clone();
-            log(&format!("Product: '{}'", product));
+            // Product debug removed
         }
         
         // ICOP - Copyright
         if let Some(copyright) = self.info_chunks.get("ICOP") {
             header.copyright = copyright.clone();
-            log(&format!("Copyright: '{}'", copyright));
+            // Copyright debug removed
         }
         
         // ICMT - Comments
         if let Some(comments) = self.info_chunks.get("ICMT") {
             header.comments = comments.clone();
-            log(&format!("Comments: '{}'", comments));
+            // Comments debug removed
         }
         
         // ISFT - Software
         if let Some(software) = self.info_chunks.get("ISFT") {
-            log(&format!("Creation software: '{}'", software));
+            // Creation software debug removed
         }
         
         // Validate header
         header.validate()?;
         
-        log(&format!("SoundFont header created successfully: '{}' v{} for {}", 
-                   header.name, header.version, header.engine));
+        // Header creation success debug removed
         
         Ok(header)
     }
     
     /// Parse sample data chunk (sdta) - Task 9A.5 implementation
     pub fn parse_sample_data(chunks: &[RiffChunk]) -> SoundFontResult<Vec<SoundFontSample>> {
-        log("Starting sample data extraction from sdta chunk...");
+        // Sample data extraction debug removed
         
         // Find LIST chunk containing sdta (sample data)
         let list_chunks = RiffParser::find_chunks(chunks, b"LIST");
@@ -257,12 +254,12 @@ impl SoundFontParser {
         let sdta_chunk = match sdta_chunk {
             Some(chunk) => chunk,
             None => {
-                log("No sample data (sdta) chunk found - SoundFont contains no samples");
+                // No sample data debug removed
                 return Ok(Vec::new());
             }
         };
         
-        log(&format!("Sample data (sdta) chunk found, size: {} bytes", sdta_chunk.data.len()));
+        // Sample data chunk found debug removed
         
         // Parse sdta sub-chunks (skip first 4 bytes which contain "sdta")
         let sdta_data = &sdta_chunk.data[4..];
@@ -278,7 +275,7 @@ impl SoundFontParser {
             match &subchunk.header.chunk_id {
                 b"smpl" => {
                     // 16-bit sample data (main samples)
-                    log(&format!("Found 16-bit sample data chunk: {} bytes", subchunk.data.len()));
+                    // 16-bit sample data found debug removed
                     
                     // Convert bytes to 16-bit samples (little-endian)
                     if subchunk.data.len() % 2 != 0 {
@@ -300,21 +297,21 @@ impl SoundFontParser {
                         sample_data.push(sample_value);
                     }
                     
-                    log(&format!("Extracted {} 16-bit samples", sample_count));
+                    // Sample extraction debug removed
                 },
                 b"sm24" => {
                     // 24-bit sample data (high-resolution extension)
-                    log(&format!("Found 24-bit sample extension chunk: {} bytes", subchunk.data.len()));
+                    // 24-bit sample extension debug removed
                     _sample_24_data = subchunk.data.clone();
                 },
                 _ => {
-                    log(&format!("Unknown sdta sub-chunk: '{}' ({} bytes)", chunk_id, subchunk.data.len()));
+                    // Unknown sdta sub-chunk debug removed
                 }
             }
         }
         
         if sample_data.is_empty() {
-            log("No sample data found in sdta chunk");
+            // No sample data found debug removed
             return Ok(Vec::new());
         }
         
@@ -334,8 +331,7 @@ impl SoundFontParser {
             sample_data,
         };
         
-        log(&format!("Sample data extraction completed: {} samples extracted", 
-                   master_sample.sample_data.len()));
+        // Sample data extraction completion debug removed
         
         Ok(vec![master_sample])
     }
@@ -343,7 +339,7 @@ impl SoundFontParser {
     /// Parse individual sample headers from pdta chunk
     /// This will be called from parse_preset_data in Task 9A.6
     pub fn parse_sample_headers(pdta_data: &[u8], raw_sample_data: &[i16]) -> SoundFontResult<Vec<SoundFontSample>> {
-        log("Parsing individual sample headers from pdta chunk...");
+        // Sample headers parsing debug removed
         
         // Parse pdta sub-chunks to find shdr (sample headers)
         let pdta_subchunks = RiffParser::parse_chunks(pdta_data)?;
@@ -355,7 +351,7 @@ impl SoundFontParser {
                 position: None,
             })?;
         
-        log(&format!("Sample header (shdr) chunk found: {} bytes", shdr_chunk.data.len()));
+        // Sample header chunk found debug removed
         
         // Each sample header is 46 bytes
         const SAMPLE_HEADER_SIZE: usize = 46;
@@ -381,15 +377,12 @@ impl SoundFontParser {
             
             // Skip terminal sample (empty name)
             if !sample.name.is_empty() {
-                log(&format!("Sample {}: '{}' - {} samples @ {}Hz", 
-                           i, sample.name, 
-                           sample.end_offset - sample.start_offset,
-                           sample.sample_rate));
+                // Individual sample debug removed
                 samples.push(sample);
             }
         }
         
-        log(&format!("Sample header parsing completed: {} samples found", samples.len()));
+        // Sample header parsing completion debug removed
         Ok(samples)
     }
     
@@ -463,7 +456,7 @@ impl SoundFontParser {
     
     /// Parse preset data chunk (pdta) - Task 9A.6 implementation
     pub fn parse_preset_data(chunks: &[RiffChunk]) -> SoundFontResult<(Vec<SoundFontPreset>, Vec<SoundFontInstrument>)> {
-        log("Starting preset and instrument data parsing from pdta chunk...");
+        // Preset data parsing debug removed
         
         // Find LIST chunk containing pdta (preset data)
         let list_chunks = RiffParser::find_chunks(chunks, b"LIST");
@@ -479,12 +472,12 @@ impl SoundFontParser {
         let pdta_chunk = match pdta_chunk {
             Some(chunk) => chunk,
             None => {
-                log("No preset data (pdta) chunk found - SoundFont contains no presets");
+                // No preset data debug removed
                 return Ok((Vec::new(), Vec::new()));
             }
         };
         
-        log(&format!("Preset data (pdta) chunk found, size: {} bytes", pdta_chunk.data.len()));
+        // Preset data chunk found debug removed
         
         // Parse pdta sub-chunks (skip first 4 bytes which contain "pdta")
         let pdta_data = &pdta_chunk.data[4..];
@@ -496,15 +489,14 @@ impl SoundFontParser {
         // Parse presets (which reference instruments)
         let presets = Self::parse_presets(&pdta_subchunks, &instruments)?;
         
-        log(&format!("Preset data parsing completed: {} presets, {} instruments", 
-                   presets.len(), instruments.len()));
+        // Preset data parsing completion debug removed
         
         Ok((presets, instruments))
     }
     
     /// Parse instrument data from pdta sub-chunks
     fn parse_instruments(pdta_subchunks: &[RiffChunk]) -> SoundFontResult<Vec<SoundFontInstrument>> {
-        log("Parsing instruments from pdta sub-chunks...");
+        // Instruments parsing debug removed
         
         // Find instrument header chunk (inst)
         let inst_chunk = pdta_subchunks.iter()
@@ -534,8 +526,7 @@ impl SoundFontParser {
         let imod_chunk = pdta_subchunks.iter()
             .find(|chunk| &chunk.header.chunk_id == b"imod");
         
-        log(&format!("Found instrument chunks: inst={} bytes, ibag={} bytes, igen={} bytes", 
-                   inst_chunk.data.len(), ibag_chunk.data.len(), igen_chunk.data.len()));
+        // Instrument chunks found debug removed
         
         // Parse instrument headers (22 bytes each)
         const INST_HEADER_SIZE: usize = 22;
@@ -572,19 +563,18 @@ impl SoundFontParser {
             
             // Skip terminal instrument (empty name)
             if !instrument.name.is_empty() {
-                log(&format!("Instrument {}: '{}' - {} zones", 
-                           i, instrument.name, instrument.instrument_zones.len()));
+                // Individual instrument debug removed
                 instruments.push(instrument);
             }
         }
         
-        log(&format!("Instrument parsing completed: {} instruments found", instruments.len()));
+        // Instrument parsing completion debug removed
         Ok(instruments)
     }
     
     /// Parse preset data from pdta sub-chunks
     fn parse_presets(pdta_subchunks: &[RiffChunk], instruments: &[SoundFontInstrument]) -> SoundFontResult<Vec<SoundFontPreset>> {
-        log("Parsing presets from pdta sub-chunks...");
+        // Presets parsing debug removed
         
         // Find preset header chunk (phdr)
         let phdr_chunk = pdta_subchunks.iter()
@@ -614,8 +604,7 @@ impl SoundFontParser {
         let pmod_chunk = pdta_subchunks.iter()
             .find(|chunk| &chunk.header.chunk_id == b"pmod");
         
-        log(&format!("Found preset chunks: phdr={} bytes, pbag={} bytes, pgen={} bytes", 
-                   phdr_chunk.data.len(), pbag_chunk.data.len(), pgen_chunk.data.len()));
+        // Preset chunks found debug removed
         
         // Parse preset headers (38 bytes each)
         const PRESET_HEADER_SIZE: usize = 38;
@@ -652,13 +641,12 @@ impl SoundFontParser {
             
             // Skip terminal preset (empty name)
             if !preset.name.is_empty() {
-                log(&format!("Preset {}: '{}' (Bank {}, Program {}) - {} zones", 
-                           i, preset.name, preset.bank, preset.program, preset.preset_zones.len()));
+                // Individual preset debug removed
                 presets.push(preset);
             }
         }
         
-        log(&format!("Preset parsing completed: {} presets found", presets.len()));
+        // Preset parsing completion debug removed
         Ok(presets)
     }
     
@@ -1025,8 +1013,8 @@ impl SoundFontParser {
             if list_chunk.data.len() >= 4 {
                 match &list_chunk.data[0..4] {
                     b"INFO" => has_info = true,
-                    b"sdta" => log("Sample data (sdta) LIST chunk found"),
-                    b"pdta" => log("Preset data (pdta) LIST chunk found"),
+                    b"sdta" => { /* Sample data LIST chunk debug removed */ },
+                    b"pdta" => { /* Preset data LIST chunk debug removed */ },
                     _ => {}
                 }
             }
@@ -1039,7 +1027,7 @@ impl SoundFontParser {
             });
         }
         
-        log("SoundFont structure validation completed successfully");
+        // Structure validation debug removed
         Ok(())
     }
 }

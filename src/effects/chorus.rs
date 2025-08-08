@@ -101,8 +101,7 @@ impl ChorusProcessor {
     /// * `feedback` - Feedback amount (0.0-0.8, typical 0.2-0.4)
     /// * `stereo_spread` - Stereo width (0.0-1.0, typical 0.5-0.8)
     pub fn new(sample_rate: f32, rate: f32, depth: f32, feedback: f32, stereo_spread: f32) -> Self {
-        log(&format!("ChorusProcessor created: rate={:.1}Hz depth={:.2} feedback={:.2} spread={:.2} @{:.0}Hz", 
-                   rate, depth, feedback, stereo_spread, sample_rate));
+        // ChorusProcessor creation debug removed
         
         let mut chorus = ChorusProcessor {
             sample_rate,
@@ -150,8 +149,7 @@ impl ChorusProcessor {
             self.delay_lines.push(delay_line);
         }
         
-        log(&format!("Chorus structure: {} modulated delay lines, base_delay={:.1}ms", 
-                   self.delay_lines.len(), base_delay_ms));
+        // Chorus structure debug removed
     }
     
     /// Process chorus for one audio sample using EMU8000 algorithm
@@ -186,7 +184,7 @@ impl ChorusProcessor {
     pub fn set_rate(&mut self, rate: f32) {
         self.rate = rate.clamp(0.1, 10.0);
         self.lfo.set_frequency(self.rate);
-        log(&format!("Chorus rate set to {:.1}Hz", self.rate));
+        // Chorus rate debug removed
     }
     
     /// Set chorus depth (modulation amount)
@@ -197,7 +195,7 @@ impl ChorusProcessor {
         for delay_line in self.delay_lines.iter_mut() {
             delay_line.set_modulation_depth(modulation_depth_samples);
         }
-        log(&format!("Chorus depth set to {:.2}", self.depth));
+        // Chorus depth debug removed
     }
     
     /// Set chorus feedback amount
@@ -207,19 +205,19 @@ impl ChorusProcessor {
         for delay_line in self.delay_lines.iter_mut() {
             delay_line.set_feedback(self.feedback * 0.8);
         }
-        log(&format!("Chorus feedback set to {:.2}", self.feedback));
+        // Chorus feedback debug removed
     }
     
     /// Set stereo spread amount
     pub fn set_stereo_spread(&mut self, stereo_spread: f32) {
         self.stereo_spread = stereo_spread.clamp(0.0, 1.0);
-        log(&format!("Chorus stereo spread set to {:.2}", self.stereo_spread));
+        // Chorus stereo spread debug removed
     }
     
     /// Set wet signal level
     pub fn set_wet_level(&mut self, wet_level: f32) {
         self.wet_level = wet_level.clamp(0.0, 1.0);
-        log(&format!("Chorus wet level set to {:.2}", self.wet_level));
+        // Chorus wet level debug removed
     }
 }
 
@@ -275,19 +273,19 @@ impl ChorusBus {
     pub fn set_channel_send(&mut self, channel: u8, send_level: f32) {
         let channel_idx = (channel as usize).min(15);
         self.channel_send_levels[channel_idx] = send_level.clamp(0.0, 1.0);
-        log(&format!("Channel {} chorus send set to {:.2}", channel, send_level));
+        // Channel chorus send debug removed
     }
     
     /// Set master chorus send level
     pub fn set_master_send(&mut self, send_level: f32) {
         self.master_send_level = send_level.clamp(0.0, 1.0);
-        log(&format!("Master chorus send set to {:.2}", self.master_send_level));
+        // Master chorus send debug removed
     }
     
     /// Set chorus return level (wet signal mixing)
     pub fn set_return_level(&mut self, return_level: f32) {
         self.return_level = return_level.clamp(0.0, 1.0);
-        log(&format!("Chorus return level set to {:.2}", self.return_level));
+        // Chorus return level debug removed
     }
     
     /// Configure chorus parameters

@@ -80,43 +80,39 @@ impl VoiceManager {
         
         // Initialize effects buses with default MIDI send levels
         voice_manager.update_effects_from_midi();
-        log(&format!("VoiceManager initialized with 32 MultiZoneSampleVoices at {} Hz", sample_rate));
+        // VoiceManager initialization debug removed
         voice_manager
     }
     
     /// Load SoundFont and build preset mapping
     pub fn load_soundfont(&mut self, soundfont: SoundFont) -> Result<(), String> {
-        log(&format!("Loading SoundFont: '{}' with {} presets, {} instruments, {} samples",
-                   soundfont.header.name, soundfont.presets.len(), 
-                   soundfont.instruments.len(), soundfont.samples.len()));
+        // SoundFont loading debug removed
         
         // Build preset mapping for fast lookup
         let mut preset_map = HashMap::new();
         
         // First pass: collect all presets that are NOT terminators
-        log("🔍 First pass: mapping real presets");
+        // First pass debug removed
         for (i, preset) in soundfont.presets.iter().enumerate() {
             let key = (preset.bank, preset.program);
             
             // Skip terminator records in first pass
             if preset.name.trim() == "EOP" || preset.name.trim() == "EOI" || 
                preset.name.trim() == "End of Presets" {
-                log(&format!("🔍 Skipping terminator: Preset {}: '{}'", i, preset.name));
+                // Terminator skipping debug removed
                 continue;
             }
             
-            log(&format!("🔍 Processing real preset: Preset {}: '{}'", i, preset.name));
+            // Real preset processing debug removed
             
             if preset_map.contains_key(&key) {
                 // Both are real presets - warn about duplicate and keep first one
-                log(&format!("Warning: Duplicate Bank {}, Program {} - '{}' conflicts with existing preset, keeping first", 
-                           preset.bank, preset.program, preset.name));
+                // Duplicate preset warning debug removed
                 continue;
             }
             
             preset_map.insert(key, i);
-            log(&format!("Preset {}: '{}' mapped to Bank {}, Program {}", 
-                       i, preset.name, preset.bank, preset.program));
+            // Preset mapping debug removed
         }
         
         // Second pass: add terminators only if no real preset exists for that bank/program

@@ -98,7 +98,7 @@ impl LowPassFilter {
     fn calculate_coefficients(&mut self) {
         // Prevent division by zero and ensure valid range
         if self.sample_rate <= 0.0 || self.cutoff_hz <= 0.0 {
-            log("Warning: Invalid filter parameters, using safe defaults");
+            // Invalid filter parameters debug removed
             self.a0 = 1.0; // Pass-through
             self.a1 = 0.0;
             self.a2 = 0.0;
@@ -125,7 +125,6 @@ impl LowPassFilter {
         self.b1 = (-2.0 * cos_omega) / norm;
         self.b2 = (1.0 - alpha) / norm;
         
-        log(&format!("Filter coefficients: fc={:.1}Hz Q={:.2} a0={:.4} b1={:.4} b2={:.4}", 
-                   self.cutoff_hz, self.resonance_q, self.a0, self.b1, self.b2));
+        // Filter coefficients debug removed
     }
 }

@@ -168,7 +168,7 @@ impl MultiZoneSampleVoice {
         soundfont: &SoundFont,
         preset: &SoundFontPreset,
     ) -> Result<(), AweError> {
-        crate::log(&format!("🚀 START_NOTE CALLED: Note {} Vel {} Ch {}", note, velocity, channel));
+        // Debug logging removed
         
         // Reset voice state
         self.note = note;
@@ -178,13 +178,13 @@ impl MultiZoneSampleVoice {
         self.samples_processed = 0;
         
         // Select and activate zones for this note/velocity
-        crate::log(&format!("🎯 About to select zones for Note {} Vel {} Ch {}", note, velocity, channel));
+        // Zone selection debug removed
         match self.select_zones(note, velocity, soundfont, preset) {
             Ok(_) => {
-                crate::log(&format!("✅ Zone selection succeeded for Note {} Vel {}", note, velocity));
+                // Zone selection success debug removed
             }
             Err(e) => {
-                crate::log(&format!("❌ Zone selection failed for Note {} Vel {}: {}", note, velocity, e));
+                // Zone selection failure debug removed
                 return Err(e);
             }
         }
@@ -359,25 +359,15 @@ impl MultiZoneSampleVoice {
     ) -> Result<(), AweError> {
         self.zones.clear();
         
-        crate::log(&format!(
-            "🔍 Zone Selection: Note {} Vel {} - Preset '{}' has {} zones, SoundFont has {} instruments, {} samples",
-            note, velocity, preset.name, preset.preset_zones.len(), 
-            soundfont.instruments.len(), soundfont.samples.len()
-        ));
+        // Zone selection details debug removed
         
-        crate::log(&format!(
-            "🔍 Zone Selection: Note {} Vel {} - SoundFont has {} samples, {} instruments",
-            note, velocity, soundfont.samples.len(), soundfont.instruments.len()
-        ));
+        // SoundFont data debug removed
         
         // Debug: Check if SoundFont has any actual sample data
         let total_sample_data: usize = soundfont.samples.iter()
             .map(|s| s.sample_data.len())
             .sum();
-        crate::log(&format!(
-            "📊 SoundFont Data Check: {} total sample data points across {} samples",
-            total_sample_data, soundfont.samples.len()
-        ));
+        // SoundFont data check debug removed
         
         // Debug: Show first few samples if available
         if !soundfont.samples.is_empty() && !soundfont.samples[0].sample_data.is_empty() {
@@ -385,12 +375,9 @@ impl MultiZoneSampleVoice {
                 .take(8)
                 .cloned()
                 .collect();
-            crate::log(&format!(
-                "🎵 First Sample Data: {:?} (name: '{}', rate: {}Hz)",
-                first_samples, soundfont.samples[0].name, soundfont.samples[0].sample_rate
-            ));
+            // First sample data debug removed
         } else {
-            crate::log("⚠️ WARNING: SoundFont has no sample data!");
+            // No sample data warning removed
         }
         
         // Find matching preset zones for this note/velocity
@@ -446,10 +433,7 @@ impl MultiZoneSampleVoice {
                                     )
                                 };
                                 
-                                crate::log(&format!(
-                                    "📋 Sample Analysis: '{}' (ID {}) - {}",
-                                    sample.name, sample_id, sample_data_info
-                                ));
+                                // Sample analysis debug removed
                                 
                                 // Create active zone with real sample data
                                 let active_zone = ActiveZone {
@@ -481,11 +465,7 @@ impl MultiZoneSampleVoice {
                                 
                                 self.zones.push(active_zone);
                                 
-                                crate::log(&format!(
-                                    "✅ Zone activated: Sample '{}' (ID {}) for Note {} Vel {} - {} samples, root={}, amp={:.3}",
-                                    sample.name, sample_id, note, velocity, 
-                                    sample.sample_data.len(), sample.original_pitch, zone_amplitude
-                                ));
+                                // Zone activation debug removed
                             }
                         }
                     }
@@ -495,10 +475,10 @@ impl MultiZoneSampleVoice {
         
         // If no zones were found, create a fallback test tone
         if self.zones.is_empty() {
-            crate::log(&format!("⚠️ No SoundFont zones found for Note {} Vel {} - creating test tone", note, velocity));
+            // No SoundFont zones warning removed
             self.create_fallback_test_tone(note, velocity);
         } else {
-            crate::log(&format!("✅ Zone selection complete: {} zones activated", self.zones.len()));
+            // Zone selection completion debug removed
         }
         
         Ok(())
@@ -525,11 +505,7 @@ impl MultiZoneSampleVoice {
         let non_zero_count = sample_data.iter().filter(|&&s| s != 0).count();
         let max_amplitude = sample_data.iter().map(|&s| s.abs()).max().unwrap_or(0);
         
-        crate::log(&format!(
-            "🔧 Test tone data: {} samples, {} non-zero, max_amp={}, first_few={:?}",
-            sample_data.len(), non_zero_count, max_amplitude,
-            sample_data.iter().take(4).cloned().collect::<Vec<i16>>()
-        ));
+        // Test tone data debug removed
         
         let zone = ActiveZone {
             zone_id: 999, // Special ID for test tone
@@ -550,10 +526,7 @@ impl MultiZoneSampleVoice {
         
         self.zones.push(zone);
         
-        crate::log(&format!(
-            "🎵 Fallback test tone created: {}Hz, {} samples for Note {} Vel {} (amplitude={:.2})",
-            frequency, sample_count, note, velocity, amplitude
-        ));
+        // Fallback test tone debug removed
     }
     
     /// Calculate zone amplitude for velocity crossfading
@@ -1044,10 +1017,7 @@ impl MultiZoneSampleVoice {
         // Create new filter with calculated parameters
         self.filter = LowPassFilter::new(self.sample_rate, cutoff, resonance);
         
-        crate::log(&format!(
-            "Filter setup: note={} vel={} → cutoff={:.1}Hz resonance={:.2}",
-            self.note, self.velocity, cutoff, resonance
-        ));
+        // Filter setup debug removed
         
         Ok(())
     }
@@ -1101,10 +1071,7 @@ impl MultiZoneSampleVoice {
         };
         self.chorus_send = (base_chorus + mid_range_boost).clamp(0.0, 0.5);
         
-        crate::log(&format!(
-            "Effects sends: note={} vel={} → reverb={:.2} chorus={:.2}",
-            self.note, self.velocity, self.reverb_send, self.chorus_send
-        ));
+        // Effects sends debug removed
         
         Ok(())
     }

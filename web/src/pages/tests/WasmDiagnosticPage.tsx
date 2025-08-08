@@ -1,235 +1,20 @@
-import { useState } from 'react'
 import { useAwePlayer } from '../../contexts/AwePlayerContext'
 import UnifiedDebugDisplay from '../../components/UnifiedDebugDisplay'
 import { debugManager } from '../../utils/DebugManager'
 
 export default function WasmDiagnosticPage() {
   const { 
-    wasmModule,
     systemStatus,
-    debugLog,
     soundFontLoaded,
-    updateDebugLog,
-    loadTestSoundFont,
-    sendMidiEvent,
-    copyDebugLog
+    sendMidiEvent
   } = useAwePlayer()
-
-  const [wasmOutput, setWasmOutput] = useState<string>('')
-
-  // Format JSON output as readable text
-  const formatOutput = (title: string, result: string): string => {
-    try {
-      const parsed = JSON.parse(result)
-      let formatted = `=== ${title} ===\n`
-      
-      if (parsed.success !== undefined) {
-        formatted += `Success: ${parsed.success}\n`
-      }
-      if (parsed.error) {
-        formatted += `Error: ${parsed.error}\n`
-      }
-      if (parsed.preset) {
-        if (typeof parsed.preset === 'string') {
-          formatted += `Preset: ${parsed.preset}\n`
-        } else {
-          formatted += `Preset Name: ${parsed.preset.name || 'Unknown'}\n`
-          formatted += `Bank: ${parsed.preset.bank || 0}\n`
-          formatted += `Program: ${parsed.preset.program || 0}\n`
-          formatted += `Status: ${parsed.preset.status || 'Unknown'}\n`
-        }
-      }
-      if (parsed.version) {
-        formatted += `Version: ${parsed.version}\n`
-      }
-      if (parsed.supports) {
-        formatted += `Supports: ${parsed.supports.join(', ')}\n`
-      }
-      if (parsed.status) {
-        formatted += `Status: ${parsed.status}\n`
-      }
-      if (parsed.pipelineReady !== undefined) {
-        formatted += `Pipeline Ready: ${parsed.pipelineReady}\n`
-      }
-      if (parsed.events_queued) {
-        formatted += `Events Queued: ${parsed.events_queued}\n`
-        formatted += `Sequence: ${parsed.sequence}\n`
-      }
-      if (parsed.name) {
-        formatted += `Name: ${parsed.name}\n`
-      }
-      if (parsed.architecture) {
-        formatted += `Architecture: ${parsed.architecture}\n`
-      }
-      if (parsed.phase) {
-        formatted += `Phase: ${parsed.phase}\n`
-      }
-      if (parsed.average_processing_time !== undefined) {
-        formatted += `Average Processing Time: ${parsed.average_processing_time}ms\n`
-        formatted += `Max Processing Time: ${parsed.max_processing_time}ms\n`
-        formatted += `Underruns: ${parsed.underruns}\n`
-        formatted += `Overruns: ${parsed.overruns}\n`
-        formatted += `Samples Processed: ${parsed.samples_processed}\n`
-        formatted += `Uptime: ${parsed.uptime_ms}ms\n`
-      }
-      
-      return formatted + '\n'
-    } catch (error) {
-      // Not JSON, return as-is with title
-      return `=== ${title} ===\n${result}\n\n`
-    }
-  }
-
-  const runWasmDiagnostics = async () => {
-    debugManager.logUserAction('Full WASM Diagnostic requested')
-    setWasmOutput('=== WASM Function Diagnostic Results ===\n')
-    debugManager.logSystemEvent('Running comprehensive WASM diagnostics')
-
-    // Ensure SoundFont is loaded
-    if (!soundFontLoaded) {
-      updateDebugLog('📦 Loading test SoundFont first...')
-      await loadTestSoundFont()
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
-
-    let output = '=== WASM Function Diagnostic Results ===\n\n'
-
-    // Test 1: System Status
-    if (wasmModule?.get_system_status) {
-      try {
-        const result = wasmModule.get_system_status()
-        output += formatOutput('get_system_status()', result)
-        updateDebugLog('✅ System status retrieved')
-      } catch (error) {
-        output += `=== get_system_status() ===\nERROR: ${error}\n\n`
-        updateDebugLog('❌ System status failed')
-      }
-    }
-
-    // Test 2: Pipeline Status
-    if (wasmModule?.get_pipeline_status_global) {
-      try {
-        const result = wasmModule.get_pipeline_status_global()
-        output += formatOutput('get_pipeline_status_global()', result)
-        updateDebugLog('✅ Pipeline status retrieved')
-      } catch (error) {
-        output += `=== get_pipeline_status_global() ===\nERROR: ${error}\n\n`
-        updateDebugLog('❌ Pipeline status failed')
-      }
-    }
-
-    // Test 3: SoundFont Info
-    if (wasmModule?.get_soundfont_info) {
-      try {
-        const result = wasmModule.get_soundfont_info()
-        output += formatOutput('get_soundfont_info()', result)
-        updateDebugLog('✅ SoundFont info retrieved')
-      } catch (error) {
-        output += '=== get_soundfont_info() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ SoundFont info failed')
-      }
-    }
-
-    // Test 4: Current Preset Info
-    if (wasmModule?.get_current_preset_info_global) {
-      try {
-        const result = wasmModule.get_current_preset_info_global()
-        output += formatOutput('get_current_preset_info_global()', result)
-        updateDebugLog('✅ Preset info retrieved')
-      } catch (error) {
-        output += '=== get_current_preset_info_global() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ Preset info failed')
-      }
-    }
-
-    // Test 5: SoundFont Synthesis Test
-    if (wasmModule?.test_soundfont_synthesis) {
-      try {
-        const result = wasmModule.test_soundfont_synthesis()
-        output += formatOutput('test_soundfont_synthesis()', result)
-        updateDebugLog('✅ SoundFont synthesis test completed')
-      } catch (error) {
-        output += '=== test_soundfont_synthesis() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ SoundFont synthesis test failed')
-      }
-    }
-
-    // Test 6: Quick C Major Test
-    if (wasmModule?.quick_c_major_test) {
-      try {
-        const result = wasmModule.quick_c_major_test()
-        output += formatOutput('quick_c_major_test()', result)
-        updateDebugLog('✅ Quick C major test completed')
-      } catch (error) {
-        output += '=== quick_c_major_test() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ Quick C major test failed')
-      }
-    }
-
-    // Test 7: Buffer Metrics
-    if (wasmModule?.get_buffer_metrics_global) {
-      try {
-        const result = wasmModule.get_buffer_metrics_global()
-        output += formatOutput('get_buffer_metrics_global()', result)
-        updateDebugLog('✅ Buffer metrics retrieved')
-      } catch (error) {
-        output += '=== get_buffer_metrics_global() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ Buffer metrics failed')
-      }
-    }
-
-    // Test 8: Version Info
-    if (wasmModule?.get_version_info) {
-      try {
-        const result = wasmModule.get_version_info()
-        output += formatOutput('get_version_info()', result)
-        updateDebugLog('✅ Version info retrieved')
-      } catch (error) {
-        output += '=== get_version_info() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ Version info failed')
-      }
-    }
-
-    // Test 9: WASM Debug Log
-    if (wasmModule?.get_debug_log_global) {
-      try {
-        const result = wasmModule.get_debug_log_global()
-        output += '=== get_debug_log_global() ===\n' + result + '\n\n'
-        updateDebugLog('✅ WASM debug log retrieved')
-      } catch (error) {
-        output += '=== get_debug_log_global() ===\nERROR: ' + error + '\n\n'
-        updateDebugLog('❌ WASM debug log failed')
-      }
-    }
-
-    output += '=== End of WASM Diagnostics ===\n'
-    setWasmOutput(output)
-    updateDebugLog('🏁 WASM diagnostics complete!')
-  }
-
-  const testBasicMidi = async () => {
-    updateDebugLog('🎵 Testing basic MIDI synthesis...')
-    
-    // Send a simple MIDI sequence and capture any WASM output
-    sendMidiEvent(0, 0x90, 60, 100) // Note On
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    sendMidiEvent(0, 0x80, 60, 0) // Note Off
-    
-    // Get any debug output that was generated
-    if (wasmModule?.get_debug_log_global) {
-      const debugLog = wasmModule.get_debug_log_global()
-      setWasmOutput(prev => prev + '\n=== MIDI Test Debug Output ===\n' + debugLog + '\n')
-    }
-    
-    updateDebugLog('🎵 MIDI test complete')
-  }
 
   return (
     <div className="test-page">
       <div className="container">
         <div className="test-header">
-          <h1>🧪 WASM Function Diagnostics</h1>
-          <p>Direct examination of WASM function outputs to identify synthesis issues</p>
+          <h1>🔬 WASM Diagnostic Suite</h1>
+          <p>Comprehensive WebAssembly module diagnostics with unified debug system</p>
           <div className={`status-indicator ${
             systemStatus === 'ready' ? 'success' : 
             systemStatus === 'error' ? 'error' : 'pending'
@@ -241,219 +26,154 @@ export default function WasmDiagnosticPage() {
         </div>
 
         <div className="test-content">
-          {/* Controls */}
+          {/* Diagnostic Controls */}
           <div className="test-section">
-            <h2>🎮 WASM Diagnostic Controls</h2>
+            <h2>🎮 Diagnostic Controls</h2>
             <div className="test-controls">
               <button 
                 onClick={() => {
-                  updateDebugLog('🔴 USER ACTION: Full WASM Diagnostic button clicked')
-                  runWasmDiagnostics()
+                  debugManager.logUserAction('WASM comprehensive diagnostic requested', { 
+                    soundFontLoaded, 
+                    systemStatus 
+                  })
                 }}
                 disabled={systemStatus !== 'ready'}
                 className="btn btn-primary"
-                style={{ background: 'var(--color-accent)', fontWeight: 'bold' }}
-              >
-                🔍 Run Full WASM Diagnostic
-              </button>
-              
-              <button 
-                onClick={testBasicMidi}
-                disabled={systemStatus !== 'ready'}
-                className="btn btn-secondary"
-              >
-                🎵 Test Basic MIDI
-              </button>
-              
-              <button 
-                onClick={async () => {
-                  updateDebugLog('🔴 USER ACTION: Audio Pipeline Test button clicked')
-                  updateDebugLog('🧪 Running comprehensive audio synthesis pipeline test...')
-                  
-                  if (!wasmModule?.test_audio_synthesis_pipeline) {
-                    updateDebugLog('❌ ERROR: test_audio_synthesis_pipeline function not available in WASM module')
-                    return
-                  }
-                  
-                  try {
-                    updateDebugLog('⏳ Executing test_audio_synthesis_pipeline()...')
-                    const result = wasmModule.test_audio_synthesis_pipeline()
-                    updateDebugLog(`📊 Raw test result: ${result}`)
-                    
-                    setWasmOutput(prev => prev + '\n=== Audio Pipeline Test Results ===\n' + result + '\n')
-                    updateDebugLog('✅ Audio synthesis pipeline test complete - results added to WASM output')
-                  } catch (error) {
-                    updateDebugLog(`❌ ERROR executing audio pipeline test: ${error}`)
-                  }
-                }}
-                disabled={systemStatus !== 'ready'}
-                className="btn btn-primary"
-                style={{ background: 'var(--color-warning)', fontWeight: 'bold' }}
-              >
-                🧪 Test Audio Pipeline
-              </button>
-              
-              <button 
-                onClick={async () => {
-                  // Log user action directly in WASM system
-                  if (wasmModule?.log_message_global) {
-                    wasmModule.log_message_global('🔴 USER ACTION: Zero Samples Debug button clicked')
-                  }
-                  
-                  if (!wasmModule?.test_zero_samples_debug) {
-                    if (wasmModule?.log_message_global) {
-                      wasmModule.log_message_global('❌ ERROR: test_zero_samples_debug function not available')
-                    }
-                    return
-                  }
-                  
-                  try {
-                    const result = wasmModule.test_zero_samples_debug()
-                    if (wasmModule?.log_message_global) {
-                      wasmModule.log_message_global(`🔍 Zero samples debug result: ${result}`)
-                    }
-                    setWasmOutput(prev => prev + '\n=== Zero Samples Debug ===\n' + result + '\n')
-                  } catch (error) {
-                    if (wasmModule?.log_message_global) {
-                      wasmModule.log_message_global(`❌ ERROR in zero samples debug: ${error}`)
-                    }
-                  }
-                }}
-                disabled={systemStatus !== 'ready'}
-                className="btn btn-warning"
                 style={{ fontWeight: 'bold' }}
               >
-                🔍 Debug Zero Samples
-              </button>
-              
-              <button 
-                onClick={async () => {
-                  if (wasmModule?.log_message_global) {
-                    wasmModule.log_message_global('🔴 USER ACTION: Zone Creation Debug button clicked')
-                  }
-                  
-                  if (!wasmModule?.debug_zone_creation_pipeline) {
-                    if (wasmModule?.log_message_global) {
-                      wasmModule.log_message_global('❌ ERROR: debug_zone_creation_pipeline function not available')
-                    }
-                    return
-                  }
-                  
-                  try {
-                    const result = wasmModule.debug_zone_creation_pipeline()
-                    if (wasmModule?.log_message_global) {
-                      wasmModule.log_message_global(`🔬 Zone creation debug result: ${result}`)
-                    }
-                    setWasmOutput(prev => prev + '\n=== Zone Creation Debug ===\n' + result + '\n')
-                  } catch (error) {
-                    if (wasmModule?.log_message_global) {
-                      wasmModule.log_message_global(`❌ ERROR in zone creation debug: ${error}`)
-                    }
-                  }
-                }}
-                disabled={systemStatus !== 'ready'}
-                className="btn btn-info"
-                style={{ fontWeight: 'bold' }}
-              >
-                🔬 Debug Zone Creation
+                🔍 Run Comprehensive Diagnostic
               </button>
               
               <button 
                 onClick={() => {
-                  setWasmOutput('')
-                  updateDebugLog('🔄 WASM diagnostics cleared')
+                  debugManager.logUserAction('WASM audio synthesis test requested')
+                  // Trigger a brief audio test
+                  sendMidiEvent(0, 0x90, 60, 100) // Note On
+                  setTimeout(() => sendMidiEvent(0, 0x80, 60, 0), 250) // Note Off
                 }}
+                disabled={systemStatus !== 'ready' || !soundFontLoaded}
+                className="btn btn-secondary"
+              >
+                🎵 Test Audio Synthesis
+              </button>
+              
+              <button 
+                onClick={() => {
+                  debugManager.logUserAction('WASM MIDI processing test requested')
+                  // Test MIDI event processing
+                  sendMidiEvent(0, 0x90, 64, 80) // Note On E4
+                  setTimeout(() => sendMidiEvent(0, 0x80, 64, 0), 100) // Quick Note Off
+                }}
+                disabled={systemStatus !== 'ready'}
+                className="btn btn-secondary"
+              >
+                🎹 Test MIDI Processing
+              </button>
+              
+              <button 
+                onClick={() => {
+                  debugManager.logUserAction('WASM system status check requested')
+                }}
+                disabled={systemStatus !== 'ready'}
                 className="btn btn-outline"
               >
-                🗑️ Clear Output
+                ⚙️ Check System Status
               </button>
             </div>
-          </div>
-
-          {/* WASM Output */}
-          {wasmOutput && (
-            <div className="test-section">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h2>🖥️ WASM Function Outputs</h2>
-                <button 
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(wasmOutput)
-                      updateDebugLog('📋 WASM output copied to clipboard')
-                    } catch (error) {
-                      updateDebugLog('❌ Failed to copy WASM output')
-                    }
-                  }}
-                  className="btn btn-sm btn-outline"
-                >
-                  📋 Copy All Output
-                </button>
-              </div>
-              
-              <textarea
-                value={wasmOutput}
-                readOnly
-                style={{
-                  width: '100%',
-                  minHeight: '400px',
-                  maxHeight: '600px',
-                  background: 'var(--color-bg-secondary)',
-                  padding: 'var(--spacing-md)',
-                  borderRadius: 'var(--radius-md)',
-                  fontFamily: 'monospace',
-                  fontSize: '0.875rem',
-                  lineHeight: '1.4',
-                  border: '1px solid var(--color-border)',
-                  resize: 'vertical',
-                  color: 'var(--color-text)'
-                }}
-              />
-              
-              <p style={{ marginTop: 'var(--spacing-md)', fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-                <strong>Raw WASM Output:</strong> Direct function results from the synthesis engine. 
-                This shows exactly what each WASM function returns, including errors and status information.
-              </p>
-            </div>
-          )}
-
-          {/* Analysis Guide */}
-          <div className="test-section">
-            <h2>🔍 What to Look For</h2>
+            
             <div style={{ 
-              background: 'var(--color-bg-secondary)', 
+              marginTop: 'var(--spacing-md)', 
               padding: 'var(--spacing-md)', 
-              borderRadius: 'var(--radius-md)' 
+              backgroundColor: 'var(--color-info-bg)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.875rem'
             }}>
-              <h3>Key Indicators:</h3>
-              <ul>
-                <li><strong>System Status:</strong> Should show "ready" and initialized components</li>
-                <li><strong>Pipeline Status:</strong> Should show active voices and processing state</li>
-                <li><strong>SoundFont Info:</strong> Should show loaded samples and presets</li>
-                <li><strong>Preset Info:</strong> Should show active instrument details</li>
-                <li><strong>Synthesis Test:</strong> Should show successful audio generation</li>
-                <li><strong>Buffer Metrics:</strong> Should show healthy processing times</li>
-                <li><strong>Debug Log:</strong> Should show recent synthesis activity</li>
+              <h3>💡 How the Unified Diagnostics Work:</h3>
+              <p>Each test button triggers a user action that automatically captures comprehensive WASM diagnostics:</p>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                <li><strong>🔊 Audio Pipeline:</strong> Sample rate, buffer configuration, pipeline readiness status</li>
+                <li><strong>🎼 SoundFont Data:</strong> Loaded samples, preset information, data integrity verification</li>
+                <li><strong>🎹 MIDI Processing:</strong> Event queue status, processing capabilities, system readiness</li>
+                <li><strong>⚙️ System Diagnostics:</strong> Overall health, bridge availability, component status</li>
+                <li><strong>🧪 Audio Test:</strong> Synthesis readiness, configuration validation, capability check</li>
               </ul>
-              
-              <h3>Common Issues:</h3>
-              <ul>
-                <li><strong>"ERROR" messages:</strong> Function calls are failing</li>
-                <li><strong>"Placeholder implementation":</strong> Function not fully implemented</li>
-                <li><strong>Empty or null returns:</strong> Data not being generated</li>
-                <li><strong>JSON parse errors:</strong> Malformed data structures</li>
-                <li><strong>No synthesis activity:</strong> MIDI events not reaching synthesis</li>
-              </ul>
+              <p><strong>Results appear in the unified debug log below</strong> with structured, filterable data.</p>
             </div>
           </div>
 
           {/* Debug Log */}
           <div className="test-section">
-            <h2>🐛 Test Log</h2>
+            <h2>🐛 Unified Debug Log</h2>
             <UnifiedDebugDisplay 
-              maxHeight="300px"
+              maxHeight="500px"
               showCategories={true}
               showTimestamps={true}
             />
+          </div>
+
+          {/* System Information */}
+          <div className="test-section">
+            <h2>📊 Current System Status</h2>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+              gap: 'var(--spacing-md)',
+              fontFamily: 'monospace',
+              fontSize: '0.875rem'
+            }}>
+              <div>
+                <h4>🎵 Audio System</h4>
+                <p><strong>Status:</strong> {systemStatus}</p>
+                <p><strong>SoundFont:</strong> {soundFontLoaded ? '✅ Loaded' : '❌ Not loaded'}</p>
+              </div>
+              
+              <div>
+                <h4>🌐 Browser Environment</h4>
+                <p><strong>WebAssembly:</strong> {typeof WebAssembly !== 'undefined' ? '✅ Supported' : '❌ Not supported'}</p>
+                <p><strong>Web Audio:</strong> {typeof AudioContext !== 'undefined' ? '✅ Available' : '❌ Not available'}</p>
+                <p><strong>Web MIDI:</strong> {typeof navigator.requestMIDIAccess !== 'undefined' ? '✅ Available' : '❌ Not available'}</p>
+              </div>
+              
+              <div>
+                <h4>🔧 Debug System</h4>
+                <p><strong>Unified Debug:</strong> ✅ Active</p>
+                <p><strong>WASM Diagnostics:</strong> ✅ Integrated</p>
+                <p><strong>Memory Efficient:</strong> ✅ 100 entry limit</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="test-section">
+            <h2>📖 Testing Instructions</h2>
+            <div style={{ fontSize: '0.875rem' }}>
+              <h3>🎯 Diagnostic Test Process:</h3>
+              <ol style={{ paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                <li><strong>Run Comprehensive Diagnostic:</strong> Captures full system state including all WASM module diagnostics</li>
+                <li><strong>Test Audio Synthesis:</strong> Plays a brief note and captures audio pipeline diagnostics</li>
+                <li><strong>Test MIDI Processing:</strong> Sends MIDI events and captures processing diagnostics</li>
+                <li><strong>Check System Status:</strong> Captures current system health without audio interference</li>
+              </ol>
+              
+              <h3>🔍 What to Look For in Results:</h3>
+              <ul style={{ paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                <li><strong>Audio Pipeline Ready:</strong> Should show true with 44.1kHz sample rate</li>
+                <li><strong>SoundFont Loaded:</strong> Should show sine test data with 441,000 samples</li>
+                <li><strong>Non-Zero Sample Data:</strong> Should show 100% non-zero samples indicating valid audio data</li>
+                <li><strong>System Bridge Available:</strong> Should show all components properly initialized</li>
+              </ul>
+              
+              <div style={{ 
+                marginTop: 'var(--spacing-md)', 
+                padding: 'var(--spacing-md)', 
+                backgroundColor: 'var(--color-success-bg)', 
+                borderRadius: 'var(--radius-md)' 
+              }}>
+                <p><strong>✅ Advantage of New System:</strong> Unlike the old debug system that flooded with continuous text, 
+                this unified approach captures comprehensive diagnostics only when you take actions, providing rich structured 
+                data without memory issues or audio processing interference.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

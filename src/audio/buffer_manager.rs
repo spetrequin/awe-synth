@@ -121,8 +121,7 @@ impl AudioBufferManager {
         manager.current_buffer_size = initial_buffer_size
             .unwrap_or_else(|| manager.detect_optimal_buffer_size());
             
-        crate::log(&format!("📊 Buffer manager initialized: {} samples", 
-            manager.current_buffer_size.as_usize()));
+        // Buffer manager initialization debug removed
         
         manager
     }
@@ -134,14 +133,13 @@ impl AudioBufferManager {
             device_memory_gb,
         });
         
-        crate::log(&format!("🔧 Device info set: {}cores, {}GB RAM", 
-            hardware_concurrency, device_memory_gb));
+        // Device info debug removed
         
         // Recalculate optimal buffer size with new device info
         if self.adaptive_mode {
             let optimal = self.detect_optimal_buffer_size();
             if optimal != self.current_buffer_size {
-                crate::log(&format!("🔄 Device info suggests buffer size: {:?}", optimal));
+                // Device info buffer suggestion debug removed
             }
         }
     }
@@ -149,13 +147,13 @@ impl AudioBufferManager {
     /// Set sample rate for buffer calculations
     pub fn set_sample_rate(&mut self, sample_rate: f32) {
         self.sample_rate = sample_rate;
-        crate::log(&format!("🔧 Sample rate set to {}Hz", sample_rate));
+        // Sample rate debug removed
         
         // Recalculate optimal buffer size for new sample rate
         if self.adaptive_mode {
             let optimal = self.calculate_optimal_buffer_size();
             if optimal != self.current_buffer_size {
-                crate::log(&format!("🔄 Sample rate change suggests buffer size: {:?}", optimal));
+                // Sample rate buffer suggestion debug removed
             }
         }
     }
@@ -178,18 +176,15 @@ impl AudioBufferManager {
             self.adaptive_mode = false; // User override
             
             let config = self.get_current_config();
-            crate::log(&format!("🔧 Buffer size changed: {:?} → {:?} (adaptive disabled)", 
-                old_size, size));
-            crate::log(&format!("📊 New config: {:.1}ms latency, {:?} CPU", 
-                config.latency_ms, config.cpu_usage));
+            // Buffer size change debug removed
+            // New config debug removed
         }
     }
     
     /// Enable or disable adaptive buffer sizing
     pub fn set_adaptive_mode(&mut self, enabled: bool) {
         self.adaptive_mode = enabled;
-        crate::log(&format!("🤖 Adaptive mode: {}", 
-            if enabled { "ENABLED" } else { "DISABLED" }));
+        // Adaptive mode debug removed
         
         if enabled {
             self.last_adaptation_ms = 0.0; // Allow immediate adaptation
@@ -210,8 +205,7 @@ impl AudioBufferManager {
         let available_time_ms = (buffer_size as f32 / self.sample_rate) * 1000.0;
         if processing_time_ms > available_time_ms * 0.8 { // 80% threshold
             self.underrun_count += 1;
-            crate::log(&format!("⚠️ Near-underrun: {:.2}ms > {:.2}ms threshold", 
-                processing_time_ms, available_time_ms * 0.8));
+            // Near-underrun debug removed
             
             // Trigger adaptive sizing if enabled
             if self.adaptive_mode {
@@ -231,7 +225,7 @@ impl AudioBufferManager {
     /// Record buffer underrun (audio glitch)
     pub fn record_underrun(&mut self) {
         self.underrun_count += 1;
-        crate::log(&format!("❌ Buffer underrun detected (total: {})", self.underrun_count));
+        // Buffer underrun debug removed
         
         if self.adaptive_mode {
             self.consider_buffer_size_increase();
@@ -273,7 +267,7 @@ impl AudioBufferManager {
         self.start_time_ms = Self::get_current_time_ms();
         self.metrics = BufferMetrics::default();
         
-        crate::log("📊 Metrics reset");
+        // Metrics reset debug removed
     }
     
     /// Get buffer management status summary as JSON string
@@ -325,22 +319,22 @@ impl AudioBufferManager {
         if let Some(device) = &self.device_info {
             // High-end devices can handle lower latency
             if device.hardware_concurrency >= 8 && device.device_memory_gb >= 8 {
-                crate::log("🚀 High-end device detected, using 128 sample buffer");
+                // High-end device debug removed
                 return BufferSize::Small;
             }
             
             // Mid-range devices use balanced approach
             if device.hardware_concurrency >= 4 && device.device_memory_gb >= 4 {
-                crate::log("⚡ Mid-range device detected, using 256 sample buffer");
+                // Mid-range device debug removed
                 return BufferSize::Medium;
             }
             
             // Low-end devices prioritize stability
-            crate::log("🐌 Low-end device detected, using 512 sample buffer");
+            // Low-end device debug removed
             BufferSize::Large
         } else {
             // Default to medium buffer size when device info is unknown
-            crate::log("❓ Unknown device capabilities, using 256 sample buffer");
+            // Unknown device debug removed
             BufferSize::Medium
         }
     }
@@ -399,8 +393,8 @@ impl AudioBufferManager {
             self.underrun_count = 0;
             
             let config = self.get_current_config();
-            crate::log(&format!("🤖 Adaptive sizing: {:?} → {:?} samples", old_size, optimal_size));
-            crate::log(&format!("📊 New latency: {:.1}ms", config.latency_ms));
+            // Adaptive sizing debug removed
+            // New latency debug removed
         }
     }
     
@@ -419,8 +413,7 @@ impl AudioBufferManager {
             let old_size = self.current_buffer_size;
             self.current_buffer_size = new_size;
             self.last_adaptation_ms = now;
-            crate::log(&format!("⬆️ Emergency buffer increase: {:?} → {:?} (underruns: {})", 
-                old_size, new_size, self.underrun_count));
+            // Emergency buffer increase debug removed
         }
     }
     
