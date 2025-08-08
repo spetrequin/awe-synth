@@ -7,7 +7,7 @@
  */
 
 use wasm_bindgen::prelude::*;
-use crate::{MidiPlayer, log};
+use crate::MidiPlayer;
 use crate::audio::{AudioBufferManager, BufferSize};
 use crate::soundfont::SoundFont;
 
@@ -58,7 +58,7 @@ impl AudioPipelineManager {
         self.is_initialized = true;
         self.connected_to_destination = true;
         
-        crate::log(&format!("🎵 AudioPipeline initialized: {}Hz, ready for processing", self.sample_rate));
+        // Pipeline initialized
         Ok(())
     }
     
@@ -77,7 +77,7 @@ impl AudioPipelineManager {
     pub fn set_status(&mut self, status: PipelineStatus) {
         if status != self.status {
             let old_status = std::mem::replace(&mut self.status, status.clone());
-            crate::log(&format!("🔄 Pipeline status: {:?} → {:?}", old_status, status));
+            // Pipeline status changed
         }
     }
     
@@ -96,7 +96,7 @@ impl AudioPipelineManager {
         self.current_sample_time = 0;
         self.last_status_report_time = 0;
         self.status = PipelineStatus::Reset;
-        crate::log("🔄 Pipeline reset - sample time zeroed");
+        // Pipeline reset
         
         // Return to ready state after reset
         self.status = PipelineStatus::Ready;
@@ -105,7 +105,7 @@ impl AudioPipelineManager {
     /// Handle buffer size change notification
     pub fn on_buffer_size_changed(&mut self, new_size: usize) {
         self.status = PipelineStatus::BufferSizeChanged;
-        crate::log(&format!("🔧 Pipeline notified of buffer size change: {} samples", new_size));
+        // Buffer size changed
         
         // Return to ready state
         self.status = PipelineStatus::Ready;
@@ -114,8 +114,7 @@ impl AudioPipelineManager {
     /// Handle adaptive mode change notification
     pub fn on_adaptive_mode_changed(&mut self, enabled: bool) {
         self.status = PipelineStatus::AdaptiveModeChanged;
-        crate::log(&format!("🤖 Pipeline notified of adaptive mode change: {}", 
-            if enabled { "ENABLED" } else { "DISABLED" }));
+        // Adaptive mode changed
         
         // Return to ready state
         self.status = PipelineStatus::Ready;
@@ -124,8 +123,7 @@ impl AudioPipelineManager {
     /// Report pipeline status with timing information
     fn report_pipeline_status(&self) {
         let uptime_seconds = self.current_sample_time as f32 / self.sample_rate;
-        crate::log(&format!("📊 Pipeline status: {:?} | Uptime: {:.1}s | Sample: {} | Connected: {}", 
-            self.status, uptime_seconds, self.current_sample_time, self.connected_to_destination));
+        // Pipeline status report (logging disabled)
     }
     
     /// Get pipeline statistics as JSON string
@@ -152,14 +150,14 @@ impl AudioWorkletBridge {
     /// Create new AudioWorkletBridge with specified sample rate
     #[wasm_bindgen(constructor)]
     pub fn new(sample_rate: f32) -> AudioWorkletBridge {
-        log(&format!("AudioWorkletBridge::new() - Sample rate: {}Hz", sample_rate));
+        // AudioWorkletBridge created
         
         let mut buffer_manager = AudioBufferManager::new(None);
         buffer_manager.set_sample_rate(sample_rate);
         
         let mut pipeline_manager = AudioPipelineManager::new(sample_rate);
         if let Err(e) = pipeline_manager.initialize() {
-            log(&format!("⚠️ Pipeline initialization warning: {}", e));
+            // Pipeline initialization warning
         }
         
         AudioWorkletBridge {
@@ -183,9 +181,9 @@ impl AudioWorkletBridge {
         if size == 128 || size == 256 || size == 512 {
             self.buffer_size = size;
             self.pipeline_manager.on_buffer_size_changed(size);
-            log(&format!("AudioWorkletBridge: Buffer size set to {}", size));
+            // Buffer size set
         } else {
-            log(&format!("AudioWorkletBridge: Invalid buffer size {} - using 128", size));
+            // Invalid buffer size - using 128
             self.buffer_size = 128;
             self.pipeline_manager.on_buffer_size_changed(128);
         }
@@ -199,7 +197,7 @@ impl AudioWorkletBridge {
     
     /// Load SoundFont into the synthesis engine (internal method)
     pub(crate) fn load_soundfont_internal(&mut self, soundfont: SoundFont) -> Result<(), String> {
-        log(&format!("Loading SoundFont into synthesis engine: '{}'", soundfont.header.name));
+        // Loading SoundFont into synthesis engine
         
         // Get mutable access to VoiceManager through MidiPlayer
         let result = {
@@ -210,7 +208,7 @@ impl AudioWorkletBridge {
         
         match result {
             Ok(()) => {
-                log("SoundFont loaded successfully into VoiceManager");
+                // SoundFont loaded successfully
                 
                 // Configure default preset (Bank 0, Program 0)
                 self.midi_player.voice_manager.select_preset(0, 0);
@@ -220,7 +218,7 @@ impl AudioWorkletBridge {
                 Ok(())
             }
             Err(e) => {
-                log(&format!("Failed to load SoundFont into VoiceManager: {}", e));
+                // Failed to load SoundFont
                 Err(e)
             }
         }
@@ -228,7 +226,7 @@ impl AudioWorkletBridge {
     
     /// Select preset by bank and program (internal method)
     pub(crate) fn select_preset_internal(&mut self, bank: u16, program: u8) -> Result<String, String> {
-        log(&format!("Selecting preset: Bank {}, Program {}", bank, program));
+        // Selecting preset
         
         // Use VoiceManager to select the preset
         self.midi_player.voice_manager.select_preset(bank, program);
@@ -236,12 +234,12 @@ impl AudioWorkletBridge {
         // Get the actual preset information
         match self.midi_player.voice_manager.get_current_preset_info() {
             Some(info) => {
-                log(&format!("Preset selected: {}", info));
+                // Preset selected
                 Ok(info)
             }
             None => {
                 let error = format!("Preset not found: Bank {}, Program {}", bank, program);
-                log(&format!("Preset selection failed: {}", error));
+                // Preset selection failed
                 Err(error)
             }
         }
@@ -259,6 +257,11 @@ impl AudioWorkletBridge {
         self.midi_player.voice_manager.is_soundfont_loaded()
     }
     
+    /// Get reference to loaded SoundFont for testing (internal method)
+    pub(crate) fn get_loaded_soundfont(&self) -> Option<&SoundFont> {
+        self.midi_player.voice_manager.get_loaded_soundfont()
+    }
+    
     /// Process audio buffer - main AudioWorklet processing method
     /// Takes output buffer size and fills it with synthesized audio
     /// Returns number of samples processed
@@ -266,13 +269,13 @@ impl AudioWorkletBridge {
     pub fn process_audio_buffer(&mut self, buffer_length: usize) -> Vec<f32> {
         // Check pipeline readiness
         if !self.pipeline_manager.is_ready() {
-            log(&format!("⚠️ Pipeline not ready: {:?}", self.pipeline_manager.get_status()));
+            // Pipeline not ready
             return vec![0.0; buffer_length.min(1024)];
         }
         
         // Validate buffer size
         if buffer_length > 1024 {
-            log(&format!("AudioWorkletBridge: Buffer size {} too large, capping at 1024", buffer_length));
+            // Buffer size too large, capping at 1024
         }
         
         let actual_length = buffer_length.min(1024);
@@ -422,16 +425,12 @@ impl AudioWorkletBridge {
         self.buffer_manager.reset_metrics();
     }
     
-    /// Get debug log from internal systems
-    #[wasm_bindgen]
-    pub fn get_debug_log(&self) -> String {
-        self.midi_player.get_debug_log()
-    }
+    // Debug log system removed
     
     /// Test the worklet bridge with a simple tone
     #[wasm_bindgen]
     pub fn test_worklet_bridge(&mut self, buffer_size: usize) -> String {
-        log("Testing AudioWorkletBridge - generating test buffer");
+        // Testing AudioWorkletBridge
         
         // Queue a test note (Middle C, velocity 100)
         self.queue_midi_event(0, 0, 0x90, 60, 100);
@@ -456,8 +455,7 @@ impl AudioWorkletBridge {
             non_zero_count > 0
         );
         
-        log(&format!("AudioWorkletBridge test: {}/{} non-zero samples, max amplitude: {:.6}", 
-            non_zero_count, buffer_size, max_amplitude));
+        // Test completed
         
         result
     }
@@ -468,7 +466,7 @@ impl AudioWorkletBridge {
         // Create a new MidiPlayer to reset all state
         self.midi_player = MidiPlayer::new();
         self.pipeline_manager.reset();
-        log("AudioWorkletBridge: Audio state reset - all voices stopped, pipeline reset");
+        // Audio state reset
     }
     
     /// Get current audio statistics for monitoring
@@ -542,7 +540,7 @@ pub fn validate_sample_rate(sample_rate: f32) -> bool {
     match sample_rate as u32 {
         8000 | 11025 | 16000 | 22050 | 44100 | 48000 => true,
         _ => {
-            log(&format!("Warning: Unusual sample rate {}Hz - EMU8000 optimized for 44.1kHz", sample_rate));
+            // Warning: Unusual sample rate
             true // Allow but warn
         }
     }

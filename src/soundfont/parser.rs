@@ -34,12 +34,10 @@ impl SoundFontParser {
     pub fn parse_soundfont(data: &[u8]) -> SoundFontResult<SoundFont> {
         let mut parser = Self::new();
         
-        log("Starting SoundFont 2.0 file parsing...");
+        // SoundFont parsing - reduced logging to prevent flooding
         
         // Step 1: Parse RIFF container structure
         let riff = RiffParser::parse_soundfont_riff(data)?;
-        
-        log(&format!("RIFF structure parsed - {} chunks found", riff.chunks.len()));
         
         // Step 2: Parse INFO chunk for header information
         let header = parser.parse_info_chunk(&riff.chunks)?;

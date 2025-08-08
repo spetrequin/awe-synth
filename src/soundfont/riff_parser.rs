@@ -49,7 +49,7 @@ impl RiffParser {
             });
         }
         
-        log("Starting RIFF container parsing...");
+        // RIFF parsing - reduced logging
         
         // Parse main RIFF header
         let riff_header = Self::read_u32_le(&data[0..4]);
@@ -127,9 +127,7 @@ impl RiffParser {
                 offset,
             };
             
-            let chunk_name = String::from_utf8_lossy(&chunk_id);
-            log(&format!("RIFF chunk parsed: '{}' size: {} bytes at offset: {}", 
-                       chunk_name, chunk_size, offset));
+            // RIFF chunk logging removed to prevent flooding
             
             chunks.push(chunk);
             offset = data_end;

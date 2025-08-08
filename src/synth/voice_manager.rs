@@ -688,6 +688,11 @@ impl VoiceManager {
         self.loaded_soundfont.is_some()
     }
     
+    /// Get reference to loaded SoundFont for testing
+    pub fn get_loaded_soundfont(&self) -> Option<&SoundFont> {
+        self.loaded_soundfont.as_ref()
+    }
+    
     pub fn note_on(&mut self, note: u8, velocity: u8, channel: u8) -> Option<usize> {
         // Phase 20.4.1: Use only MultiZoneSampleVoice system
         self.note_on_multi_zone(note, velocity, channel)
