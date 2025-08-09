@@ -273,12 +273,27 @@ let isRecordingActive = false
 export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
   const [state, dispatch] = useReducer(awePlayerReducer, initialState)
   
-  // Initialize WASM
+  // Automatically initialize WASM on context mount
+  useEffect(() => {
+    // Only initialize if not already loaded or loading
+    if (!state.wasmModule && !state.wasmLoading && !state.wasmError) {
+      debugManager.logSystemEvent('Auto-initializing WASM module on context mount')
+      initializeWasm()
+    }
+  }, []) // Empty deps - only run once on mount
+  
+  // Load WASM module (idempotent - safe to call multiple times)
   const initializeWasm = async () => {
+    // Skip if already loaded (React StrictMode calls effects twice)
+    if (state.wasmModule) {
+      debugManager.logSystemEvent('WASM module already loaded, skipping duplicate initialization')
+      return
+    }
+    
     dispatch({ type: 'WASM_LOADING' })
     
     try {
-      debugManager.logSystemEvent('WASM initialization starting')
+      debugManager.logSystemEvent('WASM module loading started')
       
       // Dynamic import of WASM module
       const wasmModule = await import('../../wasm/awe_synth.js')
@@ -287,28 +302,14 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
       // Set up debug manager with WASM module
       debugManager.setWasmModule(wasmModule)
       
-      // Initialize systems
-      const sampleRate = 44100
-      debugManager.logSystemEvent('Calling init_all_systems', { sampleRate })
-      const initResult = wasmModule.init_all_systems(sampleRate)
-      debugManager.logSystemEvent('init_all_systems completed', { result: initResult })
+      // Store module but DON'T initialize systems yet - wait for AudioContext
+      dispatch({ type: 'WASM_LOADED', payload: wasmModule })
+      debugManager.logSystemEvent('WASM module loaded successfully, ready for system initialization')
       
-      if (initResult) {
-        dispatch({ type: 'WASM_LOADED', payload: wasmModule })
-        
-        // Get system status from WASM
-        const systemStatus = JSON.parse(wasmModule.get_system_status())
-        debugManager.logSystemEvent('WASM module initialized successfully', { systemStatus })
-        
-        // WASM is ready - audio will be initialized via useEffect
-        debugManager.logSystemEvent('WASM module ready for audio initialization')
-      } else {
-        throw new Error('Failed to initialize WASM audio systems')
-      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown WASM initialization error'
+      const errorMessage = error instanceof Error ? error.message : 'Unknown WASM loading error'
       dispatch({ type: 'WASM_ERROR', payload: errorMessage })
-      debugManager.logError('WASM initialization failed', { errorMessage })
+      debugManager.logError('WASM module loading failed', { errorMessage })
     }
   }
   
@@ -324,6 +325,23 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
       
       // Create audio context
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      
+      // INITIALIZE WASM systems with AudioContext's sample rate (first and only time)
+      const actualSampleRate = audioContext.sampleRate
+      debugManager.logSystemEvent('Initializing WASM systems with correct AudioContext sample rate', { 
+        browserSampleRate: actualSampleRate,
+        note: 'Single initialization with proper sample rate prevents mismatch issues'
+      })
+      
+      const initResult = wasmModule.init_all_systems(actualSampleRate)
+      if (!initResult) {
+        throw new Error(`Failed to initialize WASM systems with sample rate ${actualSampleRate}`)
+      }
+      
+      debugManager.logSystemEvent('WASM systems initialized successfully with correct sample rate', { 
+        sampleRate: actualSampleRate,
+        success: initResult 
+      })
       
       if (audioContext.state === 'suspended') {
         updateDebugLog('📱 AudioContext suspended - will resume on first user interaction')
@@ -348,22 +366,61 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
         
         if (wasmModule?.process_stereo_buffer_global) {
           try {
-            const audioData = wasmModule.process_stereo_buffer_global(bufferSize)
+            // CRITICAL FIX: WASM expects total samples (L+R interleaved), not per-channel
+            const totalSamples = bufferSize * 2  // 1024 per channel = 2048 total interleaved
+            const audioData = wasmModule.process_stereo_buffer_global(totalSamples)
             const outputL = event.outputBuffer.getChannelData(0)
             const outputR = event.outputBuffer.getChannelData(1)
             
             for (let i = 0; i < bufferSize; i++) {
-              outputL[i] = audioData[i * 2] || 0
-              outputR[i] = audioData[i * 2 + 1] || 0
+              outputL[i] = audioData[i * 2] || 0      // Left channel: 0, 2, 4, 6...
+              outputR[i] = audioData[i * 2 + 1] || 0  // Right channel: 1, 3, 5, 7...
             }
             
-            // Periodic audio diagnostics
+            // Comprehensive real-time audio analysis
             if (now - lastDiagnosticTime > diagnosticInterval) {
               const nonZeroSamples = audioData.filter((s: number) => Math.abs(s) > 0.001).length;
               const maxAmplitude = Math.max(...audioData.map((s: number) => Math.abs(s)));
               const avgAmplitude = audioData.reduce((sum: number, s: number) => sum + Math.abs(s), 0) / audioData.length;
               
-              updateDebugLog(`🎵 Audio Processor: ${processorCallCount} calls, ${nonZeroSamples}/${audioData.length} non-zero samples, max: ${maxAmplitude.toFixed(6)}, avg: ${avgAmplitude.toFixed(6)}`);
+              // Advanced audio quality analysis
+              const rmsAmplitude = Math.sqrt(audioData.reduce((sum: number, s: number) => sum + (s * s), 0) / audioData.length);
+              const dynamicRange = maxAmplitude / (avgAmplitude + 0.000001); // Avoid division by zero
+              const clippingSamples = audioData.filter((s: number) => Math.abs(s) > 0.95).length;
+              
+              // Detect potential issues
+              const issues = [];
+              if (maxAmplitude < 0.01) issues.push("🔇 Very low volume");
+              if (maxAmplitude < 0.1) issues.push("📉 Low volume"); 
+              if (clippingSamples > 0) issues.push(`⚠️ Clipping (${clippingSamples} samples)`);
+              if (dynamicRange < 1.5) issues.push("📊 Low dynamic range (possible distortion)");
+              if (nonZeroSamples < audioData.length * 0.5) issues.push("🕳️ Many zero samples (gaps/silence)");
+              
+              // Sample waveform analysis (first 10 samples for pattern detection)
+              const waveformSample = audioData.slice(0, 10).map(s => s.toFixed(6)).join(', ');
+              
+              debugManager.updateAudioSummary('Real-time Audio Analysis', {
+                processorCalls: processorCallCount,
+                samples: {
+                  total: audioData.length,
+                  nonZero: nonZeroSamples,
+                  nonZeroPercent: ((nonZeroSamples / audioData.length) * 100).toFixed(1)
+                },
+                amplitude: {
+                  max: maxAmplitude.toFixed(6),
+                  avg: avgAmplitude.toFixed(6),
+                  rms: rmsAmplitude.toFixed(6),
+                  dynamicRange: dynamicRange.toFixed(2)
+                },
+                quality: {
+                  clippingSamples,
+                  issues: issues.length > 0 ? issues : ["✅ No issues detected"],
+                  waveformPreview: waveformSample
+                },
+                note: `Updated every ${diagnosticInterval/1000}s - Live audio analysis summary`,
+                lastUpdated: new Date().toLocaleTimeString()
+              });
+              
               lastDiagnosticTime = now;
             }
             
@@ -1132,9 +1189,11 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
     }
   }
   
-  // Initialize WASM on mount
+  // Initialize WASM on mount (only if not already initialized)
   useEffect(() => {
-    initializeWasm()
+    if (!state.wasmModule) {
+      initializeWasm()
+    }
   }, [])
 
   // Initialize audio when WASM is ready
@@ -1145,13 +1204,21 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
     }
   }, [state.wasmModule, state.audioInitialized])
 
-  // Auto-load test SoundFont when WASM is ready (don't wait for AudioContext resume)
+  // Auto-initialize audio when WASM is ready
   useEffect(() => {
-    if (state.wasmModule && !state.soundFontLoaded) {
-      updateDebugLog('📦 Auto-loading test SoundFont at startup...')
+    if (state.wasmModule && !state.audioContext && !state.audioInitializing) {
+      debugManager.logSystemEvent('Auto-initializing audio system after WASM load')
+      initializeAudio(state.wasmModule)
+    }
+  }, [state.wasmModule, state.audioContext, state.audioInitializing])
+  
+  // Auto-load test SoundFont when audio is ready
+  useEffect(() => {
+    if (state.wasmModule && state.audioContext && !state.soundFontLoaded) {
+      updateDebugLog('📦 Auto-loading test SoundFont after audio initialization...')
       loadTestSoundFont()
     }
-  }, [state.wasmModule, state.soundFontLoaded])
+  }, [state.wasmModule, state.audioContext, state.soundFontLoaded])
 
   // Resume AudioContext on first user interaction
   useEffect(() => {

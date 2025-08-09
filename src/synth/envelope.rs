@@ -184,7 +184,9 @@ impl DAHDSREnvelope {
                 }
                 self.stage_samples += 1;
                 // Only check amplitude if we started from a non-zero level
-                let amplitude_finished = self.current_level <= 0.001 && self.release_start_level > 0.001;
+                // CRITICAL FIX: Envelope was truncating at 0.1% - way too high for quiet sustained notes!
+                // Changed from 0.001 to 0.00001 (0.001%) to allow much quieter sustain levels
+                let amplitude_finished = self.current_level <= 0.00001 && self.release_start_level > 0.00001;
                 if self.stage_samples >= self.release_samples || amplitude_finished {
                     self.state = EnvelopeState::Off;
                     self.current_level = 0.0;

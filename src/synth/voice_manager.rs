@@ -803,18 +803,22 @@ impl VoiceManager {
         let mut dry_left = 0.0;
         let mut dry_right = 0.0;
         
-        // Process all MultiZoneSampleVoices
+        // Process all MultiZoneSampleVoices with modern 32-bit float precision
         for voice in self.voices.iter_mut() {
             if voice.is_active() {
                 let (left, right) = voice.process();
-                dry_left += left;
-                dry_right += right;
+                // Apply modern voice gain - EMU8000 was limited by 16-bit integer math
+                let voice_gain = 2.2;  // 220% voice gain for optimal 32-bit headroom
+                dry_left += left * voice_gain;
+                dry_right += right * voice_gain;
                 
-                // Add to effects sends
+                // Add to effects sends with stereo-aware mixing (32-bit precision)
                 let (reverb_send, chorus_send) = voice.get_effects_sends();
                 let channel = voice.get_channel();
-                self.reverb_bus.add_voice_send((left + right) * 0.5, reverb_send, channel);
-                self.chorus_bus.add_voice_send((left + right) * 0.5, chorus_send, channel);
+                // Use stereo RMS for proper effects send level (better than L+R sum)
+                let stereo_rms = ((left * left + right * right) * 0.5).sqrt() * voice_gain;
+                self.reverb_bus.add_voice_send(stereo_rms, reverb_send, channel);
+                self.chorus_bus.add_voice_send(stereo_rms, chorus_send, channel);
             }
         }
         
@@ -822,13 +826,14 @@ impl VoiceManager {
         let reverb_wet = self.reverb_bus.process_reverb();
         let chorus_wet = self.chorus_bus.process_chorus();
         
-        // Mix dry and wet signals (EMU8000 style)
-        let dry_level = 0.7; // 70% dry signal  
+        // Mix dry and wet signals (Modern 32-bit style)
+        let dry_level = 0.9; // 90% dry signal - 32-bit precision allows higher levels  
         let final_left = (dry_left * dry_level) + reverb_wet + chorus_wet;
         let final_right = (dry_right * dry_level) + reverb_wet + chorus_wet;
         
-        // Simple mixing - divide by max voices to prevent clipping
-        (final_left / 32.0, final_right / 32.0)
+        // Modern 32-bit float mixing - no artificial clipping limits
+        // With 32-bit float precision, we can handle much higher amplitudes
+        (final_left, final_right)
     }
     
     /// Process envelopes for all processing voices (call once per audio sample)

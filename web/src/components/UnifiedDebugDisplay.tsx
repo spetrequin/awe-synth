@@ -149,6 +149,26 @@ const UnifiedDebugDisplay: React.FC<UnifiedDebugDisplayProps> = ({
               ))}
             </select>
           )}
+          
+          {/* Quick Error Filter Button */}
+          {entries.some(entry => entry.category === 'error') && (
+            <button
+              onClick={() => setSelectedCategory(selectedCategory === 'error' ? 'all' : 'error')}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                border: selectedCategory === 'error' ? '2px solid #d32f2f' : '1px solid #d32f2f',
+                backgroundColor: selectedCategory === 'error' ? '#d32f2f' : 'transparent',
+                color: selectedCategory === 'error' ? 'white' : '#d32f2f',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+              title={selectedCategory === 'error' ? 'Show all entries' : 'Show only errors'}
+            >
+              🚨 Errors Only
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

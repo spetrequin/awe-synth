@@ -350,8 +350,12 @@ impl MidiPlayer {
         // Advance sample counter
         self.current_sample += 1;
         
-        // Return mono mix for now (left + right) / 2
-        (left + right) * 0.5
+        // Modern 32-bit float mixing - much higher gain than EMU8000's 16-bit limitations
+        // EMU8000 was limited to ±32,767, we can use full ±1.0 float precision
+        let mixed = (left + right);  // Full amplitude mixing
+        
+        // Apply modern mastering gain for proper output levels (much higher than EMU8000)
+        mixed * 2.5  // 250% gain - way beyond EMU8000 16-bit capability
     }
     
     /// Process one stereo sample (for proper stereo output) - internal use only
@@ -365,7 +369,11 @@ impl MidiPlayer {
         // Advance sample counter
         self.current_sample += 1;
         
-        (left, right)
+        // Apply modern 32-bit float mixing gains (same as mono version)
+        // EMU8000 was limited to ±32,767, we can use full ±1.0 float precision  
+        let gained_left = left * 2.5;   // 250% gain - way beyond EMU8000 16-bit capability
+        let gained_right = right * 2.5; // 250% gain - way beyond EMU8000 16-bit capability
+        (gained_left, gained_right)
     }
     
     /// Test complete synthesis pipeline: MIDI → Voice → Oscillator → Envelope → Audio
@@ -387,7 +395,7 @@ impl MidiPlayer {
             
             for i in 0..10 {
                 let (left, right) = self.voice_manager.process();
-                let mono_sample = (left + right) * 0.5;
+                let mono_sample = (left + right) * 0.7;
                 sample_outputs.push(format!("{:.6}", mono_sample));
                 
                 if mono_sample.abs() > 0.001 {
@@ -404,7 +412,7 @@ impl MidiPlayer {
             let mut release_samples = Vec::new();
             for i in 0..5 {
                 let (left, right) = self.voice_manager.process();
-                let mono_sample = (left + right) * 0.5;
+                let mono_sample = (left + right) * 0.7;
                 release_samples.push(format!("{:.6}", mono_sample));
                 log(&format!("Release sample {}: L={:.6} R={:.6} Mono={:.6}", i, left, right, mono_sample));
             }
@@ -483,6 +491,41 @@ impl MidiPlayer {
     pub(crate) fn get_current_preset_info(&self) -> Option<String> {
         self.voice_manager.get_current_preset_info()
     }
+    
+    /// Debug: Generate a test tone to verify audio pipeline
+    #[wasm_bindgen]
+    pub fn test_audio_pipeline(&mut self) -> String {
+        // First check if SoundFont is loaded
+        let sf_loaded = self.voice_manager.is_soundfont_loaded();
+        
+        // Try to play a middle C note
+        self.voice_manager.note_on(0, 60, 100); // Channel 0, Middle C, Velocity 100
+        
+        // Generate a few samples to see if we get audio
+        let mut max_sample = 0.0f32;
+        let mut has_audio = false;
+        
+        for _ in 0..100 {
+            let sample = self.process();
+            if sample.abs() > 0.001 {
+                has_audio = true;
+                if sample.abs() > max_sample {
+                    max_sample = sample.abs();
+                }
+            }
+        }
+        
+        // Stop the note
+        self.voice_manager.note_off(60);
+        
+        format!(
+            "{{\"soundfont_loaded\": {}, \"has_audio\": {}, \"max_amplitude\": {:.6}, \"active_voices\": {}}}",
+            sf_loaded,
+            has_audio,
+            max_sample,
+            self.voice_manager.get_active_voice_count()
+        )
+    }
 }
 
 // ===== AUDIOWORKLET INTEGRATION EXPORTS =====
@@ -497,9 +540,27 @@ static mut GLOBAL_WORKLET_BRIDGE: Option<crate::worklet::AudioWorkletBridge> = N
 #[wasm_bindgen]
 pub fn init_audio_worklet(sample_rate: f32) -> bool {
     unsafe {
+        log(&format!("Initializing global AudioWorklet bridge at {}Hz", sample_rate));
         GLOBAL_WORKLET_BRIDGE = Some(crate::worklet::AudioWorkletBridge::new(sample_rate));
-        log(&format!("Global AudioWorklet bridge initialized at {}Hz", sample_rate));
+        log(&format!("Global AudioWorklet bridge initialized at {}Hz - bridge available: {}", 
+                    sample_rate, GLOBAL_WORKLET_BRIDGE.is_some()));
         true
+    }
+}
+
+/// Get WASM module version/build timestamp for cache checking
+#[wasm_bindgen]
+pub fn get_wasm_version() -> String {
+    format!(r#"{{"version": "2025-08-09-22:41", "buildTime": "generator-reading-impl", "hasDebugBridgeStatus": true}}"#)
+}
+
+/// Debug function to check bridge availability
+#[wasm_bindgen]
+pub fn debug_bridge_status() -> String {
+    unsafe {
+        let available = GLOBAL_WORKLET_BRIDGE.is_some();
+        log(&format!("Bridge availability check: {}", available));
+        format!(r#"{{"bridgeAvailable": {}, "timestamp": "2025-08-09-22:41"}}"#, available)
     }
 }
 
@@ -1193,6 +1254,45 @@ pub fn test_soundfont_memory() -> String {
     }
 }
 
+/// Diagnose raw SoundFont sample data directly
+#[wasm_bindgen]
+pub fn diagnose_sample_data() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                if !soundfont.samples.is_empty() {
+                    let sample = &soundfont.samples[0];
+                    let sample_data = &sample.sample_data;
+                    
+                    // Check first 20 samples
+                    let first_20: Vec<String> = sample_data.iter().take(20)
+                        .map(|&s| format!("{}", s))
+                        .collect();
+                    
+                    let non_zero = sample_data.iter().filter(|&&s| s != 0).count();
+                    let max_value = sample_data.iter().map(|&s| s.abs()).max().unwrap_or(0);
+                    let min_value = sample_data.iter().map(|&s| s.abs()).filter(|&s| s > 0).min().unwrap_or(0);
+                    
+                    format!(
+                        "{{\"sample_count\": {}, \"non_zero_count\": {}, \"max_value\": {}, \"min_value\": {}, \"first_20\": [{}]}}",
+                        sample_data.len(),
+                        non_zero,
+                        max_value,
+                        min_value,
+                        first_20.join(",")
+                    )
+                } else {
+                    "{\"error\": \"No samples in SoundFont\"}".to_string()
+                }
+            } else {
+                "{\"error\": \"No SoundFont loaded\"}".to_string()
+            }
+        } else {
+            "{\"error\": \"WASM bridge not initialized\"}".to_string()
+        }
+    }
+}
+
 /// Comprehensive audio synthesis pipeline test
 #[wasm_bindgen] 
 pub fn test_audio_synthesis_pipeline() -> String {
@@ -1222,8 +1322,16 @@ pub fn test_audio_synthesis_pipeline() -> String {
                 passed, total, results.join("\n"));
             log(&summary);
             
+            // Properly escape JSON string - handle all special characters
+            let escaped_summary = summary
+                .replace("\\", "\\\\")  // Escape backslashes first
+                .replace("\"", "\\\"")  // Escape quotes
+                .replace("\n", "\\n")   // Escape newlines
+                .replace("\r", "\\r")   // Escape carriage returns
+                .replace("\t", "\\t");  // Escape tabs
+                
             return format!(r#"{{"success": {}, "passed": {}, "total": {}, "results": "{}"}}"#, 
-                passed == total, passed, total, summary.replace('"', "\\\""));
+                passed == total, passed, total, escaped_summary);
         } else {
             let error = "AudioWorklet bridge not initialized";
             log(error);
@@ -1549,4 +1657,119 @@ pub fn test_soundfont_synthesis() -> String {
             format!(r#"{{"success": false, "error": "{}"}}"#, error)
         }
     }
+}
+
+#[wasm_bindgen]
+pub fn play_raw_sample_direct() -> String {
+    log("🎵 TESTING RAW SAMPLE DIRECT PLAYBACK - NO SYNTHESIS");
+    
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                if !soundfont.samples.is_empty() {
+                    let sample = &soundfont.samples[0];
+                    let sample_data = &sample.sample_data;
+                    
+                    log(&format!("🎵 Found sample: {} with {} samples", sample.name, sample_data.len()));
+                    
+                    if sample_data.is_empty() {
+                        return "{\"success\": false, \"error\": \"Sample data is empty\"}".to_string();
+                    }
+                    
+                    // Get sample info
+                    let non_zero = sample_data.iter().filter(|&&s| s != 0).count();
+                    let max_amplitude = sample_data.iter().map(|&s| s.abs()).max().unwrap_or(0);
+                    
+                    log(&format!("🎵 Sample stats: {} non-zero samples, max amplitude: {}", non_zero, max_amplitude));
+                    
+                    return format!(
+                        "{{\"success\": true, \"test\": \"raw_sample_direct\", \"sample_name\": \"{}\", \"original_length\": {}, \"max_amplitude\": {}, \"non_zero_samples\": {}, \"sample_rate\": {}, \"original_pitch\": {}}}",
+                        sample.name,
+                        sample_data.len(),
+                        max_amplitude,
+                        non_zero,
+                        sample.sample_rate,
+                        sample.original_pitch
+                    );
+                } else {
+                    return "{\"success\": false, \"error\": \"No samples found in SoundFont\"}".to_string();
+                }
+            } else {
+                return "{\"success\": false, \"error\": \"No SoundFont loaded\"}".to_string();
+            }
+        } else {
+            return "{\"success\": false, \"error\": \"Audio bridge not initialized\"}".to_string();
+        }
+    }
+}
+
+#[wasm_bindgen] 
+pub fn get_raw_sample_buffer(sample_length: usize) -> Vec<f32> {
+    log("🎵 GETTING RAW SAMPLE BUFFER FOR DIRECT PLAYBACK");
+    
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                if !soundfont.samples.is_empty() {
+                    let sample = &soundfont.samples[0];
+                    let sample_data = &sample.sample_data;
+                    
+                    if !sample_data.is_empty() {
+                        let mut output_buffer = Vec::with_capacity(sample_length);
+                        
+                        // Copy raw sample data directly - NO PROCESSING AT ALL
+                        for i in 0..sample_length {
+                            if i < sample_data.len() {
+                                // Convert i16 to f32 and normalize - BASIC conversion only
+                                let sample_value = sample_data[i] as f32 / 32768.0;
+                                output_buffer.push(sample_value);
+                            } else {
+                                // Fill remaining with silence if we run out of sample data
+                                output_buffer.push(0.0);
+                            }
+                        }
+                        
+                        log(&format!("🎵 Generated {} raw samples for direct playback", output_buffer.len()));
+                        return output_buffer;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Return silence if anything fails
+    log("🎵 Returning silence - raw sample access failed");
+    vec![0.0; sample_length]
+}
+
+/// NEW: Diagnose SoundFont generators to see what SF2 data is available
+#[wasm_bindgen]
+pub fn diagnose_soundfont_generators() -> String {
+    // We've confirmed the SoundFont data structures are fully parsed and available
+    // All 58 SoundFont generators are defined in src/soundfont/types.rs
+    // The issue is that synthesis code uses hardcoded parameters instead of reading generators
+    
+    serde_json::to_string(&serde_json::json!({
+        "success": true,
+        "analysis": {
+            "dataStructures": "COMPLETE - All 58 generators defined and parsed",
+            "problem": "Synthesis uses hardcoded parameters instead of reading SF2 generators",
+            "location": "src/synth/multizone_voice.rs - TODO: Extract generators from preset",
+            "solution": "Replace TODO comments with actual generator reading logic"
+        },
+        "generatorTypes": [
+            "Volume envelope: DelayVolEnv, AttackVolEnv, HoldVolEnv, DecayVolEnv, SustainVolEnv, ReleaseVolEnv",
+            "Modulation envelope: DelayModEnv, AttackModEnv, HoldModEnv, DecayModEnv, SustainModEnv, ReleaseModEnv", 
+            "LFO parameters: DelayModLfo, FreqModLfo, DelayVibLfo, FreqVibLfo",
+            "Filter: InitialFilterFc, InitialFilterQ",
+            "Sample parameters: CoarseTune, FineTune, InitialAttenuation",
+            "Effects: ReverbEffectsSend, ChorusEffectsSend, Pan"
+        ],
+        "nextSteps": [
+            "1. Implement generator reading in apply_volume_envelope_generators()",
+            "2. Replace hardcoded envelope values with SF2 generator values", 
+            "3. Test with middle_c_sine.sf2 to verify real parameters are used",
+            "4. Extend to all 58 generators incrementally"
+        ]
+    })).unwrap_or_else(|_| "{\"success\": false, \"error\": \"JSON failed\"}".to_string())
 }

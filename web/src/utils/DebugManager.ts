@@ -5,7 +5,7 @@
 
 interface DebugEntry {
   timestamp: number
-  category: 'user' | 'system' | 'audio' | 'midi' | 'soundfont' | 'error'
+  category: 'user' | 'system' | 'audio' | 'midi' | 'soundfont' | 'error' | 'envelope' | 'voice'
   event: string
   data?: any
   wasmDiagnostics?: {
@@ -35,6 +35,54 @@ class DebugManager {
     this.wasmModule = module
   }
 
+  // Update an existing entry by event name, or create new if not found
+  updateEntry(category: DebugEntry['category'], event: string, data?: any, includeWasmDiagnostics = false) {
+    // Find existing entry with same category and event
+    const existingIndex = this.entries.findIndex(entry => 
+      entry.category === category && entry.event === event
+    )
+    
+    const entry: DebugEntry = {
+      timestamp: Date.now(), // Always update timestamp
+      category,
+      event,
+      data
+    }
+
+    // Capture WASM diagnostics if requested
+    if (includeWasmDiagnostics && this.wasmModule) {
+      try {
+        entry.wasmDiagnostics = {
+          audioPipeline: JSON.parse(this.wasmModule.diagnose_audio_pipeline()),
+          soundfontData: JSON.parse(this.wasmModule.diagnose_soundfont_data()),
+          midiProcessing: JSON.parse(this.wasmModule.diagnose_midi_processing()),
+          systemDiagnostics: JSON.parse(this.wasmModule.get_system_diagnostics()),
+          audioTest: JSON.parse(this.wasmModule.run_audio_test())
+        }
+      } catch (error) {
+        // Ignore WASM diagnostic errors
+      }
+    }
+
+    if (existingIndex >= 0) {
+      // Update existing entry
+      this.entries[existingIndex] = entry
+    } else {
+      // Create new entry
+      this.addNewEntry(entry)
+    }
+    
+    this.notifyListeners()
+  }
+
+  // Helper method to add new entry and maintain size limit
+  private addNewEntry(entry: DebugEntry) {
+    this.entries.push(entry)
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(-this.maxEntries)
+    }
+  }
+
   // Add a debug entry with optional WASM diagnostics
   addEntry(category: DebugEntry['category'], event: string, data?: any, includeWasmDiagnostics = false) {
     const entry: DebugEntry = {
@@ -59,13 +107,7 @@ class DebugManager {
       }
     }
 
-    // Add to entries and maintain size limit
-    this.entries.push(entry)
-    if (this.entries.length > this.maxEntries) {
-      this.entries = this.entries.slice(-this.maxEntries)
-    }
-
-    // Notify listeners
+    this.addNewEntry(entry)
     this.notifyListeners()
   }
 
@@ -79,7 +121,20 @@ class DebugManager {
   }
 
   logAudioEvent(event: string, data?: any) {
-    this.addEntry('audio', event, data, true) // Include diagnostics for audio events
+    // Only include full diagnostics for critical audio events to reduce noise
+    const criticalEvents = ['Audio Buffer Analysis During Sustain', 'Audio Synthesis Pipeline Test Started']
+    const includeDiagnostics = criticalEvents.some(critical => event.includes(critical))
+    this.addEntry('audio', event, data, includeDiagnostics)
+  }
+
+  logAudioSummary(event: string, data?: any) {
+    // Special method for audio summary without full diagnostics spam
+    this.addEntry('audio', event, data, false)
+  }
+
+  updateAudioSummary(event: string, data?: any) {
+    // Update existing audio summary entry instead of creating new ones
+    this.updateEntry('audio', event, data, false)
   }
 
   logMidiEvent(event: string, data?: any) {
@@ -88,6 +143,14 @@ class DebugManager {
 
   logSoundFontEvent(event: string, data?: any) {
     this.addEntry('soundfont', event, data, true) // Include diagnostics for SoundFont events
+  }
+
+  logEnvelopeEvent(event: string, data?: any) {
+    this.addEntry('envelope', event, data)
+  }
+
+  logVoiceEvent(event: string, data?: any) {
+    this.addEntry('voice', event, data)
   }
 
   logError(event: string, data?: any) {

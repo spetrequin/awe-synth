@@ -2,20 +2,78 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**🚨 MANDATORY REQUIREMENT: MUST READ ALL PROJECT DOCUMENTATION BEFORE ANY WORK 🚨**
+## 🛑 **STOP - MANDATORY SESSION INITIALIZATION PROTOCOL**
 
-**📚 REQUIRED READING - NO EXCEPTIONS:**
-- **CLAUDE.md** (this file) - Project guidelines and development principles  
-- **docs/ARCHITECTURE.md** - Complete system design and component architecture
-- **docs/PROJECT_TODO.md** - Current project status and phase planning
-- **docs/EMU8000_REFERENCE.md** - Hardware specifications and SoundFont 2.0 details
-- **docs/UNIFIED_DEBUG_SYSTEM.md** - Unified debug system architecture and usage
+**YOU MUST COMPLETE THIS CHECKLIST BEFORE ANY WORK:**
 
-**❌ ABSOLUTELY FORBIDDEN: Starting work without reading ALL documentation above**
-**❌ ABSOLUTELY FORBIDDEN: Skipping documentation because "I understand the project"**
-**❌ ABSOLUTELY FORBIDDEN: Making architectural decisions without consulting docs/ARCHITECTURE.md**
+### **📋 SESSION INITIALIZATION CHECKLIST (DO NOT SKIP)**
 
-**✅ MANDATORY WORKFLOW:** Read ALL docs → Understand current phase → Update TodoWrite → Begin work
+**Step 1: Foundation Documents (MANDATORY - READ IN ORDER)**
+- [ ] **CLAUDE.md** (this entire file) - Project philosophy and development principles
+- [ ] **docs/ARCHITECTURE.md** - EMU8000 emulation architecture and component design
+- [ ] **docs/PROJECT_TODO.md** - Current project status (spoiler: not production ready!)
+- [ ] **docs/TODO.md** - Complete development history showing REAL current status
+- [ ] **docs/EMU8000_REFERENCE.md** - Hardware specifications we're emulating
+
+**Step 2: Critical Architecture Documents (MANDATORY)**
+- [ ] **docs/MULTIZONE_VOICE_DESIGN.md** - NEW voice system architecture (Phase 20 rebuild)
+- [ ] **docs/DEVELOPMENT_SEQUENCE.md** - Development strategy and current blockers
+- [ ] **docs/TESTING_ARCHITECTURE.md** - Testing philosophy (NO test code in src/)
+- [ ] **docs/UNIFIED_DEBUG_SYSTEM.md** - Debug system (NO console.log, NO crate::log)
+- [ ] **docs/WASM_EXPORTS.md** - Available WASM functions and diagnostic tools
+
+**Step 3: Reality Check Questions (ANSWER THESE BEFORE PROCEEDING)**
+1. **What is the REAL project status?** (Hint: Has NEVER produced audio yet)
+2. **How many voice systems exist and what's wrong with them?** (Hint: 3 broken systems)
+3. **What phase are we in?** (Hint: Phase 20 complete voice system rebuild)
+4. **What debug system do we use?** (Hint: Unified diagnostics, NOT console logging)
+5. **Where is test code allowed?** (Hint: ONLY in tests/ directory, NEVER in src/)
+6. **How many voices does EMU8000 support?** (Hint: 32)
+7. **What's the primary blocker?** (Hint: Sample interpolation returns silence)
+
+**Step 4: Context Verification (MANDATORY)**
+- [ ] Check if dev server is running (port 3000)
+- [ ] Understand we're in Phase 20: complete voice system rebuild from scratch
+- [ ] Verify TodoWrite tool status (restore from PROJECT_TODO.md if empty)
+- [ ] Acknowledge that infrastructure exists but produces NO SOUND
+- [ ] Check docs/TESTING_PROGRESSION.md for current testing phase and tasks
+
+### **⚠️ CRITICAL PROJECT REALITY**
+
+**THIS PROJECT HAS NEVER PRODUCED A SINGLE AUDIBLE NOTE:**
+- Despite optimistic documentation claiming "PRODUCTION READY"
+- All synthesis infrastructure exists but produces only silence
+- Three voice systems exist: Voice (oscillator), SampleVoice (broken), MultiZoneSampleVoice (incomplete)
+- Phase 20 is rebuilding MultiZoneSampleVoice from scratch with complete EMU8000 effects
+- Core issue: Sample interpolation and PCM playback not properly connected
+
+**CURRENT PHASE 20 STATUS:**
+- **Goal**: Build NEW MultiZoneSampleVoice with complete EMU8000 effects chain
+- **Strategy**: Complete rewrite, NOT consolidation of broken systems
+- **Priority**: Make ONE NOTE audible before any other features
+- **Architecture**: 32-voice polyphonic synthesis at 44.1kHz with per-voice effects
+
+**FORBIDDEN ACTIONS:**
+- ❌ Don't add console.log, crate::log, or any text logging
+- ❌ Don't put test code in src/ directory (violates clean separation policy)
+- ❌ Don't claim project works without verification at diagnostic pages
+- ❌ Don't trust "complete" status in documentation without actual testing
+- ❌ Don't start new features when basic audio generation is broken
+
+**REQUIRED ACTIONS:**
+- ✅ Use unified debug system at http://localhost:3000/tests/wasm-diagnostics
+- ✅ Focus on Phase 20: complete MultiZoneSampleVoice rebuild
+- ✅ Test with simple SoundFont: `/web/public/sf2/instruments/middle_c_sine.sf2` (10-second middle C sine wave)
+- ✅ Verify actual system state before making any changes
+- ✅ Follow DEVELOPMENT_SEQUENCE.md for implementation strategy
+- ✅ **MANDATORY**: Document ALL session progress in docs/TESTING_PROGRESSION.md before ending session
+
+**TESTING SOUNDFONT:**
+- **File**: `/web/public/sf2/instruments/middle_c_sine.sf2`
+- **Content**: Single 10-second middle C sine wave sample
+- **Structure**: Complete SF2 with preset → instrument → sample hierarchy
+- **Purpose**: Simplest possible test case - if this doesn't play, nothing will
+- **Expected**: Should produce audible 440Hz sine wave when middle C (note 60) is pressed
 
 ## 🎯 **PROJECT INTENT**
 
