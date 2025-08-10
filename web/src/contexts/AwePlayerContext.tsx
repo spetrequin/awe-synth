@@ -343,6 +343,77 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
         success: initResult 
       })
       
+      // CRITICAL: Verify bridge is actually available before proceeding
+      // This prevents timing issues that could cause "Bridge not available" errors later
+      debugManager.logSystemEvent('Verifying bridge availability post-initialization')
+      
+      let bridgeVerified = false
+      let attempts = 0
+      const maxAttempts = 10
+      
+      while (!bridgeVerified && attempts < maxAttempts) {
+        try {
+          const bridgeStatus = wasmModule.debug_bridge_status()
+          const bridgeData = JSON.parse(bridgeStatus)
+          
+          if (bridgeData.available) {
+            debugManager.logSystemEvent('✅ Bridge verification successful', {
+              attempt: attempts + 1,
+              sampleRate: bridgeData.sample_rate,
+              status: bridgeData.status
+            })
+            bridgeVerified = true
+          } else {
+            attempts++
+            debugManager.logSystemEvent(`⏳ Bridge verification attempt ${attempts}/${maxAttempts}`, {
+              bridgeAvailable: bridgeData.available,
+              waiting: true
+            })
+            // Small delay to let initialization complete
+            await new Promise(resolve => setTimeout(resolve, 10))
+          }
+        } catch (error) {
+          attempts++
+          debugManager.logSystemEvent(`⚠️ Bridge verification error on attempt ${attempts}/${maxAttempts}`, {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+      }
+      
+      if (!bridgeVerified) {
+        throw new Error(`Bridge initialization verification failed after ${maxAttempts} attempts. Bridge is not available for diagnostic functions.`)
+      }
+      
+      // Log summary of bridge verification process
+      const totalAttempts = attempts + 1
+      const verificationTime = totalAttempts * 10 // rough estimate in ms
+      
+      if (totalAttempts === 1) {
+        debugManager.logSystemEvent('🎉 Bridge initialization complete - immediate success', {
+          attempts: totalAttempts,
+          sampleRate: actualSampleRate,
+          verificationTime: '< 1ms',
+          status: 'Bridge available immediately after init_all_systems()'
+        })
+      } else {
+        debugManager.logSystemEvent('🎉 Bridge initialization complete - required retries', {
+          attempts: totalAttempts,
+          sampleRate: actualSampleRate,
+          verificationTime: `~${verificationTime}ms`,
+          status: `Bridge became available after ${totalAttempts} attempts (indicates timing issue resolved)`
+        })
+      }
+      
+      debugManager.logSystemEvent('Bridge Verification Summary', {
+        result: 'SUCCESS',
+        attemptsRequired: totalAttempts,
+        timing: totalAttempts === 1 ? 'immediate' : 'delayed',
+        indication: totalAttempts === 1 ? 
+          'No race condition detected' : 
+          'Race condition detected but handled successfully'
+      })
+      
       if (audioContext.state === 'suspended') {
         updateDebugLog('📱 AudioContext suspended - will resume on first user interaction')
         // Don't resume here - let first user action handle it

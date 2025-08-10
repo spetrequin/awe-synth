@@ -540,10 +540,31 @@ static mut GLOBAL_WORKLET_BRIDGE: Option<crate::worklet::AudioWorkletBridge> = N
 #[wasm_bindgen]
 pub fn init_audio_worklet(sample_rate: f32) -> bool {
     unsafe {
-        log(&format!("Initializing global AudioWorklet bridge at {}Hz", sample_rate));
-        GLOBAL_WORKLET_BRIDGE = Some(crate::worklet::AudioWorkletBridge::new(sample_rate));
-        log(&format!("Global AudioWorklet bridge initialized at {}Hz - bridge available: {}", 
-                    sample_rate, GLOBAL_WORKLET_BRIDGE.is_some()));
+        log(&format!("🔧 BRIDGE INIT: Starting initialization at {}Hz", sample_rate));
+        
+        // Check if bridge already exists
+        if GLOBAL_WORKLET_BRIDGE.is_some() {
+            log("⚠️ BRIDGE INIT: Bridge already exists, replacing existing bridge");
+        }
+        
+        // Create new bridge
+        let new_bridge = crate::worklet::AudioWorkletBridge::new(sample_rate);
+        GLOBAL_WORKLET_BRIDGE = Some(new_bridge);
+        
+        // Verify creation
+        let bridge_created = GLOBAL_WORKLET_BRIDGE.is_some();
+        log(&format!("✅ BRIDGE INIT: Bridge created successfully at {}Hz - available: {}", 
+                    sample_rate, bridge_created));
+        
+        // Test bridge functionality immediately
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            log(&format!("🔍 BRIDGE INIT: Bridge validation - sample_rate: {}Hz, status: Ready", 
+                        sample_rate));
+        } else {
+            log("❌ BRIDGE INIT: Bridge creation failed - GLOBAL_WORKLET_BRIDGE is None immediately after creation");
+            return false;
+        }
+        
         true
     }
 }
@@ -554,13 +575,93 @@ pub fn get_wasm_version() -> String {
     format!(r#"{{"version": "2025-08-09-22:41", "buildTime": "generator-reading-impl", "hasDebugBridgeStatus": true}}"#)
 }
 
-/// Debug function to check bridge availability
+/// Comprehensive bridge lifecycle diagnostic for pipeline testing
+#[wasm_bindgen]
+pub fn diagnose_bridge_lifecycle() -> String {
+    unsafe {
+        let bridge_exists = GLOBAL_WORKLET_BRIDGE.is_some();
+        
+        log(&format!("🔬 BRIDGE LIFECYCLE: Starting comprehensive diagnostic"));
+        log(&format!("🔬 BRIDGE LIFECYCLE: Static variable state - is_some(): {}", bridge_exists));
+        
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            let sample_rate = bridge.get_sample_rate();
+            log(&format!("🔬 BRIDGE LIFECYCLE: Bridge details - sample_rate: {}Hz, ready for diagnostics", sample_rate));
+            
+            format!(r#"{{
+                "success": true,
+                "bridge": {{
+                    "exists": true,
+                    "sample_rate": {},
+                    "status": "functional",
+                    "lifecycle": "active",
+                    "created": true,
+                    "accessible": true,
+                    "ready_for_diagnostics": true
+                }},
+                "diagnosis": "Bridge is fully operational and ready for all diagnostic functions",
+                "timestamp": "2025-08-09-22:41"
+            }}"#, sample_rate)
+        } else {
+            log("🔬 BRIDGE LIFECYCLE: Bridge is NULL - analyzing possible causes");
+            log("🔬 BRIDGE LIFECYCLE: Cause analysis:");
+            log("   ❌ init_all_systems() might not have been called");
+            log("   ❌ init_audio_worklet() might have failed silently");
+            log("   ❌ Bridge creation might have thrown an exception");
+            log("   ❌ Memory corruption or static variable issue");
+            
+            format!(r#"{{
+                "success": false,
+                "error": "Bridge not available",
+                "bridge": {{
+                    "exists": false,
+                    "status": "missing",
+                    "lifecycle": "not_initialized_or_destroyed",
+                    "created": false,
+                    "accessible": false,
+                    "ready_for_diagnostics": false
+                }},
+                "diagnosis": "Bridge is not initialized - all diagnostic functions will fail",
+                "possible_causes": [
+                    "init_all_systems() not called from JavaScript",
+                    "init_audio_worklet() failed during creation",
+                    "Static variable memory issue",
+                    "Bridge was destroyed after creation"
+                ],
+                "recommended_actions": [
+                    "Check JavaScript initialization sequence in AwePlayerContext",
+                    "Verify AudioContext creation succeeded",
+                    "Check for exceptions during bridge creation",
+                    "Verify no cleanup code is destroying the bridge"
+                ],
+                "timestamp": "2025-08-09-22:41"
+            }}"#)
+        }
+    }
+}
+
+
+/// Debug function to check bridge availability with detailed lifecycle tracking
 #[wasm_bindgen]
 pub fn debug_bridge_status() -> String {
     unsafe {
         let available = GLOBAL_WORKLET_BRIDGE.is_some();
-        log(&format!("Bridge availability check: {}", available));
-        format!(r#"{{"bridgeAvailable": {}, "timestamp": "2025-08-09-22:41"}}"#, available)
+        
+        // Enhanced debugging with lifecycle information
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            let sample_rate = bridge.get_sample_rate();
+            log(&format!("🔍 BRIDGE STATUS: Bridge is available - sample_rate: {}Hz", sample_rate));
+            format!(r#"{{"available": true, "sample_rate": {}, "status": "initialized", "lifecycle": "active", "timestamp": "2025-08-09-22:41"}}"#, 
+                    sample_rate)
+        } else {
+            log("⚠️ BRIDGE STATUS: Bridge is NOT available - GLOBAL_WORKLET_BRIDGE is None");
+            log("🔍 BRIDGE STATUS: This could indicate:");
+            log("   1. init_audio_worklet() was never called");
+            log("   2. Bridge creation failed silently");
+            log("   3. Bridge was destroyed/reset after creation");
+            log("   4. Memory management issue with static variable");
+            format!(r#"{{"available": false, "status": "not_initialized", "lifecycle": "missing", "timestamp": "2025-08-09-22:41"}}"#)
+        }
     }
 }
 
@@ -859,18 +960,36 @@ pub use midi::test_sequences::{
 /// Initialize all global systems with sample rate
 #[wasm_bindgen]
 pub fn init_all_systems(sample_rate: f32) -> bool {
+    log(&format!("🚀 SYSTEM INIT: Starting complete system initialization at {}Hz", sample_rate));
     let mut success = true;
     
-    // Initialize AudioWorklet bridge
+    // Initialize AudioWorklet bridge with enhanced tracking
+    log("🔧 SYSTEM INIT: Initializing AudioWorklet bridge...");
     if !init_audio_worklet(sample_rate) {
-        log("❌ Failed to initialize AudioWorklet bridge");
+        log("❌ SYSTEM INIT: AudioWorklet bridge initialization FAILED");
         success = false;
+    } else {
+        log("✅ SYSTEM INIT: AudioWorklet bridge initialization SUCCESS");
+        
+        // Immediate post-init verification
+        unsafe {
+            let bridge_available = GLOBAL_WORKLET_BRIDGE.is_some();
+            log(&format!("🔍 SYSTEM INIT: Bridge verification after init - available: {}", bridge_available));
+        }
     }
     
     // Initialize MIDI test sequence generator
+    log("🔧 SYSTEM INIT: Initializing MIDI test sequence generator...");
     init_test_sequence_generator(sample_rate);
+    log("✅ SYSTEM INIT: MIDI test sequence generator initialized");
     
-    log(&format!("🚀 AWE Player systems initialized at {}Hz", sample_rate));
+    // Final system status
+    if success {
+        log(&format!("🎉 SYSTEM INIT: AWE Player systems fully initialized at {}Hz", sample_rate));
+    } else {
+        log(&format!("⚠️ SYSTEM INIT: AWE Player systems initialization completed with errors at {}Hz", sample_rate));
+    }
+    
     success
 }
 

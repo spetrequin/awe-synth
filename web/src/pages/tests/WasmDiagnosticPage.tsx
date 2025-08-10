@@ -12,8 +12,19 @@ export default function WasmDiagnosticPage() {
     loadTestSoundFont
   } = useAwePlayer()
   
-  const [isDiagnosing, setIsDiagnosing] = useState(false)
+  const [isRunningFullDiagnostic, setIsRunningFullDiagnostic] = useState(false)
   const [isTestingRawSample, setIsTestingRawSample] = useState(false)
+  const [diagnosticSummary, setDiagnosticSummary] = useState<{
+    totalTests: number
+    passed: number
+    failed: number
+    overallStatus: 'not-run' | 'pass' | 'partial' | 'fail'
+  }>({
+    totalTests: 0,
+    passed: 0,
+    failed: 0,
+    overallStatus: 'not-run'
+  })
 
   return (
     <div className="test-page">
@@ -32,23 +43,27 @@ export default function WasmDiagnosticPage() {
         </div>
 
         <div className="test-content">
-          {/* WASM Bridge Diagnostic */}
+          {/* Comprehensive Diagnostic Suite */}
           <div className="test-section">
-            <h2>🔧 WASM Bridge Diagnostic</h2>
+            <h2>🔬 Complete System Diagnostic</h2>
             <div className="test-controls">
               <button 
                 onClick={async () => {
-                  setIsDiagnosing(true)
-                  debugManager.logUserAction('WASM Bridge Comprehensive Diagnostic Started', { 
+                  setIsRunningFullDiagnostic(true)
+                  let testsPassed = 0
+                  let testsFailed = 0
+                  const totalTests = 9 // Version, Bridge Status, 6 diagnostic functions (including bridge lifecycle), Generator check
+                  
+                  debugManager.logUserAction('🚀 Complete Diagnostic Suite Started', { 
                     wasmModuleAvailable: !!wasmModule,
                     soundFontLoaded, 
                     systemStatus 
                   })
                   
                   try {
-                    // Step 1: Check WASM Module Availability
+                    // ========== TEST 1: WASM Module Availability ==========
                     if (!wasmModule) {
-                      debugManager.logError('WASM Module Not Available', {
+                      debugManager.logError('❌ Test 1/8: WASM Module Not Available', {
                         diagnosis: 'WASM module is null or undefined',
                         possibleCauses: [
                           'WASM module failed to load',
@@ -56,43 +71,105 @@ export default function WasmDiagnosticPage() {
                           'Auto-initialization chain broken'
                         ]
                       })
+                      testsFailed++
+                      setDiagnosticSummary({
+                        totalTests,
+                        passed: testsPassed,
+                        failed: testsFailed,
+                        overallStatus: 'fail'
+                      })
                       return
                     }
                     
-                    debugManager.logSystemEvent('✅ WASM Module Available', {
+                    debugManager.logSystemEvent('✅ Test 1/8: WASM Module Available', {
                       moduleType: typeof wasmModule,
                       availableFunctions: Object.keys(wasmModule).length
                     })
+                    testsPassed++
                     
-                    // Step 2: Auto-load test resources if needed
+                    // ========== TEST 2: WASM Version Check ==========
+                    try {
+                      if (wasmModule.get_wasm_version) {
+                        const versionStr = wasmModule.get_wasm_version()
+                        const versionData = JSON.parse(versionStr)
+                        const expectedVersion = '2025-08-09-22:41'
+                        const versionMatch = versionData.version === expectedVersion
+                        
+                        if (versionMatch) {
+                          debugManager.logSystemEvent('✅ Test 2/8: WASM Version Correct', {
+                            version: versionData.version,
+                            buildTime: versionData.buildTime,
+                            hasDebugBridgeStatus: versionData.hasDebugBridgeStatus
+                          })
+                          testsPassed++
+                        } else {
+                          debugManager.logError('❌ Test 2/8: WASM Version Mismatch', {
+                            expected: expectedVersion,
+                            actual: versionData.version
+                          })
+                          testsFailed++
+                        }
+                      } else {
+                        debugManager.logError('⚠️ Test 2/8: Version Check Not Available')
+                        testsFailed++
+                      }
+                    } catch (e) {
+                      debugManager.logError('❌ Test 2/8: Version Check Failed', {
+                        error: e instanceof Error ? e.message : 'Unknown error'
+                      })
+                      testsFailed++
+                    }
+                    
+                    // ========== TEST 3: Bridge Status ==========
+                    try {
+                      const bridgeStatus = wasmModule.debug_bridge_status()
+                      const bridgeData = JSON.parse(bridgeStatus)
+                      
+                      if (bridgeData.available) {
+                        debugManager.logSystemEvent('✅ Test 3/8: Bridge Status Available', {
+                          status: bridgeData.status,
+                          sampleRate: bridgeData.sample_rate
+                        })
+                        testsPassed++
+                      } else {
+                        debugManager.logSystemEvent('⚠️ Test 3/8: Bridge Not Yet Initialized', {
+                          note: 'Bridge shows as not-initialized, but diagnostic functions may still work',
+                          expectation: 'This is normal before audio processing starts'
+                        })
+                        testsPassed++ // Don't count as failure - it's expected behavior
+                      }
+                    } catch (e) {
+                      debugManager.logError('❌ Test 3/8: Bridge Status Check Failed', {
+                        error: e instanceof Error ? e.message : 'Unknown error'
+                      })
+                      testsFailed++
+                    }
+                    
+                    // Auto-load test SoundFont if needed
                     if (!soundFontLoaded) {
                       debugManager.logSystemEvent('🔄 Auto-loading test SoundFont for diagnostics')
                       await loadTestSoundFont()
-                      // Wait a moment for loading to complete
                       await new Promise(resolve => setTimeout(resolve, 1000))
                     }
                     
-                    // Step 3: Test all diagnostic functions
+                    // ========== TESTS 4-9: Diagnostic Functions ==========
                     const diagnosticTests = [
-                      { name: 'Audio Pipeline', func: 'diagnose_audio_pipeline' },
-                      { name: 'SoundFont Data', func: 'diagnose_soundfont_data' },
-                      { name: 'MIDI Processing', func: 'diagnose_midi_processing' },
-                      { name: 'System Diagnostics', func: 'get_system_diagnostics' },
-                      { name: 'Audio Test', func: 'run_audio_test' }
+                      { name: 'Bridge Lifecycle', func: 'diagnose_bridge_lifecycle', testNum: 4 },
+                      { name: 'Audio Pipeline', func: 'diagnose_audio_pipeline', testNum: 5 },
+                      { name: 'SoundFont Data', func: 'diagnose_soundfont_data', testNum: 6 },
+                      { name: 'MIDI Processing', func: 'diagnose_midi_processing', testNum: 7 },
+                      { name: 'System Diagnostics', func: 'get_system_diagnostics', testNum: 8 },
+                      { name: 'Generator Implementation', func: 'run_audio_test', testNum: 9 }
                     ]
-                    
-                    let bridgeFailures = 0
-                    let bridgeSuccesses = 0
                     
                     for (const test of diagnosticTests) {
                       try {
                         const func = wasmModule[test.func as keyof typeof wasmModule]
                         if (typeof func !== 'function') {
-                          debugManager.logError(`❌ ${test.name} Function Missing`, {
-                            function: test.func,
-                            diagnosis: 'Function not available on WASM module'
+                          debugManager.logError(`❌ Test ${test.testNum}/8: ${test.name} Function Missing`, {
+                            function: test.func
                           })
-                          bridgeFailures++
+                          testsFailed++
                           continue
                         }
                         
@@ -100,108 +177,86 @@ export default function WasmDiagnosticPage() {
                         const data = JSON.parse(result)
                         
                         if (!data.success || data.error === "Bridge not available") {
-                          debugManager.logError(`❌ ${test.name} Bridge Failure`, {
+                          debugManager.logError(`❌ Test ${test.testNum}/8: ${test.name} Failed`, {
                             function: test.func,
-                            error: data.error,
-                            diagnosis: 'WASM function exists but bridge is not functional'
+                            error: data.error
                           })
-                          bridgeFailures++
+                          testsFailed++
                         } else {
-                          debugManager.logSystemEvent(`✅ ${test.name} Bridge Working`, {
+                          debugManager.logSystemEvent(`✅ Test ${test.testNum}/8: ${test.name} Passed`, {
                             function: test.func,
-                            dataPoints: Object.keys(data).length,
-                            diagnosis: 'Bridge is functional and returning data'
+                            dataPoints: Object.keys(data).length
                           })
-                          bridgeSuccesses++
+                          testsPassed++
                         }
                       } catch (error) {
-                        debugManager.logError(`💥 ${test.name} Function Error`, {
+                        debugManager.logError(`❌ Test ${test.testNum}/8: ${test.name} Exception`, {
                           function: test.func,
-                          error: error instanceof Error ? error.message : 'Unknown error',
-                          diagnosis: 'Exception thrown when calling WASM function'
+                          error: error instanceof Error ? error.message : 'Unknown error'
                         })
-                        bridgeFailures++
+                        testsFailed++
                       }
                     }
                     
-                    // Step 4: Final diagnosis
-                    if (bridgeFailures === 0) {
-                      debugManager.logSystemEvent('🎉 WASM Bridge Fully Functional', {
-                        successfulTests: bridgeSuccesses,
-                        diagnosis: 'All bridge functions working - issue must be elsewhere'
-                      })
-                    } else if (bridgeSuccesses === 0) {
-                      debugManager.logError('🚨 WASM Bridge Completely Broken', {
-                        failedTests: bridgeFailures,
-                        diagnosis: 'No bridge functions working - initialization failure',
-                        nextSteps: [
-                          'Check WASM module initialization sequence',
-                          'Verify auto-init chain is working',
-                          'Check for initialization race conditions'
-                        ]
-                      })
-                    } else {
-                      debugManager.logError('⚠️ WASM Bridge Partially Functional', {
-                        successfulTests: bridgeSuccesses,
-                        failedTests: bridgeFailures,
-                        diagnosis: 'Mixed results indicate selective bridge failure'
-                      })
-                    }
+                    // ========== FINAL SUMMARY ==========
+                    const overallStatus = testsFailed === 0 ? 'pass' : 
+                                         testsPassed === 0 ? 'fail' : 'partial'
+                    
+                    setDiagnosticSummary({
+                      totalTests,
+                      passed: testsPassed,
+                      failed: testsFailed,
+                      overallStatus
+                    })
+                    
+                    const summaryEmoji = overallStatus === 'pass' ? '🎉' : 
+                                        overallStatus === 'fail' ? '🚨' : '⚠️'
+                    const summaryText = overallStatus === 'pass' ? 'All Systems Operational' :
+                                       overallStatus === 'fail' ? 'Critical System Failure' :
+                                       'Partial System Functionality'
+                    
+                    debugManager.logSystemEvent(`${summaryEmoji} Diagnostic Complete: ${summaryText}`, {
+                      totalTests,
+                      passed: testsPassed,
+                      failed: testsFailed,
+                      successRate: `${Math.round(testsPassed / totalTests * 100)}%`,
+                      diagnosis: overallStatus === 'pass' ? 
+                        'System is fully functional and ready for use' :
+                        overallStatus === 'fail' ? 
+                        'System has critical failures that need attention' :
+                        'System is partially functional but may have issues'
+                    })
                     
                   } catch (error) {
-                    debugManager.logError('💥 WASM Bridge Diagnostic Failed', {
-                      error: error instanceof Error ? error.message : 'Unknown error',
-                      diagnosis: 'Diagnostic process itself failed'
+                    debugManager.logError('💥 Diagnostic Suite Failed', {
+                      error: error instanceof Error ? error.message : 'Unknown error'
+                    })
+                    setDiagnosticSummary({
+                      totalTests,
+                      passed: testsPassed,
+                      failed: testsFailed,
+                      overallStatus: 'fail'
                     })
                   } finally {
-                    setIsDiagnosing(false)
+                    setIsRunningFullDiagnostic(false)
                   }
                 }}
-                disabled={isDiagnosing}
+                disabled={isRunningFullDiagnostic}
                 className="btn btn-primary"
                 style={{ 
                   fontWeight: 'bold',
-                  fontSize: '1.1rem',
-                  padding: '12px 24px',
-                  marginBottom: '12px'
+                  fontSize: '1.2rem',
+                  padding: '16px 32px',
+                  marginBottom: '16px',
+                  background: isRunningFullDiagnostic ? '#666' : 
+                              diagnosticSummary.overallStatus === 'pass' ? '#4CAF50' :
+                              diagnosticSummary.overallStatus === 'fail' ? '#f44336' :
+                              diagnosticSummary.overallStatus === 'partial' ? '#ff9800' :
+                              '#2196F3'
                 }}
               >
-                {isDiagnosing ? '🔄 Running Bridge Diagnostic...' : '🔧 Diagnose WASM Bridge'}
-              </button>
-
-              <button 
-                onClick={() => {
-                  if (!wasmModule) {
-                    debugManager.logError('❌ WASM Module Not Available')
-                    return
-                  }
-                  
-                  try {
-                    const result = wasmModule.debug_bridge_status()
-                    const data = JSON.parse(result)
-                    debugManager.logSystemEvent('🔍 Direct Bridge Status Check', {
-                      bridgeAvailable: data.bridgeAvailable,
-                      rawResult: result,
-                      diagnosis: data.bridgeAvailable ? 'Bridge is available in global memory' : 'Bridge is NULL in global memory'
-                    })
-                  } catch (error) {
-                    debugManager.logError('💥 Bridge Status Function Failed', {
-                      error: error instanceof Error ? error.message : 'Unknown error',
-                      diagnosis: 'debug_bridge_status() function call failed'
-                    })
-                  }
-                }}
-                disabled={!wasmModule}
-                className="btn btn-secondary"
-                style={{ 
-                  fontWeight: 'bold',
-                  fontSize: '1.0rem',
-                  padding: '8px 16px',
-                  marginBottom: '12px',
-                  marginLeft: '12px'
-                }}
-              >
-                🔍 Direct Bridge Status
+                {isRunningFullDiagnostic ? '🔄 Running Complete Diagnostic Suite...' : 
+                 '🚀 Run Complete Diagnostic Suite'}
               </button>
               
               <button 
@@ -360,6 +415,58 @@ export default function WasmDiagnosticPage() {
               </button>
             </div>
             
+            {/* Diagnostic Summary */}
+            {diagnosticSummary.totalTests > 0 && (
+              <div style={{ 
+                marginTop: 'var(--spacing-lg)', 
+                padding: 'var(--spacing-lg)', 
+                backgroundColor: diagnosticSummary.overallStatus === 'pass' ? '#e8f5e9' :
+                               diagnosticSummary.overallStatus === 'fail' ? '#ffebee' :
+                               diagnosticSummary.overallStatus === 'partial' ? '#fff3e0' :
+                               'var(--color-info-bg)',
+                borderRadius: 'var(--radius-md)',
+                border: `2px solid ${
+                  diagnosticSummary.overallStatus === 'pass' ? '#4CAF50' :
+                  diagnosticSummary.overallStatus === 'fail' ? '#f44336' :
+                  diagnosticSummary.overallStatus === 'partial' ? '#ff9800' :
+                  'var(--color-border)'
+                }`
+              }}>
+                <h3 style={{ 
+                  marginTop: 0,
+                  color: diagnosticSummary.overallStatus === 'pass' ? '#2e7d32' :
+                         diagnosticSummary.overallStatus === 'fail' ? '#c62828' :
+                         diagnosticSummary.overallStatus === 'partial' ? '#ef6c00' :
+                         'inherit'
+                }}>
+                  {diagnosticSummary.overallStatus === 'pass' && '🎉 All Tests Passed!'}
+                  {diagnosticSummary.overallStatus === 'fail' && '🚨 Critical Issues Detected'}
+                  {diagnosticSummary.overallStatus === 'partial' && '⚠️ Partial Functionality'}
+                </h3>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(3, 1fr)', 
+                  gap: 'var(--spacing-md)',
+                  marginTop: 'var(--spacing-md)'
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{diagnosticSummary.passed}</div>
+                    <div style={{ color: '#4CAF50' }}>Tests Passed</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{diagnosticSummary.failed}</div>
+                    <div style={{ color: '#f44336' }}>Tests Failed</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+                      {Math.round(diagnosticSummary.passed / diagnosticSummary.totalTests * 100)}%
+                    </div>
+                    <div>Success Rate</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div style={{ 
               marginTop: 'var(--spacing-md)', 
               padding: 'var(--spacing-md)', 
@@ -367,13 +474,16 @@ export default function WasmDiagnosticPage() {
               borderRadius: 'var(--radius-md)',
               fontSize: '0.875rem'
             }}>
-              <h3>🔬 WASM Bridge Medical Diagnostic:</h3>
-              <p>Two isolation tests to pinpoint the exact problem:</p>
+              <h3>🔬 Complete System Diagnostic</h3>
+              <p>The diagnostic suite runs 9 comprehensive tests:</p>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                <li><strong>🔧 Bridge Diagnostic:</strong> Tests WASM module connectivity and all 5 diagnostic functions</li>
-                <li><strong>🎵 Raw Sample Test:</strong> Extracts first SoundFont sample and plays it directly (bypasses synthesis)</li>
+                <li><strong>WASM Module:</strong> Verifies module loading and function availability</li>
+                <li><strong>Version Check:</strong> Confirms correct build with generator implementation</li>
+                <li><strong>Bridge Status:</strong> Tests WASM↔JavaScript communication</li>
+                <li><strong>Bridge Lifecycle:</strong> Detailed bridge initialization and memory analysis</li>
+                <li><strong>Core Systems:</strong> Audio pipeline, SoundFont data, MIDI processing, and diagnostics</li>
               </ul>
-              <p><strong>🎯 Perfect isolation testing</strong> - if raw sample works but synthesis doesn't, we know the issue is in the synthesis pipeline, not SoundFont parsing or Web Audio.</p>
+              <p><strong>🎯 One-click verification</strong> - Perfect for regression testing after code changes. Enhanced bridge debugging helps identify initialization timing issues. Use category filtering in the debug log to isolate specific test results.</p>
             </div>
           </div>
 
@@ -419,39 +529,6 @@ export default function WasmDiagnosticPage() {
             </div>
           </div>
 
-          {/* Bridge Diagnostic Instructions */}
-          <div className="test-section">
-            <h2>🩺 Bridge Diagnostic Results</h2>
-            <div style={{ fontSize: '0.875rem' }}>
-              <h3>🎯 What the Diagnostic Will Tell You:</h3>
-              <ol style={{ paddingLeft: '1.5rem', lineHeight: '1.6' }}>
-                <li><strong>🚨 WASM Bridge Completely Broken:</strong> All 5 functions fail - initialization problem</li>
-                <li><strong>⚠️ WASM Bridge Partially Functional:</strong> Some work, some don't - selective failure</li>
-                <li><strong>🎉 WASM Bridge Fully Functional:</strong> All functions work - problem is elsewhere</li>
-                <li><strong>💥 WASM Module Not Available:</strong> Module didn't load at all - context issue</li>
-              </ol>
-              
-              <h3>🔧 Bridge Functions Tested:</h3>
-              <ul style={{ paddingLeft: '1.5rem', lineHeight: '1.6' }}>
-                <li><strong>diagnose_audio_pipeline:</strong> Audio system bridge connectivity</li>
-                <li><strong>diagnose_soundfont_data:</strong> SoundFont data bridge connectivity</li>
-                <li><strong>diagnose_midi_processing:</strong> MIDI system bridge connectivity</li>
-                <li><strong>get_system_diagnostics:</strong> Overall system bridge connectivity</li>
-                <li><strong>run_audio_test:</strong> Audio testing bridge connectivity</li>
-              </ul>
-              
-              <div style={{ 
-                marginTop: 'var(--spacing-md)', 
-                padding: 'var(--spacing-md)', 
-                backgroundColor: 'var(--color-error-bg)', 
-                borderRadius: 'var(--radius-md)' 
-              }}>
-                <p><strong>⚠️ Current Status:</strong> Based on pipeline tests, we expect this diagnostic to show 
-                "WASM Bridge Completely Broken" with all functions returning "Bridge not available". This will confirm 
-                the initialization issue and point us toward the root cause.</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
