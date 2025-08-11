@@ -1,9 +1,11 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
 import { debugManager } from '../utils/DebugManager'
+import { systemHealthManager } from '../utils/SystemHealthManager'
 
 // Types
 interface WasmModule {
   init_all_systems: (sampleRate: number) => boolean
+  init_audio_worklet: (sampleRate: number) => boolean
   queue_midi_event_global: (timestamp: number, channel: number, messageType: number, data1: number, data2: number) => void
   reset_audio_state_global: () => void
   get_system_status: () => string
@@ -28,9 +30,14 @@ interface WasmModule {
   // New structured diagnostic functions
   diagnose_audio_pipeline: () => string
   diagnose_soundfont_data: () => string
+  get_all_soundfont_samples: () => string
+  get_sample_data_by_index: (index: number) => Float32Array | undefined
   diagnose_midi_processing: () => string
   get_system_diagnostics: () => string
   run_audio_test: () => string
+  diagnose_bridge_lifecycle: () => string
+  debug_bridge_status: () => string
+  diagnose_loop_calculation: () => string
 }
 
 interface AudioWorkletManager {
@@ -270,6 +277,10 @@ interface AwePlayerProviderProps {
 let recordingBuffer: Float32Array[] = []
 let isRecordingActive = false
 
+// Global WASM loading state (prevents multiple simultaneous loads)
+let globalWasmModule: WasmModule | null = null
+let wasmLoadingPromise: Promise<WasmModule> | null = null
+
 export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
   const [state, dispatch] = useReducer(awePlayerReducer, initialState)
   
@@ -282,26 +293,69 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
     }
   }, []) // Empty deps - only run once on mount
   
-  // Load WASM module (idempotent - safe to call multiple times)
+  // Load WASM module (GLOBALLY idempotent - prevents multiple simultaneous loads)
   const initializeWasm = async () => {
     // Skip if already loaded (React StrictMode calls effects twice)
-    if (state.wasmModule) {
-      debugManager.logSystemEvent('WASM module already loaded, skipping duplicate initialization')
+    if (state.wasmModule || globalWasmModule) {
+      debugManager.logSystemEvent('WASM module already loaded, skipping duplicate initialization', {
+        stateModule: !!state.wasmModule,
+        globalModule: !!globalWasmModule,
+        preventingDuplicate: true
+      })
+      
+      // If we have global module but not in state, update state
+      if (globalWasmModule && !state.wasmModule) {
+        debugManager.logSystemEvent('Using existing global WASM module')
+        dispatch({ type: 'WASM_LOADED', payload: globalWasmModule })
+      }
       return
+    }
+    
+    // If already loading, wait for the existing promise
+    if (wasmLoadingPromise) {
+      debugManager.logSystemEvent('WASM loading already in progress, waiting for completion')
+      try {
+        const wasmModule = await wasmLoadingPromise
+        dispatch({ type: 'WASM_LOADED', payload: wasmModule })
+        return
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown WASM loading error'
+        dispatch({ type: 'WASM_ERROR', payload: errorMessage })
+        return
+      }
     }
     
     dispatch({ type: 'WASM_LOADING' })
     
+    // Create single loading promise to prevent multiple simultaneous loads
+    wasmLoadingPromise = (async () => {
+      try {
+        debugManager.logSystemEvent('WASM module loading started (SINGLE GLOBAL LOAD)')
+        
+        // Dynamic import of WASM module
+        const wasmModule = await import('../../wasm/awe_synth.js')
+        await wasmModule.default()
+        
+        // Set up debug manager with WASM module
+        debugManager.setWasmModule(wasmModule)
+        
+        // Set up health manager with WASM module
+        systemHealthManager.setWasmModule(wasmModule)
+        
+        // Store globally to prevent multiple loads
+        globalWasmModule = wasmModule
+        
+        debugManager.logSystemEvent('WASM module loaded successfully and stored globally')
+        return wasmModule
+        
+      } catch (error) {
+        wasmLoadingPromise = null // Reset on error
+        throw error
+      }
+    })()
+    
     try {
-      debugManager.logSystemEvent('WASM module loading started')
-      
-      // Dynamic import of WASM module
-      const wasmModule = await import('../../wasm/awe_synth.js')
-      await wasmModule.default()
-      
-      // Set up debug manager with WASM module
-      debugManager.setWasmModule(wasmModule)
-      
+      const wasmModule = await wasmLoadingPromise
       // Store module but DON'T initialize systems yet - wait for AudioContext
       dispatch({ type: 'WASM_LOADED', payload: wasmModule })
       debugManager.logSystemEvent('WASM module loaded successfully, ready for system initialization')
@@ -310,11 +364,31 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown WASM loading error'
       dispatch({ type: 'WASM_ERROR', payload: errorMessage })
       debugManager.logError('WASM module loading failed', { errorMessage })
+    } finally {
+      wasmLoadingPromise = null // Clear promise after completion
     }
   }
   
   // Initialize Audio
   const initializeAudio = async (wasmModuleOverride?: any) => {
+    // CRITICAL: Prevent duplicate initialization that could destroy existing bridge
+    if (state.audioInitialized && state.audioContext) {
+      debugManager.logSystemEvent('⚠️ initializeAudio() called but audio already initialized - SKIPPING to prevent bridge destruction', {
+        audioInitialized: state.audioInitialized,
+        audioContext: !!state.audioContext,
+        preventingDuplicateInit: true,
+        warning: 'This could have destroyed the existing bridge!'
+      })
+      return
+    }
+    
+    debugManager.logSystemEvent('🎵 initializeAudio() starting', {
+      audioInitialized: state.audioInitialized,
+      audioContext: !!state.audioContext,
+      wasmModule: !!state.wasmModule,
+      callStack: 'Tracking initializeAudio calls to detect duplicates'
+    })
+    
     dispatch({ type: 'AUDIO_INITIALIZING' })
     
     try {
@@ -333,15 +407,41 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
         note: 'Single initialization with proper sample rate prevents mismatch issues'
       })
       
+      debugManager.logSystemEvent('🔧 Calling init_all_systems() now', { 
+        sampleRate: actualSampleRate,
+        functionExists: typeof wasmModule.init_all_systems === 'function',
+        aboutToCall: 'init_all_systems()'
+      })
+      
       const initResult = wasmModule.init_all_systems(actualSampleRate)
+      
+      debugManager.logSystemEvent('🔧 init_all_systems() returned', { 
+        result: initResult,
+        resultType: typeof initResult,
+        success: !!initResult,
+        exact_value: initResult,
+        is_true: initResult === true,
+        is_false: initResult === false,
+        critical: initResult ? 'SUCCESS - Bridge should be available' : 'FAILED - Bridge will not be available'
+      })
+      
       if (!initResult) {
+        debugManager.logError('❌ init_all_systems() returned false', {
+          sampleRate: actualSampleRate,
+          result: initResult,
+          implication: 'Bridge initialization failed inside init_all_systems()'
+        })
         throw new Error(`Failed to initialize WASM systems with sample rate ${actualSampleRate}`)
       }
       
       debugManager.logSystemEvent('WASM systems initialized successfully with correct sample rate', { 
         sampleRate: actualSampleRate,
-        success: initResult 
+        success: initResult,
+        note: 'init_all_systems() includes AudioWorklet bridge initialization'
       })
+      
+      // Immediately update bridge health status after init
+      systemHealthManager.updateBridgeStatus()
       
       // CRITICAL: Verify bridge is actually available before proceeding
       // This prevents timing issues that could cause "Bridge not available" errors later
@@ -349,7 +449,7 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
       
       let bridgeVerified = false
       let attempts = 0
-      const maxAttempts = 10
+      const maxAttempts = 3  // Reduced from 10 - bridge should be immediate after init_all_systems
       
       while (!bridgeVerified && attempts < maxAttempts) {
         try {
@@ -369,15 +469,15 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
               bridgeAvailable: bridgeData.available,
               waiting: true
             })
-            // Small delay to let initialization complete
-            await new Promise(resolve => setTimeout(resolve, 10))
+            // Reduced delay - bridge should be available immediately
+            await new Promise(resolve => setTimeout(resolve, 5))
           }
         } catch (error) {
           attempts++
           debugManager.logSystemEvent(`⚠️ Bridge verification error on attempt ${attempts}/${maxAttempts}`, {
             error: error instanceof Error ? error.message : 'Unknown error'
           })
-          await new Promise(resolve => setTimeout(resolve, 10))
+          await new Promise(resolve => setTimeout(resolve, 5))
         }
       }
       
@@ -548,6 +648,10 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
         type: 'AUDIO_INITIALIZED', 
         payload: { context: audioContext, worklet: workletManager } 
       })
+      
+      // Update health status
+      systemHealthManager.updateAudioStatus(audioContext, true)
+      
       updateDebugLog('✅ Audio system initialized with ScriptProcessorNode')
       
       if (audioContext.state === 'suspended') {
@@ -579,6 +683,7 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
         type: 'MIDI_INITIALIZED', 
         payload: { access: midiAccess, devices } 
       })
+      
       updateDebugLog(`✅ MIDI initialized - ${devices.length} input devices found`)
       
     } catch (error) {
@@ -1260,28 +1365,36 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
     }
   }
   
-  // Initialize WASM on mount (only if not already initialized)
+  // Initialize WASM and Audio together for faster startup
   useEffect(() => {
-    if (!state.wasmModule) {
-      initializeWasm()
+    const initializeSystem = async () => {
+      // Step 1: Initialize WASM if needed
+      if (!state.wasmModule && !globalWasmModule) {
+        debugManager.logSystemEvent('🚀 Fast initialization: Starting WASM + Audio sequence')
+        await initializeWasm()
+      }
+      
+      // Step 2: Initialize Audio immediately after WASM (if we have the module)
+      const wasmModule = state.wasmModule || globalWasmModule
+      if (wasmModule && !state.audioInitialized) {
+        debugManager.logSystemEvent('🎵 Fast initialization: Auto-initializing audio system...')
+        // Don't wait for state update, use the module directly
+        await initializeAudio(wasmModule)
+      }
     }
-  }, [])
+    
+    initializeSystem()
+  }, []) // Only run once on mount
 
-  // Initialize audio when WASM is ready
+  // Backup: Initialize audio if WASM loads separately
   useEffect(() => {
     if (state.wasmModule && !state.audioInitialized) {
-      updateDebugLog('🎵 Auto-initializing audio system...')
+      updateDebugLog('🎵 Backup: Auto-initializing audio system...')
       initializeAudio()
     }
   }, [state.wasmModule, state.audioInitialized])
 
-  // Auto-initialize audio when WASM is ready
-  useEffect(() => {
-    if (state.wasmModule && !state.audioContext && !state.audioInitializing) {
-      debugManager.logSystemEvent('Auto-initializing audio system after WASM load')
-      initializeAudio(state.wasmModule)
-    }
-  }, [state.wasmModule, state.audioContext, state.audioInitializing])
+  // REMOVED: Duplicate useEffect that was causing double initialization and bridge destruction
   
   // Auto-load test SoundFont when audio is ready
   useEffect(() => {
@@ -1291,12 +1404,24 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
     }
   }, [state.wasmModule, state.audioContext, state.soundFontLoaded])
 
-  // Resume AudioContext on first user interaction
+  // Resume AudioContext on first user interaction and monitor state changes
   useEffect(() => {
+    if (!state.audioContext) return
+
     const resumeAudioOnInteraction = async () => {
       if (state.audioContext && state.audioContext.state === 'suspended') {
         await state.audioContext.resume()
         updateDebugLog('🔊 AudioContext resumed automatically')
+        // Update health status after resume
+        systemHealthManager.updateAudioStatus(state.audioContext, state.audioInitialized)
+      }
+    }
+
+    // Monitor AudioContext state changes for health updates
+    const handleStateChange = () => {
+      if (state.audioContext) {
+        systemHealthManager.updateAudioStatus(state.audioContext, state.audioInitialized)
+        updateDebugLog(`🔊 AudioContext state changed: ${state.audioContext.state}`)
       }
     }
 
@@ -1306,12 +1431,18 @@ export function AwePlayerProvider({ children }: AwePlayerProviderProps) {
       document.addEventListener(event, resumeAudioOnInteraction, { once: true })
     })
 
+    // Add state change listener
+    state.audioContext.addEventListener('statechange', handleStateChange)
+
     return () => {
       events.forEach(event => {
         document.removeEventListener(event, resumeAudioOnInteraction)
       })
+      if (state.audioContext) {
+        state.audioContext.removeEventListener('statechange', handleStateChange)
+      }
     }
-  }, [state.audioContext])
+  }, [state.audioContext, state.audioInitialized])
   
   const contextValue: AwePlayerContextValue = {
     ...state,

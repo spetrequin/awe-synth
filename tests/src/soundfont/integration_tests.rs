@@ -104,7 +104,7 @@ mod player_integration_tests {
         
         // Load SoundFont into player
         let data = utils::load_real_soundfont(test_data::CT2MGM_SF2).unwrap();
-        let result = awe_synth::load_soundfont_into_player(&data);
+        let result = awe_synth::parse_soundfont_file(&data);
         
         println!("SoundFont loading result: {}", result);
         
@@ -153,7 +153,7 @@ mod synthesis_integration_tests {
         
         // Load SoundFont
         let data = utils::load_real_soundfont(test_data::CT2MGM_SF2).unwrap();
-        let load_result = awe_synth::load_soundfont_into_player(&data);
+        let load_result = awe_synth::parse_soundfont_file(&data);
         println!("SoundFont load: {}", load_result);
         
         // Test synthesis

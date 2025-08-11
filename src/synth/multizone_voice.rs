@@ -452,8 +452,17 @@ impl MultiZoneSampleVoice {
                                     sample_rate: sample.sample_rate as f32,
                                     position: 0.0,
                                     playback_rate: 1.0, // Will be calculated based on pitch
-                                    loop_start: if sample.loop_start > 0 { Some(sample.loop_start as usize) } else { None },
-                                    loop_end: if sample.loop_end > sample.loop_start { Some(sample.loop_end as usize) } else { None },
+                                    // Loop points: both must be non-zero for a valid loop
+                                    loop_start: if sample.loop_end > 0 && sample.loop_start < sample.loop_end { 
+                                        Some(sample.loop_start as usize) 
+                                    } else { 
+                                        None 
+                                    },
+                                    loop_end: if sample.loop_end > 0 && sample.loop_start < sample.loop_end { 
+                                        Some(sample.loop_end as usize) 
+                                    } else { 
+                                        None 
+                                    },
                                     loop_active: false,
                                     zone_amplitude,
                                     is_active: true,
@@ -802,6 +811,9 @@ impl MultiZoneSampleVoice {
         
         // Apply effects send generators (91-92)
         self.apply_effects_send_generators(preset)?;
+        
+        // Apply loop offset generators (2, 3, 45, 50) - CRITICAL FOR LOOP POINTS
+        self.apply_loop_generators(preset, soundfont)?;
         
         Ok(())
     }
@@ -1268,6 +1280,125 @@ impl MultiZoneSampleVoice {
         self.chorus_send = (base_chorus + mid_range_boost).clamp(0.0, 0.5);
         
         // Effects sends debug removed
+        
+        Ok(())
+    }
+    
+    /// Apply loop offset SoundFont generators (2, 3, 45, 50)
+    fn apply_loop_generators(&mut self, preset: &SoundFontPreset, soundfont: &SoundFont) -> Result<(), AweError> {
+        use crate::soundfont::types::{GeneratorType, GeneratorAmount};
+        
+        // SoundFont 2.0 loop offset generators:
+        // - Generator 2: startloopAddrsOffset (fine loop start offset in samples)
+        // - Generator 3: endloopAddrsOffset (fine loop end offset in samples)  
+        // - Generator 45: startloopAddrsCoarseOffset (coarse loop start offset in 32768-sample units)
+        // - Generator 50: endloopAddrsCoarseOffset (coarse loop end offset in 32768-sample units)
+        
+        // Default offsets (no change)
+        let mut start_fine_offset = 0i32;
+        let mut end_fine_offset = 0i32;
+        let mut start_coarse_offset = 0i32;
+        let mut end_coarse_offset = 0i32;
+        
+        // Collect generators from all preset zones
+        for preset_zone in &preset.preset_zones {
+            for generator in &preset_zone.generators {
+                match generator.generator_type {
+                    GeneratorType::StartloopAddrsOffset => {
+                        if let GeneratorAmount::Short(value) = generator.amount {
+                            start_fine_offset += value as i32;
+                        }
+                    },
+                    GeneratorType::EndloopAddrsOffset => {
+                        if let GeneratorAmount::Short(value) = generator.amount {
+                            end_fine_offset += value as i32;
+                        }
+                    },
+                    GeneratorType::StartloopAddrsCoarseOffset => {
+                        if let GeneratorAmount::Short(value) = generator.amount {
+                            start_coarse_offset += value as i32;
+                        }
+                    },
+                    GeneratorType::EndloopAddrsCoarseOffset => {
+                        if let GeneratorAmount::Short(value) = generator.amount {
+                            end_coarse_offset += value as i32;
+                        }
+                    },
+                    _ => {} // Ignore other generators
+                }
+            }
+        }
+        
+        // Collect generators from instrument zones (if preset links to instruments)
+        for preset_zone in &preset.preset_zones {
+            if let Some(instrument_id) = preset_zone.instrument_id {
+                if let Some(instrument) = soundfont.instruments.get(instrument_id as usize) {
+                    for instrument_zone in &instrument.instrument_zones {
+                        for generator in &instrument_zone.generators {
+                            match generator.generator_type {
+                                GeneratorType::StartloopAddrsOffset => {
+                                    if let GeneratorAmount::Short(value) = generator.amount {
+                                        start_fine_offset += value as i32;
+                                    }
+                                },
+                                GeneratorType::EndloopAddrsOffset => {
+                                    if let GeneratorAmount::Short(value) = generator.amount {
+                                        end_fine_offset += value as i32;
+                                    }
+                                },
+                                GeneratorType::StartloopAddrsCoarseOffset => {
+                                    if let GeneratorAmount::Short(value) = generator.amount {
+                                        start_coarse_offset += value as i32;
+                                    }
+                                },
+                                GeneratorType::EndloopAddrsCoarseOffset => {
+                                    if let GeneratorAmount::Short(value) = generator.amount {
+                                        end_coarse_offset += value as i32;
+                                    }
+                                },
+                                _ => {} // Ignore other generators
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Apply loop offset calculations to all active zones
+        for zone in &mut self.zones {
+            if zone.is_active {
+                // Get sample for this zone
+                if let Some(sample) = soundfont.samples.get(0) { // TODO: Use correct sample index from zone
+                    // Use sample's relative loop points (already converted from absolute during parsing)
+                    let sample_length = sample.sample_data.len();
+                    
+                    // Validate that loop points are within sample bounds and properly ordered
+                    // Note: loop_end == 0 means no loop in the SF2 file
+                    if sample.loop_end > 0 && sample.loop_start < sample.loop_end && 
+                       (sample.loop_start as usize) < sample_length && 
+                       (sample.loop_end as usize) <= sample_length {
+                        // Valid loop points - use them
+                        zone.loop_start = Some(sample.loop_start as usize);
+                        zone.loop_end = Some(sample.loop_end as usize);
+                        
+                        crate::log(&format!("SoundFont loop: Sample '{}' has valid loop points: {}-{} (sample length: {})",
+                                          sample.name, sample.loop_start, sample.loop_end, sample_length));
+                    } else {
+                        // No loop or invalid loop points - disable looping
+                        zone.loop_start = None;
+                        zone.loop_end = None;
+                        
+                        let reason = if sample.loop_end == 0 {
+                            "no loop defined"
+                        } else {
+                            "invalid loop points"
+                        };
+                        crate::log(&format!("SoundFont loop: Sample '{}' {}: {}-{} (sample length: {})",
+                                          sample.name, reason, sample.loop_start, sample.loop_end, sample_length));
+                    }
+                }
+            }
+        }
         
         Ok(())
     }

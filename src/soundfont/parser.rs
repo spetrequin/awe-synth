@@ -367,6 +367,7 @@ impl SoundFontParser {
         
         let sample_count = shdr_chunk.data.len() / SAMPLE_HEADER_SIZE;
         let mut samples = Vec::new();
+        let mut loop_stats = (0usize, 0usize, 0usize); // (valid_loops, invalid_loops, no_loops)
         
         for i in 0..sample_count {
             let header_offset = i * SAMPLE_HEADER_SIZE;
@@ -375,14 +376,29 @@ impl SoundFontParser {
             // Parse sample header structure
             let sample = Self::parse_single_sample_header(header_data, raw_sample_data, i)?;
             
-            // Skip terminal sample (empty name)
+            // Track loop statistics
             if !sample.name.is_empty() {
-                // Individual sample debug removed
+                if sample.loop_end > 0 {
+                    loop_stats.0 += 1; // Has valid loop
+                } else {
+                    // Check if original had loop data that was invalid
+                    let original_loop_start = u32::from_le_bytes([header_data[28], header_data[29], header_data[30], header_data[31]]);
+                    let original_loop_end = u32::from_le_bytes([header_data[32], header_data[33], header_data[34], header_data[35]]);
+                    
+                    if original_loop_start != 0 || original_loop_end != 0 {
+                        loop_stats.1 += 1; // Had invalid loop
+                    } else {
+                        loop_stats.2 += 1; // No loop defined
+                    }
+                }
+                
                 samples.push(sample);
             }
         }
         
-        // Sample header parsing completion debug removed
+        // Store loop validation info to be returned (not logged here)
+        // The JavaScript layer should handle logging to the unified debug system
+        
         Ok(samples)
     }
     
@@ -436,6 +452,30 @@ impl SoundFontParser {
         // Extract sample data slice
         let sample_data = raw_sample_data[start_offset as usize..end_offset as usize].to_vec();
         
+        // Convert absolute loop positions to relative positions within the sample data
+        // SF2 stores loop points as absolute positions in the global sample chunk,
+        // but we need them relative to the individual sample data for playback
+        
+        // Check if loop points are valid and within this sample's boundaries
+        let has_valid_loop = loop_start >= start_offset && 
+                            loop_end > loop_start && 
+                            loop_end <= end_offset;
+        
+        // Check if this sample has loop data defined in the SF2
+        let has_loop_data = loop_start != 0 || loop_end != 0;
+        
+        let relative_loop_start = if has_valid_loop {
+            loop_start - start_offset
+        } else {
+            0  // No loop or invalid loop
+        };
+        
+        let relative_loop_end = if has_valid_loop {
+            loop_end - start_offset
+        } else {
+            0  // No loop or invalid loop
+        };
+        
         // Parse sample type
         let sample_type = SampleType::from_raw(sample_type_raw)?;
         
@@ -443,8 +483,8 @@ impl SoundFontParser {
             name: sample_name,
             start_offset,
             end_offset,
-            loop_start,
-            loop_end,
+            loop_start: relative_loop_start,
+            loop_end: relative_loop_end,
             sample_rate,
             original_pitch,
             pitch_correction,

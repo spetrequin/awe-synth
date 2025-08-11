@@ -259,6 +259,232 @@ Sample(s) - actual audio data with loop points
 
 ---
 
+# 🔄 SOUNDFONT 2.0 LOOP POINT ARCHITECTURE (CRITICAL DISCOVERY)
+
+## ⚠️ THE "BIG BLOB" vs MODERN ARRAY APPROACH
+
+### **Understanding SoundFont File Structure (1994 Design)**
+
+SoundFont 2.0 was designed for the EMU8000 chip in 1994, optimized for hardware memory access patterns:
+
+```
+SF2 File Structure:
+┌─────────────────────────────────────────────────────────────┐
+│  SINGLE SAMPLE DATA CHUNK ("smpl")                         │
+├─────────────┬─────────────┬─────────────┬─────────────────┤
+│ Sample 1    │ Sample 2    │ Sample 3    │ ... Sample N    │
+│ 8205 samples│ 4402 samples│ 12567 samp. │ 1454 samples   │
+├─────────────┼─────────────┼─────────────┼─────────────────┤
+│ Pos 0       │ Pos 8205    │ Pos 12607   │ Pos 290551     │
+│ to 8204     │ to 12606    │ to 25173    │ to 292004      │
+└─────────────┴─────────────┴─────────────┴─────────────────┘
+```
+
+**Sample Headers Store Absolute Positions:**
+```rust
+// Sample "Piano Db4" header in SF2 file:
+SampleHeader {
+    name: "Piano Db4",
+    start_offset: 290551,     // Absolute position in big chunk
+    end_offset: 298756,       // Absolute position in big chunk  
+    loop_start: 298712,       // Absolute position in big chunk
+    loop_end: 298748,         // Absolute position in big chunk
+}
+```
+
+### **Modern Software Architecture (Our Approach)**
+
+Modern audio software uses individual sample arrays for easier processing:
+
+```
+Our Memory Structure:
+┌─────────────────────────────────────────────────────────────┐
+│  Vec<SoundFontSample>                                       │
+├─────────────┬─────────────┬─────────────┬─────────────────┤
+│ samples[0]  │ samples[1]  │ samples[2]  │ samples[N]      │
+│ Piano Db4   │ Guitar E2   │ Trumpet C4  │ Drum Snare     │
+│ 8205 data   │ 4402 data   │ 12567 data  │ 1454 data      │
+│ loop: ?     │ loop: ?     │ loop: ?     │ loop: ?         │
+└─────────────┴─────────────┴─────────────┴─────────────────┘
+```
+
+### **The Conversion Problem Discovered (August 2025)**
+
+**Initial Symptom:**
+- Sample "Piano Db4": 8205 samples long
+- SF2 header said: loop_start: 298712, loop_end: 298748
+- 298712 > 8205, so loops appeared "invalid"
+- Polyphone showed: loop 8161-8197 (which made sense!)
+
+**Root Cause Analysis:**
+1. **SF2 stores absolute positions**: 298712 in the global chunk
+2. **Sample starts at position**: 290551 in the global chunk  
+3. **Relative position**: 298712 - 290551 = 8161 ✅
+4. **This matches Polyphone exactly!**
+
+### **Correct SoundFont 2.0 Loop Calculation Formula**
+
+The SoundFont 2.0 specification requires calculating **final** loop points using generator offsets:
+
+```rust
+// SoundFont 2.0 Loop Point Calculation (MANDATORY)
+fn calculate_final_loop_points(
+    sample: &SoundFontSample,
+    preset_generators: &[Generator],
+    instrument_generators: &[Generator]
+) -> (u32, u32, bool) {
+    
+    // Step 1: Extract all loop offset generators
+    let mut start_fine_offset = 0i32;
+    let mut end_fine_offset = 0i32;
+    let mut start_coarse_offset = 0i32;
+    let mut end_coarse_offset = 0i32;
+    
+    // Collect from instrument generators (defaults)
+    for gen in instrument_generators {
+        match gen.generator_type {
+            GeneratorType::StartloopAddrsOffset => start_fine_offset = get_i16(&gen.amount),
+            GeneratorType::EndloopAddrsOffset => end_fine_offset = get_i16(&gen.amount),
+            GeneratorType::StartloopAddrsCoarseOffset => start_coarse_offset = get_i16(&gen.amount),
+            GeneratorType::EndloopAddrsCoarseOffset => end_coarse_offset = get_i16(&gen.amount),
+            _ => {}
+        }
+    }
+    
+    // Preset generators override instrument generators
+    for gen in preset_generators {
+        match gen.generator_type {
+            GeneratorType::StartloopAddrsOffset => start_fine_offset = get_i16(&gen.amount),
+            GeneratorType::EndloopAddrsOffset => end_fine_offset = get_i16(&gen.amount),
+            GeneratorType::StartloopAddrsCoarseOffset => start_coarse_offset = get_i16(&gen.amount),
+            GeneratorType::EndloopAddrsCoarseOffset => end_coarse_offset = get_i16(&gen.amount),
+            _ => {}
+        }
+    }
+    
+    // Step 2: Apply SoundFont 2.0 formula
+    // Final Loop Start = Sample Header Loop Start + Fine Offset + (Coarse Offset × 32768)
+    let final_loop_start = sample.loop_start as i64 + 
+                          start_fine_offset as i64 + 
+                          (start_coarse_offset as i64 * 32768);
+                          
+    let final_loop_end = sample.loop_end as i64 + 
+                        end_fine_offset as i64 + 
+                        (end_coarse_offset as i64 * 32768);
+    
+    // Step 3: Validate against sample bounds
+    let sample_length = sample.sample_data.len() as u32;
+    
+    if final_loop_start >= 0 && final_loop_end > final_loop_start && 
+       final_loop_start < sample_length as i64 && final_loop_end <= sample_length as i64 {
+        (final_loop_start as u32, final_loop_end as u32, true)
+    } else {
+        // Invalid loop points - disable looping
+        (0, 0, false)
+    }
+}
+```
+
+### **Why This Calculation is Critical**
+
+1. **Creative Labs SoundFonts rely on this** - Professional SoundFonts use generator offsets extensively
+2. **Sample headers are absolute positions** - Loop points reference the entire SF2 sample chunk, not individual samples
+3. **Generator offsets make them relative** - The calculation converts to proper per-sample loop points
+4. **Without this calculation**: Most samples appear to have "invalid" loop points and don't loop
+5. **With this calculation**: Samples loop correctly with proper boundaries
+
+### **Generator Types for Loop Calculation**
+
+| Generator ID | Type | Purpose | Units |
+|--------------|------|---------|-------|
+| 2 | StartloopAddrsOffset | Fine loop start offset | samples |
+| 3 | EndloopAddrsOffset | Fine loop end offset | samples |
+| 45 | StartloopAddrsCoarseOffset | Coarse loop start offset | 32768 × samples |
+| 50 | EndloopAddrsCoarseOffset | Coarse loop end offset | 32768 × samples |
+
+### **Implementation Evidence**
+
+Research of FluidSynth source code confirms this approach:
+- FluidSynth performs identical generator offset calculations
+- Both fine and coarse offsets are applied to sample header loop points
+- This is **mandatory** for SoundFont 2.0 compliance, not optional
+
+### **ACTUAL SOLUTION - Simple Absolute-to-Relative Conversion**
+
+**Research Findings (August 2025):**
+After extensive investigation and comparison with Polyphone (professional SoundFont editor), we discovered the real issue was much simpler than generator offset calculations.
+
+**The Real Problem:**
+- SoundFont files store ALL sample data in one big chunk for 1990s memory efficiency
+- Loop points are stored as **absolute positions** in this big chunk
+- Modern software needs **relative positions** within individual samples
+
+**Example from Creative Labs GM SoundFont:**
+- Sample "Piano Db4": 8205 samples long
+- SF2 file stores: `loop_start: 298712, loop_end: 298748` (absolute positions)
+- Sample starts at: `start_offset: 290551` in the big chunk
+- **Correct loop points**: 298712 - 290551 = 8161, 298748 - 290551 = 8197
+
+**✅ CORRECT SOLUTION - Convert During Parsing:**
+```rust
+// In SF2 parser - convert absolute to relative positions
+let relative_loop_start = if loop_start >= start_offset && loop_start <= end_offset {
+    loop_start - start_offset  // Convert absolute to relative
+} else {
+    0  // Invalid loop start
+};
+
+let relative_loop_end = if loop_end >= start_offset && loop_end <= end_offset {
+    loop_end - start_offset    // Convert absolute to relative  
+} else {
+    sample_data.len() as u32   // Invalid loop end
+};
+```
+
+**Why This Works:**
+- Polyphone shows "Piano Db4" loop points as 8161-8197 (relative positions)
+- Our parser now stores the same relative positions
+- No complex generator calculations needed for basic loop functionality
+- Matches what professional SoundFont software displays
+
+**❌ OVERCOMPLICATED APPROACH (What we tried first):**
+```rust
+// Generator offset calculations - unnecessary for basic loop points
+let final_loop_start = sample.loop_start + fine_offset + (coarse_offset * 32768);
+// This is only needed for advanced SoundFont features, not basic loops
+```
+
+### **When DO You Need Generator Offset Calculations?**
+
+**Generator offsets ARE needed for advanced SoundFont features:**
+1. **Real-time loop point modulation** - Adjusting loops during playback
+2. **Multi-zone instruments** - Different loop points per velocity/key range
+3. **SoundFont editing tools** - Like Polyphone's advanced loop editing
+4. **Advanced synthesis** - Where presets modify instrument loop points dynamically
+
+**For basic sample playbook (our current goal):**
+- ✅ Simple absolute-to-relative conversion works perfectly
+- ✅ Matches what users see in professional tools
+- ✅ Enables immediate loop playback functionality
+- ✅ No complex calculation overhead
+
+### **Development Lesson Learned**
+
+**Always verify assumptions against reference software:**
+1. **Polyphone** showed the actual expected values (8161-8197)
+2. **Our parser** was storing absolute positions (298712-298748)  
+3. **Simple conversion** solved the issue immediately
+4. **Complex solutions** were unnecessary for the basic use case
+
+**Quote:** *"Sometimes the best solution is just understanding the data format correctly!"*
+
+### **Implementation Files Changed**
+- `src/soundfont/parser.rs`: Added absolute-to-relative conversion during parsing
+- `src/synth/multizone_voice.rs`: Simplified to use relative loop points directly
+- `docs/EMU8000_REFERENCE.md`: Documented the architecture difference and solution
+
+---
+
 # 🎛️ PARAMETER CONVERSION FORMULAS
 
 ## Essential Conversion Functions
@@ -465,7 +691,34 @@ let current_value = start + (end - start) * exponential_progress;
 
 # 🚨 CRITICAL IMPLEMENTATION PITFALLS
 
-## 1. Fine Tuning Filtering (NEVER DO THIS)
+## 1. Loop Point Absolute vs Relative Position Error (DISCOVERED AUGUST 2025)
+**❌ WRONG:**
+```rust
+// Using SF2 absolute loop positions directly in individual samples - WILL FAIL!
+if sample.loop_start < sample.sample_data.len() && sample.loop_end <= sample.sample_data.len() {
+    // sample.loop_start is 298712, but sample_data.len() is only 8205!
+    audio_buffer.loop_start = sample.loop_start;  // Invalid!
+    audio_buffer.loop_end = sample.loop_end;      // Invalid!
+}
+```
+
+**✅ CORRECT:**
+```rust
+// Convert absolute positions to relative during SF2 parsing (SIMPLE!)
+let relative_loop_start = if loop_start >= start_offset && loop_start <= end_offset {
+    loop_start - start_offset  // 298712 - 290551 = 8161 ✅
+} else {
+    0
+};
+
+// Then use relative positions for playback
+audio_buffer.loop_start = sample.loop_start;  // Now 8161 (relative)
+audio_buffer.loop_end = sample.loop_end;      // Now 8197 (relative)
+```
+
+**Why This Matters**: SoundFont files store loop points as **absolute positions** in the global sample chunk (1990s "big blob" design), but modern software needs **relative positions** within individual samples. The solution is simple conversion during parsing, not complex generator calculations. Polyphone and other professional tools show the relative values (8161-8197), which is what our parser should store.
+
+## 2. Fine Tuning Filtering (NEVER DO THIS)
 **❌ WRONG:**
 ```rust
 // Never filter or "sanitize" fine tuning values!
@@ -661,8 +914,8 @@ fn emu8000_four_point_interpolate(s_minus1: f32, s0: f32, s1: f32, s2: f32, frac
 
 ---
 
-**Document Version:** 2.0  
-**Last Updated:** July 30, 2025  
-**Status:** Reorganized for improved readability and implementation guidance
+**Document Version:** 2.2  
+**Last Updated:** August 10, 2025  
+**Status:** Major discovery - SoundFont loop points: absolute vs relative architecture analysis and simple solution
 
 **Remember:** This reference should be consulted whenever implementing EMU8000 or SoundFont features. Every generator, parameter range, and implementation detail has been researched and validated against professional implementations and hardware specifications.

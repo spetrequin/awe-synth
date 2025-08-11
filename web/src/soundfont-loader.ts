@@ -178,47 +178,56 @@ export class SoundFontLoader {
             const arrayBuffer = await file.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
             
-            // Check if we have a WASM function to load SoundFont
-            if (this.wasmModule.load_soundfont) {
-                // Future: Call WASM to load SoundFont
-                const success = this.wasmModule.load_soundfont(uint8Array);
-                
-                if (success) {
-                    const loadTime = performance.now() - startTime;
-                    this.handleLoadSuccess(file.name, file.size, loadTime);
-                } else {
-                    throw new Error('WASM failed to load SoundFont');
-                }
-            } else {
-                // For now, simulate successful load since WASM function doesn't exist yet
-                this.logger.log('⚠️ WASM load_soundfont not available - simulating load');
-                
-                // Parse basic SF2 header info
-                const header = this.parseSF2Header(uint8Array);
+            // Call WASM to parse and load the SoundFont
+            if (this.wasmModule.parse_soundfont_file) {
+                const resultJson = this.wasmModule.parse_soundfont_file(uint8Array);
+                const result = JSON.parse(resultJson);
                 
                 const loadTime = performance.now() - startTime;
-                this.currentSoundFont = {
-                    name: file.name,
-                    size: file.size,
-                    presets: header.presets || 0,
-                    samples: header.samples || 0,
-                    loadTime: loadTime
-                };
                 
-                this.updateInfo(
-                    `Loaded: ${file.name} (${this.formatFileSize(file.size)})<br>` +
-                    `Presets: ${header.presets || 'Unknown'}, Samples: ${header.samples || 'Unknown'}<br>` +
-                    `Load time: ${loadTime.toFixed(1)}ms<br>` +
-                    `<span style="color: #ff9900;">⚠️ WASM integration pending</span>`,
-                    'success'
-                );
-                
-                this.logger.log(`✅ SoundFont loaded (simulation): ${file.name}`);
-                
-                // Show clear button
-                if (this.clearButton) {
-                    this.clearButton.style.display = 'inline-block';
+                if (result.success) {
+                    // Get additional info from WASM
+                    const soundfontDataJson = this.wasmModule.diagnose_soundfont_data();
+                    const soundfontData = JSON.parse(soundfontDataJson);
+                    
+                    if (soundfontData.success) {
+                        this.currentSoundFont = {
+                            name: soundfontData.soundfont.name,
+                            size: file.size,
+                            presets: soundfontData.soundfont.presetCount,
+                            samples: soundfontData.soundfont.sampleCount,
+                            loadTime: loadTime
+                        };
+                        
+                        this.updateInfo(
+                            `✅ Loaded: ${soundfontData.soundfont.name}<br>` +
+                            `Size: ${this.formatFileSize(file.size)}<br>` +
+                            `Presets: ${soundfontData.soundfont.presetCount}, ` +
+                            `Samples: ${soundfontData.soundfont.sampleCount}<br>` +
+                            `Load time: ${loadTime.toFixed(1)}ms`,
+                            'success'
+                        );
+                    } else {
+                        // Fallback if soundfont data not available
+                        this.updateInfo(
+                            `✅ Loaded: ${file.name}<br>` +
+                            `Size: ${this.formatFileSize(file.size)}<br>` +
+                            `Load time: ${loadTime.toFixed(1)}ms`,
+                            'success'
+                        );
+                    }
+                    
+                    this.logger.log(`✅ SoundFont loaded by WASM: ${file.name} in ${loadTime.toFixed(1)}ms`);
+                    
+                    // Show clear button
+                    if (this.clearButton) {
+                        this.clearButton.style.display = 'inline-block';
+                    }
+                } else {
+                    throw new Error(result.error || 'WASM failed to load SoundFont');
                 }
+            } else {
+                throw new Error('WASM load_soundfont_into_player function not available');
             }
             
         } catch (error) {
@@ -227,61 +236,6 @@ export class SoundFontLoader {
         }
     }
     
-    /**
-     * Parse basic SF2 header information
-     */
-    private parseSF2Header(data: Uint8Array): { presets?: number, samples?: number } {
-        try {
-            // Check for RIFF header
-            const riff = String.fromCharCode(...data.slice(0, 4));
-            if (riff !== 'RIFF') {
-                throw new Error('Not a valid RIFF file');
-            }
-            
-            // Check for sfbk signature
-            const sfbk = String.fromCharCode(...data.slice(8, 12));
-            if (sfbk !== 'sfbk') {
-                throw new Error('Not a valid SoundFont file');
-            }
-            
-            // Very basic parsing - just report that it's valid
-            // Real parsing would extract preset and sample counts
-            return {
-                presets: 128,  // Placeholder
-                samples: 256   // Placeholder
-            };
-            
-        } catch (error) {
-            this.logger.log(`❌ SF2 header parse error: ${error}`);
-            return {};
-        }
-    }
-    
-    /**
-     * Handle successful SoundFont load
-     */
-    private handleLoadSuccess(name: string, size: number, loadTime: number): void {
-        this.currentSoundFont = {
-            name: name,
-            size: size,
-            presets: 0, // To be filled by WASM
-            samples: 0, // To be filled by WASM
-            loadTime: loadTime
-        };
-        
-        this.updateInfo(
-            `Loaded: ${name} (${this.formatFileSize(size)})<br>` +
-            `Load time: ${loadTime.toFixed(1)}ms`,
-            'success'
-        );
-        
-        this.logger.log(`✅ SoundFont loaded: ${name} in ${loadTime.toFixed(1)}ms`);
-        
-        // Show clear button
-        if (this.clearButton) {
-            this.clearButton.style.display = 'inline-block';
-        }
-    }
     
     /**
      * Update info display
@@ -314,7 +268,7 @@ export class SoundFontLoader {
      */
     public clearSoundFont(): void {
         this.currentSoundFont = null;
-        this.updateInfo('No SoundFont loaded - Using default sine wave synthesis', 'info');
+        this.updateInfo('No SoundFont loaded', 'info');
         this.logger.log('🧹 SoundFont cleared');
         
         // Hide clear button
@@ -327,7 +281,7 @@ export class SoundFontLoader {
             this.fileInput.value = '';
         }
         
-        // TODO: Call WASM to clear SoundFont when available
+        // Call WASM to clear SoundFont if function available
         if (this.wasmModule.clear_soundfont) {
             this.wasmModule.clear_soundfont();
         }

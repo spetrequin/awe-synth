@@ -1071,24 +1071,62 @@ pub fn test_soundfont_module() -> String {
     }
 }
 
-/// Parse complete SoundFont file (Task 9A.4)
+/// Parse complete SoundFont file and load into synthesis engine
 #[wasm_bindgen]
 pub fn parse_soundfont_file(data: &[u8]) -> String {
-    match soundfont::SoundFontParser::parse_soundfont(data) {
-        Ok(soundfont) => {
-            log(&format!("SoundFont parsing successful: '{}' v{}", 
-                       soundfont.header.name, soundfont.header.version));
-            format!(r#"{{"success": true, "name": "{}", "version": "{}", "engine": "{}", "presets": {}, "instruments": {}, "samples": {}}}"#,
-                   soundfont.header.name,
-                   soundfont.header.version,
-                   soundfont.header.engine,
-                   soundfont.presets.len(),
-                   soundfont.instruments.len(),
-                   soundfont.samples.len())
-        }
+    let soundfont = match soundfont::SoundFontParser::parse_soundfont(data) {
+        Ok(sf) => sf,
         Err(e) => {
             log(&format!("SoundFont parsing failed: {}", e));
-            format!(r#"{{"success": false, "error": "{}"}}"#, e)
+            return format!(r#"{{"success": false, "error": "Parsing failed: {}"}}"#, e);
+        }
+    };
+    
+    // Log basic parsing info
+    log(&format!("SoundFont parsed successfully: '{}' with {} presets, {} instruments, {} samples",
+               soundfont.header.name, soundfont.presets.len(), 
+               soundfont.instruments.len(), soundfont.samples.len()));
+    
+    // Analyze and log loop validation summary
+    let mut valid_loops = 0;
+    let mut no_loops = 0;
+    let mut invalid_loops = 0;
+    
+    for sample in &soundfont.samples {
+        if sample.loop_end > 0 && sample.loop_start < sample.loop_end {
+            valid_loops += 1;
+        } else if sample.loop_start == 0 && sample.loop_end == 0 {
+            no_loops += 1;
+        } else {
+            invalid_loops += 1;
+        }
+    }
+    
+    // Log loop validation summary
+    log(&format!("📊 LOOP VALIDATION: {} samples total - ✅ {} with loops, ⭕ {} without loops (normal), ❌ {} invalid",
+                soundfont.samples.len(), valid_loops, no_loops, invalid_loops));
+    
+    if invalid_loops > 0 {
+        log(&format!("⚠️ WARNING: {} samples had invalid loop data", invalid_loops));
+    }
+    
+    // Load SoundFont into synthesis engine
+    unsafe {
+        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
+            match bridge.load_soundfont_internal(soundfont) {
+                Ok(()) => {
+                    log("✅ SoundFont loaded successfully into synthesis engine");
+                    r#"{"success": true, "message": "SoundFont loaded into synthesis engine"}"#.to_string()
+                }
+                Err(e) => {
+                    log(&format!("Failed to load SoundFont into synthesis engine: {}", e));
+                    format!(r#"{{"success": false, "error": "{}"}}"#, e)
+                }
+            }
+        } else {
+            let error = "AudioWorklet bridge not initialized";
+            log(error);
+            format!(r#"{{"success": false, "error": "{}"}}"#, error)
         }
     }
 }
@@ -1230,42 +1268,6 @@ pub fn test_soundfont_parsing() -> String {
     parse_soundfont_file(&test_sf2)
 }
 
-/// Load SoundFont into MidiPlayer for synthesis
-#[wasm_bindgen]
-pub fn load_soundfont_into_player(data: &[u8]) -> String {
-    // Parse SoundFont file
-    let soundfont = match soundfont::SoundFontParser::parse_soundfont(data) {
-        Ok(sf) => sf,
-        Err(e) => {
-            log(&format!("SoundFont parsing failed: {}", e));
-            return format!(r#"{{"success": false, "error": "Parsing failed: {}"}}"#, e);
-        }
-    };
-    
-    log(&format!("SoundFont parsed successfully: '{}' with {} presets, {} instruments, {} samples",
-               soundfont.header.name, soundfont.presets.len(), 
-               soundfont.instruments.len(), soundfont.samples.len()));
-    
-    // Get the global AudioWorklet bridge and load SoundFont
-    unsafe {
-        if let Some(ref mut bridge) = GLOBAL_WORKLET_BRIDGE {
-            match bridge.load_soundfont_internal(soundfont) {
-                Ok(()) => {
-                    log("SoundFont loaded successfully into synthesis engine");
-                    r#"{"success": true, "message": "SoundFont loaded into synthesis engine"}"#.to_string()
-                }
-                Err(e) => {
-                    log(&format!("Failed to load SoundFont into synthesis engine: {}", e));
-                    format!(r#"{{"success": false, "error": "{}"}}"#, e)
-                }
-            }
-        } else {
-            let error = "AudioWorklet bridge not initialized - call init_audio_worklet() first";
-            log(error);
-            format!(r#"{{"success": false, "error": "{}"}}"#, error)
-        }
-    }
-}
 
 /// Select preset by bank and program number
 #[wasm_bindgen]
@@ -1647,6 +1649,122 @@ pub fn diagnose_soundfont_data() -> String {
     }
 }
 
+/// Get ALL samples from loaded SoundFont - returns structured JSON array
+#[wasm_bindgen]
+pub fn get_all_soundfont_samples() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if bridge.is_soundfont_loaded_internal() {
+                if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                    if soundfont.samples.is_empty() {
+                        return r#"{"success": false, "error": "No samples found in SoundFont", "samples": []}"#.to_string();
+                    }
+                    
+                    let mut samples_json = Vec::new();
+                    
+                    for (index, sample) in soundfont.samples.iter().enumerate() {
+                        // Limit preview to avoid huge JSON responses
+                        let sample_preview: Vec<i16> = sample.sample_data.iter().take(10).copied().collect();
+                        let non_zero_count = sample.sample_data.iter().take(100).filter(|&&s| s != 0).count();
+                        let max_amplitude = sample.sample_data.iter().take(1000).map(|&s| s.abs()).max().unwrap_or(0);
+                        
+                        // Validate loop points against actual sample length
+                        // Note: loop_start == 0 && loop_end == 0 means no loop
+                        // loop_start == 0 && loop_end > 0 means loop from beginning
+                        let sample_length = sample.sample_data.len() as u32;
+                        let (validated_loop_start, validated_loop_end, has_valid_loop) = 
+                            if sample.loop_end > 0 && sample.loop_start < sample_length && 
+                               sample.loop_end <= sample_length && sample.loop_start < sample.loop_end {
+                                (sample.loop_start, sample.loop_end, true)
+                            } else {
+                                // No loop or invalid loop points
+                                (0, 0, false)
+                            };
+                        
+                        // Debug log the first few samples to see what we're getting
+                        if index < 5 {
+                            log(&format!("Sample {}: '{}' - length: {}, raw loop: {}-{}, valid: {}, final: {}-{}", 
+                                       index, sample.name, sample_length, sample.loop_start, sample.loop_end, 
+                                       has_valid_loop, validated_loop_start, validated_loop_end));
+                        }
+
+                        let sample_json = format!(r#"{{
+                            "index": {},
+                            "name": "{}",
+                            "length": {},
+                            "sampleRate": {},
+                            "originalPitch": {},
+                            "loopStart": {},
+                            "loopEnd": {},
+                            "hasValidLoop": {},
+                            "rawLoopStart": {},
+                            "rawLoopEnd": {},
+                            "preview": {:?},
+                            "nonZeroIn100": {},
+                            "maxAmplitude": {},
+                            "hasData": {}
+                        }}"#, 
+                        index,
+                        sample.name, 
+                        sample_length, 
+                        sample.sample_rate, 
+                        sample.original_pitch,
+                        validated_loop_start,
+                        validated_loop_end,
+                        has_valid_loop,
+                        sample.loop_start,  // Include raw values for debugging
+                        sample.loop_end,
+                        sample_preview, 
+                        non_zero_count, 
+                        max_amplitude, 
+                        non_zero_count > 0);
+                        
+                        samples_json.push(sample_json);
+                    }
+                    
+                    format!(r#"{{
+                        "success": true,
+                        "sampleCount": {},
+                        "samplesShown": {},
+                        "samples": [{}]
+                    }}"#, 
+                    soundfont.samples.len(),
+                    samples_json.len(),
+                    samples_json.join(",\n"))
+                } else {
+                    r#"{"success": false, "error": "SoundFont reference not available", "samples": []}"#.to_string()
+                }
+            } else {
+                r#"{"success": false, "error": "No SoundFont loaded", "samples": []}"#.to_string()
+            }
+        } else {
+            r#"{"success": false, "error": "Bridge not available", "samples": []}"#.to_string()
+        }
+    }
+}
+
+/// Get raw sample data for a specific sample by index - returns Float32Array
+#[wasm_bindgen]
+pub fn get_sample_data_by_index(sample_index: usize) -> Option<Vec<f32>> {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                if sample_index < soundfont.samples.len() {
+                    let sample = &soundfont.samples[sample_index];
+                    
+                    // Convert i16 sample data to f32 normalized to -1.0 to 1.0
+                    let float_data: Vec<f32> = sample.sample_data.iter()
+                        .map(|&s| s as f32 / 32768.0)  // Normalize 16-bit to float
+                        .collect();
+                    
+                    return Some(float_data);
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Test audio synthesis chain - returns structured JSON
 #[wasm_bindgen]
 pub fn run_audio_test() -> String {
@@ -1859,6 +1977,127 @@ pub fn get_raw_sample_buffer(sample_length: usize) -> Vec<f32> {
     // Return silence if anything fails
     log("🎵 Returning silence - raw sample access failed");
     vec![0.0; sample_length]
+}
+
+/// NEW: Diagnose SoundFont loop point calculation with detailed analysis
+#[wasm_bindgen]
+pub fn diagnose_loop_calculation() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                // Check first few samples for loop point data
+                let mut loop_analysis = Vec::new();
+                for (idx, sample) in soundfont.samples.iter().take(10).enumerate() {
+                    let sample_length = sample.sample_data.len() as u32;
+                    let has_loop_data = sample.loop_start > 0 && sample.loop_end > sample.loop_start;
+                    let within_bounds = sample.loop_start < sample_length && sample.loop_end <= sample_length;
+                    
+                    loop_analysis.push(format!(
+                        "#{}: '{}' len={} loop=({},{}) hasLoop={} withinBounds={}",
+                        idx, sample.name, sample_length, 
+                        sample.loop_start, sample.loop_end, has_loop_data, within_bounds
+                    ));
+                    
+                    // Log each sample for debugging
+                    log(&format!("LOOP DEBUG {}: '{}' len={} start={} end={} valid={}",
+                               idx, sample.name, sample_length, sample.loop_start, sample.loop_end,
+                               has_loop_data && within_bounds));
+                }
+                
+                // Now do deeper analysis - check for loop generators
+                let mut has_loop_generators = false;
+                if let Some(preset) = soundfont.presets.first() {
+                    for zone in &preset.preset_zones {
+                        for gen in &zone.generators {
+                            match gen.generator_type {
+                                crate::soundfont::types::GeneratorType::StartloopAddrsOffset |
+                                crate::soundfont::types::GeneratorType::EndloopAddrsOffset |
+                                crate::soundfont::types::GeneratorType::StartloopAddrsCoarseOffset |
+                                crate::soundfont::types::GeneratorType::EndloopAddrsCoarseOffset => {
+                                    has_loop_generators = true;
+                                    log(&format!("Found loop generator: {:?}", gen.generator_type));
+                                    break;
+                                },
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                
+                // Additional analysis - check raw SF2 loop values before our conversion
+                let mut raw_loop_info = Vec::new();
+                for (idx, sample) in soundfont.samples.iter().take(5).enumerate() {
+                    raw_loop_info.push(format!(
+                        "Sample {}: start_offset={}, end_offset={}, loop_start={}, loop_end={}",
+                        idx, sample.start_offset, sample.end_offset, sample.loop_start, sample.loop_end
+                    ));
+                }
+                
+                return format!(r#"{{
+                    "status": "loop_point_analysis",
+                    "soundfont_name": "{}",
+                    "total_samples": {},
+                    "first_10_samples": {:?},
+                    "has_loop_generators": {},
+                    "raw_offsets": {:?},
+                    "analysis": "Loop points should be relative to individual samples, not global memory"
+                }}"#, soundfont.header.name, soundfont.samples.len(), loop_analysis, has_loop_generators, raw_loop_info);
+            }
+        }
+    }
+    
+    r#"{"error": "No SoundFont loaded or bridge unavailable"}"#.to_string()
+}
+
+/// Get loop validation summary for loaded SoundFont
+#[wasm_bindgen]
+pub fn get_loop_validation_summary() -> String {
+    unsafe {
+        if let Some(ref bridge) = GLOBAL_WORKLET_BRIDGE {
+            if let Some(soundfont) = bridge.get_loaded_soundfont() {
+                let mut valid_loops = 0;
+                let mut invalid_loops = 0;
+                let mut no_loops = 0;
+                let mut loop_errors = Vec::new();
+                
+                for (idx, sample) in soundfont.samples.iter().enumerate() {
+                    // Check if sample has valid loop points (both > 0)
+                    if sample.loop_end > 0 && sample.loop_start < sample.loop_end {
+                        valid_loops += 1;
+                    } else {
+                        // Check original offsets to see if loop was attempted but failed
+                        // Since we don't store original loop points, we check if it's just no loop
+                        if sample.loop_start == 0 && sample.loop_end == 0 {
+                            no_loops += 1;
+                        } else {
+                            invalid_loops += 1;
+                            loop_errors.push(format!(
+                                "Sample {}: '{}' - Invalid loop points: {}-{}",
+                                idx, sample.name, sample.loop_start, sample.loop_end
+                            ));
+                        }
+                    }
+                }
+                
+                return format!(r#"{{
+                    "success": true,
+                    "summary": {{
+                        "totalSamples": {},
+                        "validLoops": {},
+                        "noLoops": {},
+                        "invalidLoops": {},
+                        "message": "📊 {} samples: ✅ {} with loops, ⭕ {} without loops (normal), ❌ {} failed"
+                    }},
+                    "errors": {:?}
+                }}"#, 
+                soundfont.samples.len(), valid_loops, no_loops, invalid_loops,
+                soundfont.samples.len(), valid_loops, no_loops, invalid_loops,
+                loop_errors);
+            }
+        }
+    }
+    
+    r#"{"success": false, "error": "No SoundFont loaded"}"#.to_string()
 }
 
 /// NEW: Diagnose SoundFont generators to see what SF2 data is available

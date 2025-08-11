@@ -10,7 +10,7 @@ interface UnifiedDebugDisplayProps {
 
 const UnifiedDebugDisplay: React.FC<UnifiedDebugDisplayProps> = ({
   className = '',
-  maxHeight = '400px',
+  maxHeight = '500px',
   showCategories = true,
   showTimestamps = true
 }) => {
@@ -31,306 +31,174 @@ const UnifiedDebugDisplay: React.FC<UnifiedDebugDisplayProps> = ({
     : entries.filter(entry => entry.category === selectedCategory)
 
   // Get available categories
-  const categories = ['all', ...new Set(entries.map(entry => entry.category))]
+  const categories = ['all', ...Array.from(new Set(entries.map(entry => entry.category)))]
 
-  // Format timestamp
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit',
-      fractionalSecondDigits: 3
-    })
-  }
-
-  // Get category emoji
-  const getCategoryEmoji = (category: string) => {
-    switch (category) {
-      case 'user': return '👤'
-      case 'system': return '⚙️'
-      case 'audio': return '🔊'
-      case 'midi': return '🎹'
-      case 'soundfont': return '🎼'
-      case 'error': return '❌'
-      default: return '📝'
-    }
-  }
-
-  // Copy log to clipboard
-  const copyLog = async () => {
+  // Copy logs to clipboard with detailed data
+  const copyToClipboard = async () => {
     try {
-      const summary = debugManager.getSummary()
-      const exportData = {
-        summary,
-        entries: filteredEntries,
-        timestamp: new Date().toISOString(),
-        filter: selectedCategory
-      }
+      const logText = filteredEntries
+        .map(entry => {
+          let text = `[${entry.timestamp}] ${entry.category.toUpperCase()}: ${entry.event}`
+          
+          // Include data details for all entries
+          if (entry.data) {
+            text += '\n  📊 Details: ' + JSON.stringify(entry.data, null, 2).replace(/\n/g, '\n  ')
+          }
+          
+          // Include WASM diagnostics for all entries
+          if (entry.wasmDiagnostics) {
+            text += '\n  🔧 WASM Diagnostics: ' + JSON.stringify(entry.wasmDiagnostics, null, 2).replace(/\n/g, '\n  ')
+          }
+          
+          return text
+        })
+        .join('\n\n')
       
-      const logText = JSON.stringify(exportData, null, 2)
       await navigator.clipboard.writeText(logText)
-      
       setCopyStatus('✅ Copied!')
       setTimeout(() => setCopyStatus(''), 2000)
-      
-      debugManager.logUserAction('Debug log copied to clipboard', { 
-        entryCount: filteredEntries.length,
-        category: selectedCategory 
-      })
     } catch (error) {
       setCopyStatus('❌ Copy failed')
       setTimeout(() => setCopyStatus(''), 2000)
-      debugManager.logError('Failed to copy debug log', { error })
     }
   }
 
-  // Clear log
-  const clearLog = () => {
+  // Clear all logs
+  const clearLogs = () => {
     debugManager.clear()
-    debugManager.logUserAction('Debug log cleared')
-    setCopyStatus('🗑️ Cleared!')
-    setTimeout(() => setCopyStatus(''), 2000)
   }
 
-  // Format entry data for display
-  const formatEntryData = (entry: DebugEntry) => {
-    const parts = []
-    
-    if (entry.data) {
-      parts.push(`Data: ${JSON.stringify(entry.data)}`)
+  // Get entry styling based on category
+  const getEntryStyles = (category: string) => {
+    switch (category) {
+      case 'user': return 'border-l-4 border-blue-500 bg-blue-50 text-blue-900'
+      case 'system': return 'border-l-4 border-green-500 bg-green-50 text-green-900'
+      case 'audio': return 'border-l-4 border-purple-500 bg-purple-50 text-purple-900'
+      case 'midi': return 'border-l-4 border-indigo-500 bg-indigo-50 text-indigo-900'
+      case 'error': return 'border-l-4 border-red-500 bg-red-50 text-red-900'
+      default: return 'border-l-4 border-gray-500 bg-gray-50 text-gray-900'
     }
-    
-    if (entry.wasmDiagnostics) {
-      parts.push('WASM Diagnostics:')
-      Object.entries(entry.wasmDiagnostics).forEach(([key, value]) => {
-        if (value && typeof value === 'object') {
-          parts.push(`  ${key}: ${JSON.stringify(value, null, 2)}`)
-        } else if (value) {
-          parts.push(`  ${key}: ${value}`)
-        }
-      })
+  }
+
+  // Get category badge styling
+  const getCategoryBadgeStyles = (category: string) => {
+    switch (category) {
+      case 'user': return 'bg-blue-100 text-blue-800'
+      case 'system': return 'bg-green-100 text-green-800'
+      case 'audio': return 'bg-purple-100 text-purple-800'
+      case 'midi': return 'bg-indigo-100 text-indigo-800'
+      case 'error': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
     }
-    
-    return parts.length > 0 ? parts.join('\n') : null
   }
 
   return (
-    <div className={`unified-debug-display ${className}`}>
-      {/* Header with controls */}
-      <div className="debug-header" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '8px 12px',
-        backgroundColor: '#f5f5f5',
-        borderBottom: '1px solid #ddd',
-        fontSize: '14px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <strong>Debug Log ({filteredEntries.length} entries)</strong>
-          
-          {showCategories && (
-            <select 
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{
-                padding: '2px 6px',
-                border: '1px solid #ccc',
-                borderRadius: '3px',
-                fontSize: '12px'
-              }}
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>
-                  {cat === 'all' ? 'All Categories' : `${getCategoryEmoji(cat)} ${cat}`}
-                </option>
-              ))}
-            </select>
-          )}
-          
-          {/* Quick Error Filter Button */}
-          {entries.some(entry => entry.category === 'error') && (
-            <button
-              onClick={() => setSelectedCategory(selectedCategory === 'error' ? 'all' : 'error')}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                border: selectedCategory === 'error' ? '2px solid #d32f2f' : '1px solid #d32f2f',
-                backgroundColor: selectedCategory === 'error' ? '#d32f2f' : 'transparent',
-                color: selectedCategory === 'error' ? 'white' : '#d32f2f',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-              title={selectedCategory === 'error' ? 'Show all entries' : 'Show only errors'}
-            >
-              🚨 Errors Only
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {copyStatus && (
-            <span style={{ fontSize: '12px', color: copyStatus.includes('❌') ? '#d32f2f' : '#2e7d32' }}>
-              {copyStatus}
+    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
+      {/* Header */}
+      <div className="border-b border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-gray-900">🐛 Debug Log</h3>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">
+              {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
             </span>
-          )}
-          
-          <button
-            onClick={copyLog}
-            disabled={filteredEntries.length === 0}
-            style={{
-              padding: '4px 8px',
-              fontSize: '12px',
-              border: '1px solid #007bff',
-              backgroundColor: '#007bff',
-              color: 'white',
-              borderRadius: '3px',
-              cursor: filteredEntries.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: filteredEntries.length === 0 ? 0.5 : 1
-            }}
-          >
-            📋 Copy
-          </button>
-          
-          <button
-            onClick={clearLog}
-            disabled={entries.length === 0}
-            style={{
-              padding: '4px 8px',
-              fontSize: '12px',
-              border: '1px solid #dc3545',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              borderRadius: '3px',
-              cursor: entries.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: entries.length === 0 ? 0.5 : 1
-            }}
-          >
-            🗑️ Clear
-          </button>
-        </div>
-      </div>
-
-      {/* Debug entries */}
-      <div 
-        style={{
-          maxHeight,
-          overflowY: 'auto',
-          padding: '8px',
-          backgroundColor: '#fafafa',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          lineHeight: '1.4'
-        }}
-      >
-        {filteredEntries.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            color: '#666', 
-            fontStyle: 'italic',
-            padding: '20px'
-          }}>
-            No debug entries {selectedCategory !== 'all' ? `for category "${selectedCategory}"` : ''}
+            <button
+              onClick={copyToClipboard}
+              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+            >
+              {copyStatus || '📋 Copy'}
+            </button>
+            <button
+              onClick={clearLogs}
+              className="px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-colors"
+            >
+              🗑️ Clear
+            </button>
           </div>
-        ) : (
-          <div>
-            {filteredEntries.map((entry, index) => {
-              const extraData = formatEntryData(entry)
-              
-              return (
-                <div 
-                  key={index}
-                  style={{
-                    marginBottom: '8px',
-                    padding: '6px',
-                    backgroundColor: entry.category === 'error' ? '#ffebee' : '#ffffff',
-                    border: `1px solid ${entry.category === 'error' ? '#ffcdd2' : '#e0e0e0'}`,
-                    borderRadius: '3px'
-                  }}
-                >
-                  {/* Entry header */}
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: extraData ? '6px' : '0'
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ 
-                        fontWeight: 'bold',
-                        color: entry.category === 'error' ? '#d32f2f' : '#333'
-                      }}>
-                        {showCategories && `${getCategoryEmoji(entry.category)} `}
-                        {entry.event}
-                      </span>
-                      {entry.wasmDiagnostics && (
-                        <span style={{ 
-                          marginLeft: '8px',
-                          padding: '2px 4px',
-                          backgroundColor: '#e3f2fd',
-                          color: '#1976d2',
-                          borderRadius: '2px',
-                          fontSize: '10px'
-                        }}>
-                          WASM
-                        </span>
-                      )}
-                    </div>
-                    
-                    {showTimestamps && (
-                      <span style={{ 
-                        fontSize: '10px', 
-                        color: '#666',
-                        marginLeft: '8px',
-                        flexShrink: 0
-                      }}>
-                        {formatTimestamp(entry.timestamp)}
-                      </span>
-                    )}
-                  </div>
+        </div>
 
-                  {/* Entry details */}
-                  {extraData && (
-                    <div style={{ 
-                      fontSize: '11px',
-                      color: '#555',
-                      backgroundColor: '#f8f8f8',
-                      padding: '4px',
-                      borderRadius: '2px',
-                      whiteSpace: 'pre-wrap',
-                      maxHeight: '200px',
-                      overflowY: 'auto'
-                    }}>
-                      {extraData}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+        {/* Category Filter */}
+        {showCategories && (
+          <div className="flex flex-wrap gap-2">
+            {categories.map(category => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  selectedCategory === category
+                    ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {category === 'all' ? '🔍 All' : category}
+                <span className="ml-1 text-xs opacity-75">
+                  ({category === 'all' ? entries.length : entries.filter(e => e.category === category).length})
+                </span>
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Summary footer */}
-      {entries.length > 0 && (
-        <div style={{
-          padding: '6px 12px',
-          backgroundColor: '#f0f0f0',
-          borderTop: '1px solid #ddd',
-          fontSize: '11px',
-          color: '#666'
-        }}>
-          Summary: {Object.entries(
-            entries.reduce((acc, entry) => {
-              acc[entry.category] = (acc[entry.category] || 0) + 1
-              return acc
-            }, {} as Record<string, number>)
-          ).map(([cat, count]) => `${getCategoryEmoji(cat)}${cat}:${count}`).join(' • ')}
-        </div>
-      )}
+      {/* Log Entries */}
+      <div 
+        className="overflow-auto p-2 space-y-1" 
+        style={{ maxHeight }}
+      >
+        {filteredEntries.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <div className="text-2xl mb-2">📝</div>
+            <p>No debug entries</p>
+            <p className="text-sm">Debug messages will appear here</p>
+          </div>
+        ) : (
+          filteredEntries.map((entry, index) => (
+            <div 
+              key={index}
+              className={`p-3 rounded-lg text-sm font-mono ${getEntryStyles(entry.category)}`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 text-xs font-bold rounded ${getCategoryBadgeStyles(entry.category)}`}>
+                    {entry.category.toUpperCase()}
+                  </span>
+                  {showTimestamps && (
+                    <span className="text-xs opacity-75">
+                      {entry.timestamp}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="whitespace-pre-wrap break-words">
+                {entry.event}
+              </div>
+              
+              {entry.data && (
+                <details className="mt-2" open={entry.category === 'error'}>
+                  <summary className="cursor-pointer text-xs opacity-75 hover:opacity-100">
+                    📊 View Details
+                  </summary>
+                  <pre className="mt-2 p-2 bg-black bg-opacity-10 rounded text-xs overflow-auto">
+                    {JSON.stringify(entry.data, null, 2)}
+                  </pre>
+                </details>
+              )}
+              
+              {entry.wasmDiagnostics && (
+                <details className="mt-2" open={entry.category === 'error'}>
+                  <summary className="cursor-pointer text-xs opacity-75 hover:opacity-100">
+                    🔧 WASM Diagnostics
+                  </summary>
+                  <pre className="mt-2 p-2 bg-black bg-opacity-10 rounded text-xs overflow-auto">
+                    {JSON.stringify(entry.wasmDiagnostics, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }

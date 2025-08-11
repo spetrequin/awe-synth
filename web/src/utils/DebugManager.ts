@@ -14,6 +14,7 @@ interface DebugEntry {
     midiProcessing?: any
     systemDiagnostics?: any
     audioTest?: any
+    bridgeLifecycle?: any
   }
 }
 
@@ -23,6 +24,7 @@ interface WasmModule {
   diagnose_midi_processing: () => string
   get_system_diagnostics: () => string
   run_audio_test: () => string
+  diagnose_bridge_lifecycle: () => string
 }
 
 class DebugManager {
@@ -31,8 +33,44 @@ class DebugManager {
   private wasmModule: WasmModule | null = null
   private listeners: ((entries: DebugEntry[]) => void)[] = []
 
-  setWasmModule(module: WasmModule | null) {
-    this.wasmModule = module
+  setWasmModule(module: any | null) {
+    if (module) {
+      // Verify which diagnostic functions are actually available
+      const expectedFunctions = [
+        'diagnose_audio_pipeline',
+        'diagnose_soundfont_data', 
+        'diagnose_midi_processing',
+        'get_system_diagnostics',
+        'run_audio_test',
+        'diagnose_bridge_lifecycle'
+      ]
+      
+      const availableFunctions = expectedFunctions.filter(fnName => 
+        typeof module[fnName] === 'function'
+      )
+      
+      const missingFunctions = expectedFunctions.filter(fnName => 
+        typeof module[fnName] !== 'function'
+      )
+      
+      this.addEntry('system', 'WASM Module Connection Status', {
+        availableFunctions,
+        missingFunctions,
+        totalExpected: expectedFunctions.length,
+        totalAvailable: availableFunctions.length
+      })
+      
+      if (availableFunctions.length === expectedFunctions.length) {
+        this.wasmModule = module as WasmModule
+        this.addEntry('system', '✅ All WASM diagnostic functions available')
+      } else {
+        this.wasmModule = null
+        this.addEntry('error', `❌ Missing WASM functions: ${missingFunctions.join(', ')}`)
+      }
+    } else {
+      this.wasmModule = null
+      this.addEntry('system', 'WASM Module disconnected')
+    }
   }
 
   // Update an existing entry by event name, or create new if not found
@@ -57,7 +95,8 @@ class DebugManager {
           soundfontData: JSON.parse(this.wasmModule.diagnose_soundfont_data()),
           midiProcessing: JSON.parse(this.wasmModule.diagnose_midi_processing()),
           systemDiagnostics: JSON.parse(this.wasmModule.get_system_diagnostics()),
-          audioTest: JSON.parse(this.wasmModule.run_audio_test())
+          audioTest: JSON.parse(this.wasmModule.run_audio_test()),
+          bridgeLifecycle: JSON.parse(this.wasmModule.diagnose_bridge_lifecycle())
         }
       } catch (error) {
         // Ignore WASM diagnostic errors
@@ -100,7 +139,8 @@ class DebugManager {
           soundfontData: this.parseJSON(this.wasmModule.diagnose_soundfont_data()),
           midiProcessing: this.parseJSON(this.wasmModule.diagnose_midi_processing()),
           systemDiagnostics: this.parseJSON(this.wasmModule.get_system_diagnostics()),
-          audioTest: this.parseJSON(this.wasmModule.run_audio_test())
+          audioTest: this.parseJSON(this.wasmModule.run_audio_test()),
+          bridgeLifecycle: this.parseJSON(this.wasmModule.diagnose_bridge_lifecycle())
         }
       } catch (error) {
         entry.wasmDiagnostics = { error: `WASM diagnostics failed: ${error}` }
